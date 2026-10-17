@@ -13,6 +13,12 @@ const info = await stat(installer),
 const root = await mkdtemp(resolve('.local/update-check-'));
 let corrupt = false;
 const server = createServer((req, res) => {
+  if (req.url === '/') {
+    res
+      .writeHead(200, { 'Content-Type': 'text/html' })
+      .end('<!doctype html><title>Update verification</title>');
+    return;
+  }
   if (req.url?.startsWith('/latest.yml')) {
     const text = corrupt
       ? yaml.replace(/sha512: .+/g, 'sha512: ' + Buffer.alloc(64).toString('base64'))
@@ -43,9 +49,14 @@ const app = await electron.launch({
   timeout: 30000,
 });
 try {
+  await app.firstWindow();
+  await app.evaluate('globalThis.__name = (value) => value; undefined');
   const run = async (name: string) =>
     app.evaluate(
       async ({ app }, input) => {
+        const require = process
+          .getBuiltinModule('module')
+          .createRequire(input.module + '/package.json');
         const path = require('node:path');
         const { NsisUpdater } = require(input.module);
         const { ElectronHttpExecutor } = require(
