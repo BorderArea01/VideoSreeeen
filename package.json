@@ -1,6 +1,6 @@
 {
   "name": "videosreeeen",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "private": true,
   "description": "多人观影：Windows、Android 和浏览器，共同缓存与 WebSocket 同步",
   "license": "GPL-3.0-only",
@@ -16,7 +16,7 @@
     "build": "tsc --noEmit && vite build && node scripts/build-server.mjs",
     "start": "node dist-server/index.mjs",
     "desktop": "electron desktop/main.cjs",
-    "package:windows": "electron-builder --win portable --x64",
+    "package:windows": "electron-builder --win nsis portable --x64 --publish never",
     "test": "tsx --test --test-concurrency=1 tests/*.test.ts",
     "test:ui": "tsx scripts/ui-check.ts",
     "test:onboarding": "tsx scripts/onboarding-check.ts",
@@ -32,9 +32,14 @@
     "test:worker": "tsx scripts/worker-check.ts",
     "pages:prepare": "node scripts/build-pages.mjs",
     "pages:deploy": "npm run pages:prepare && wrangler --cwd pages pages deploy ../.local/pages-dist --project-name videosreeeen --branch main --commit-dirty=true",
-    "test:public": "tsx scripts/public-check.ts"
+    "test:public": "tsx scripts/public-check.ts",
+    "test:broadcast": "tsx scripts/broadcast-check.ts",
+    "release:prepare": "node scripts/prepare-release.mjs",
+    "release:publish": "node scripts/publish-release.mjs",
+    "test:site-broadcast": "tsx scripts/site-broadcast-check.ts"
   },
   "dependencies": {
+    "electron-updater": "^6.8.9",
     "hls.js": "^1.6.13",
     "ipaddr.js": "^2.3.0",
     "ws": "^8.18.3",
@@ -74,7 +79,27 @@
       "output": "artifacts/windows"
     },
     "win": {
-      "target": "portable"
+      "target": [
+        "nsis",
+        "portable"
+      ]
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "allowElevation": false,
+      "deleteAppDataOnUninstall": false,
+      "artifactName": "VideoSreeeen-Setup.exe"
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "BorderArea01",
+        "repo": "VideoSreeeen"
+      }
+    ],
+    "concurrency": {
+      "jobs": 1
     }
   }
 }

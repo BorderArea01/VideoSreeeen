@@ -2,6 +2,7 @@ import { DurableObject } from 'cloudflare:workers';
 import { Rooms, RoomError, type StoredRoom } from '../server/rooms';
 import { clientMessageSchema, parseInvite, type Chat } from '../shared/protocol';
 import { directPlan } from '../shared/cache-plan';
+import { RoomImages, type ImageMeta } from '../server/images';
 
 interface Env {
   ROOMS: DurableObjectNamespace<WatchRoom>;
@@ -39,8 +40,8 @@ export default {
         status: 204,
         headers: {
           'Access-Control-Allow-Origin': origin ?? url.origin,
-          'Access-Control-Allow-Methods': 'GET,HEAD,OPTIONS',
-          'Access-Control-Allow-Headers': 'Content-Type,Range',
+          'Access-Control-Allow-Methods': 'GET,HEAD,POST,OPTIONS',
+          'Access-Control-Allow-Headers': 'Content-Type,Range,Authorization,X-Member-Id',
           Vary: 'Origin',
         },
       });
@@ -50,7 +51,7 @@ export default {
         ok: true,
         app: 'videosreeeen',
         runtime: 'cloudflare',
-        version: '0.3.1',
+        version: '0.4.0',
         mediaRelay: false,
         p2p: true,
       });
@@ -68,7 +69,7 @@ export default {
       if (!code || !/^[A-HJ-NP-Z2-9]{6}$/.test(code))
         return new Response('请更新客户端后重试', { status: 400 });
       return env.ROOMS.get(env.ROOMS.idFromName(code)).fetch(request);
-    } else if (url.pathname.startsWith('/cache-plan/')) {
+    } else if (url.pathname.startsWith('/cache-plan/') || url.pathname.startsWith('/images/')) {
       const code = url.pathname.split('/')[2];
       if (!code || !/^[A-HJ-NP-Z2-9]{6}$/.test(code))
         return new Response('Not found', { status: 404 });
@@ -92,6 +93,27 @@ export default {
 export class WatchRoom extends DurableObject<Env> {
   private rooms = new Rooms();
   private chatIds: string[] = [];
+  private images = new RoomImages(
+    this.rooms,
+    {
+      list: async () => [
+        ...(await this.ctx.storage.list<ImageMeta>({ prefix: 'imgmeta:' })).values(),
+      ],
+      meta: async (value) => this.ctx.storage.put('imgmeta:' + value.id, value),
+      put: async (id, index, value) => this.ctx.storage.put(`imgdata:${id}:${index}`, value),
+      get: async (id, index) => this.ctx.storage.get<Uint8Array>(`imgdata:${id}:${index}`),
+      delete: async (value) => {
+        const keys = Array.from(
+          { length: Math.ceil(value.size / 65536) },
+          (_, i) => `imgdata:${value.id}:${i}`,
+        );
+        for (let i = 0; i < keys.length; i += 100)
+          await this.ctx.storage.delete(keys.slice(i, i + 100));
+        await this.ctx.storage.delete('imgmeta:' + value.id);
+      },
+    },
+    () => this.save(),
+  );
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
     ctx.blockConcurrencyWhile(async () => {
@@ -113,6 +135,7 @@ export class WatchRoom extends DurableObject<Env> {
   }
   async fetch(request: Request) {
     const url = new URL(request.url);
+    if (url.pathname.startsWith('/images/')) return this.images.handle(request);
     if (url.pathname.startsWith('/cache-plan/')) {
       const [, , code, secret] = url.pathname.split('/');
       const room = this.rooms.mediaAccess(code!, secret!);
@@ -266,6 +289,7 @@ export class WatchRoom extends DurableObject<Env> {
       }
     }
     this.rooms.sweep();
+    await this.images.sweep();
     await this.save();
     if (this.room || this.ctx.getWebSockets().length)
       await this.ctx.storage.setAlarm(Date.now() + 30000);

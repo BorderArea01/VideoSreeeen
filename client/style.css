@@ -1600,3 +1600,55 @@ button {
     transition: none !important;
   }
 }
+.source-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  margin-top: 14px;
+}
+.source-actions .button {
+  font-size: 12px;
+  padding: 8px 12px;
+}
+.source-actions .subtle {
+  font-size: 11px;
+  flex: 1;
+  min-width: 120px;
+}
+.cache-options {
+  margin-top: 16px;
+}
+.cache-options > summary {
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 12px;
+  width: max-content;
+}
+.cache-options .mode-card {
+  margin-top: 10px;
+}
+.brand small,
+.frame-index,
+.scene-footer,
+.sidebar-foot {
+  display: none;
+}
+.welcome-text p {
+  max-width: 350px;
+}
+.image-viewer {
+  max-width: 95vw;
+  max-height: 95vh;
+  padding: 12px;
+}
+.image-viewer img {
+  display: block;
+  max-width: 88vw;
+  max-height: 82vh;
+  object-fit: contain;
+}
+.image-viewer .icon-button {
+  margin-left: auto;
+  display: block;
+}

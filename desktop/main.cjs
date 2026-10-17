@@ -14,6 +14,8 @@ const os = require('node:os');
 const { DiskCache } = require('./cache.cjs');
 const { BlockCache } = require('./blocks.cjs');
 let blocks;
+let captureUntil = 0;
+let update;
 protocol.registerSchemesAsPrivileged([
   {
     scheme: 'vs-cache',
@@ -216,10 +218,44 @@ app.whenReady().then(async () => {
   });
   win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   win.webContents.on('will-navigate', (e) => e.preventDefault());
+  update = require('./updates.cjs')(event);
+  win.webContents.session.setDisplayMediaRequestHandler((request, callback) => {
+    const allowed = request.frame === win.webContents.mainFrame && Date.now() < captureUntil;
+    captureUntil = 0;
+    if (!allowed || !site || site.webContents.isDestroyed()) return callback(null);
+    // Capture only the isolated original-site tab. Never grant the app window,
+    // microphone, filesystem, room credentials, or the user's desktop to it.
+    callback({
+      video: site.webContents.mainFrame,
+      audio: site.webContents.mainFrame,
+      enableLocalEcho: true,
+    });
+  });
   ipcMain.handle('native', async (e, method, data = {}) => {
     if (e.sender !== win.webContents || e.senderFrame !== win.webContents.mainFrame)
       throw new Error('不允许的调用');
     switch (method) {
+      case 'update':
+        return update(data.action);
+      case 'captureSite':
+        if (!site || site.webContents.isDestroyed()) throw new Error('请先打开原站视频');
+        await sampleSite();
+        {
+          const frame =
+            frames().find((frame) => frame.url === sample.frame) ?? site.webContents.mainFrame;
+          const focused = await frame.executeJavaScript(bridge + ';window.__VS.focus(true)', true);
+          if (!focused) throw new Error('未检测到可共享的播放器');
+        }
+        captureUntil = Date.now() + 10000;
+        return {};
+      case 'endCapture':
+        captureUntil = 0;
+        await Promise.all(
+          frames().map((frame) =>
+            frame.executeJavaScript('window.__VS?.focus?.(false)', true).catch(() => {}),
+          ),
+        );
+        return {};
       case 'serverInfo':
         return serverInfo;
       case 'openBrowser':

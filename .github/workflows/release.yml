@@ -1,4 +1,4 @@
-name: Build clients
+name: Build and publish clients
 on:
   workflow_dispatch:
   push:
@@ -18,12 +18,16 @@ jobs:
           node-version: '24'
           cache: npm
       - run: npm ci --no-audit --no-fund
+      - run: npm test
       - run: npm run build
       - run: npm run package:windows
       - uses: actions/upload-artifact@v4
         with:
           name: videosreeeen-windows
-          path: artifacts/windows/*.exe
+          path: |
+            artifacts/windows/*.exe
+            artifacts/windows/*.blockmap
+            artifacts/windows/latest.yml
   android:
     runs-on: ubuntu-latest
     env:
@@ -46,8 +50,45 @@ jobs:
       - run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
       - run: npm ci --ignore-scripts --no-audit --no-fund
       - run: npm run build
-      - run: gradle -p android :app:assembleDebug --no-daemon --max-workers=1 --console=plain
+      - name: Build with the stable release key
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          VS_ANDROID_STORE_PASSWORD: ${{ secrets.ANDROID_STORE_PASSWORD }}
+        run: |
+          test -n "$KEYSTORE_BASE64" && test -n "$VS_ANDROID_STORE_PASSWORD" || { echo 'Configure the stable Android release signing secrets first'; exit 1; }
+          export VS_ANDROID_KEYSTORE="$RUNNER_TEMP/videosreeeen-release.jks"
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$VS_ANDROID_KEYSTORE"
+          trap 'rm -f "$VS_ANDROID_KEYSTORE"' EXIT
+          gradle -p android :app:assembleRelease :app:lintRelease --no-daemon --max-workers=1 --console=plain
+          mkdir -p artifacts/android
+          cp android/app/build/outputs/apk/release/app-release.apk artifacts/android/VideoSreeeen-Android.apk
       - uses: actions/upload-artifact@v4
         with:
-          name: videosreeeen-android-debug
-          path: android/app/build/outputs/apk/debug/*.apk
+          name: videosreeeen-android
+          path: artifacts/android/*.apk
+  publish:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [windows, android]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: actions/download-artifact@v4
+        with:
+          name: videosreeeen-windows
+          path: artifacts/windows
+      - uses: actions/download-artifact@v4
+        with:
+          name: videosreeeen-android
+          path: artifacts/android
+      - run: node -e 'if (process.env.GITHUB_REF_NAME !== "v" + require("./package.json").version) process.exit(1)'
+      - run: npm run release:prepare
+      - run: npm run release:publish
+        env:
+          GH_TOKEN: ${{ github.token }}

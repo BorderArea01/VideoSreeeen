@@ -2,7 +2,7 @@
 
 本项目采用 GPL-3.0-only，完整许可证见 LICENSE。运行时第三方依赖各自保留原许可证；依赖精确版本见 package-lock.json。
 
-- Electron / Electron Builder：Windows 壳与打包；MIT，Chromium 另含其第三方声明，随 Electron 运行时分发。
+- Electron / Electron Builder / electron-updater：Windows 壳、打包与 NSIS 增量更新；MIT，Chromium 另含其第三方声明，随 Electron 运行时分发。
 - AndroidX WebKit：Android WebView 跨 frame 的文档开始脚本与只读播放器探测；Apache-2.0。
 - hls.js：HLS 播放；Apache-2.0。
 - ws、Zod、ipaddr.js：WebSocket、消息校验与 IP 地址校验；MIT。

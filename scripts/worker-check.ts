@@ -16,7 +16,14 @@ const runtime = new Miniflare(
           directory: 'dist',
           binding: 'ASSETS',
           routerConfig: { has_user_worker: true },
-          run_worker_first: ['/ws', '/healthz', '/config', '/cache-plan/*', '/media/*'],
+          run_worker_first: [
+            '/ws',
+            '/healthz',
+            '/config',
+            '/cache-plan/*',
+            '/media/*',
+            '/images/*',
+          ],
         },
       },
       {
@@ -30,7 +37,14 @@ const runtime = new Miniflare(
           directory: 'dist',
           binding: 'ASSETS',
           routerConfig: { has_user_worker: true },
-          run_worker_first: ['/ws', '/healthz', '/config', '/cache-plan/*', '/media/*'],
+          run_worker_first: [
+            '/ws',
+            '/healthz',
+            '/config',
+            '/cache-plan/*',
+            '/media/*',
+            '/images/*',
+          ],
         },
         bindings: { ICE_SERVERS: '[]' },
       },
@@ -98,6 +112,25 @@ try {
   const restored = await a.next('state');
   assert.equal(restored.room.chat.at(-1).text, 'before hibernation');
   assert.equal(restored.room.members.filter((m: any) => m.online).length, 2);
+  const image = Buffer.concat([
+    Buffer.from('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7', 'base64'),
+    Buffer.alloc(2 * 1024 * 1024),
+  ]);
+  const upload = await fetch(origin + '/images/ABC234', {
+    method: 'POST',
+    headers: { Authorization: 'Bearer ' + welcome.resume, 'X-Member-Id': welcome.memberId },
+    body: image,
+  });
+  assert.equal(upload.status, 201, await upload.clone().text());
+  const imageId = ((await upload.json()) as any).id;
+  await runtime.unsafeEvictDurableObject('videosreeeen-test', 'WatchRoom', {
+    name: 'ABC234',
+    webSockets: 'hibernate',
+  });
+  const original = await fetch(origin + '/images/ABC234/' + imageId);
+  assert.equal(original.status, 200, await original.clone().text());
+  assert.deepEqual(Buffer.from(await original.arrayBuffer()), image);
+  evidence.largeImage = { bytes: image.length, originalPreserved: true, hibernation: true };
   evidence.hibernation = { liveSocketsPreserved: true, chatPreserved: true };
   a.clear();
   a.send({ type: 'ping', sentAt: 123 });

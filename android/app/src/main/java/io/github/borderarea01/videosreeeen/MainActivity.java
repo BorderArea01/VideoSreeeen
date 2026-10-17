@@ -23,6 +23,7 @@ public class MainActivity extends Activity {
     private String bridge;
     private MediaCache cache;
     private BlockCache blocks;
+    private AppUpdates updates;
     private volatile JSONObject sample = new JSONObject();
     private final List<JavaScriptReplyProxy> frames = new ArrayList<>();
     private final List<String> observed = Collections.synchronizedList(new ArrayList<>());
@@ -176,7 +177,7 @@ public class MainActivity extends Activity {
         s.setDomStorageEnabled(true);
         s.setMediaPlaybackRequiresUserGesture(false);
         s.setAllowFileAccess(false);
-        s.setAllowContentAccess(false);
+        s.setAllowContentAccess(!remote);
         s.setMixedContentMode(
             remote ? WebSettings.MIXED_CONTENT_NEVER_ALLOW : WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
         );
@@ -335,6 +336,13 @@ public class MainActivity extends Activity {
             executor.execute(() -> {
                 try {
                     JSONObject payload = new JSONObject(raw);
+                    if (method.equals("update")) {
+                        if (updates == null) updates = new AppUpdates(MainActivity.this, data ->
+                            emit("update", data)
+                        );
+                        resolve(id, updates.call(payload.optString("action", "status")), null);
+                        return;
+                    }
                     if (method.equals("cacheStart")) {
                         resolve(id, cache.start(payload), null);
                         return;
@@ -505,6 +513,7 @@ public class MainActivity extends Activity {
 
     @Override
     protected void onDestroy() {
+        if (updates != null) updates.close();
         if (blocks != null) blocks.cancel("*");
         if (cache != null) cache.close();
         calls.shutdownNow();

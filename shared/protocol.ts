@@ -20,8 +20,11 @@ export type Source = z.infer<typeof sourceSchema>;
 export const mediaSchema = z.object({
   url: webUrl,
   title: z.string().trim().min(1).max(200),
-  provider: z.enum(['bilibili', 'xifan', 'mgn', 'direct', 'other']),
+  provider: z.enum(['bilibili', 'xifan', 'mgn', 'direct', 'other', 'local']),
   source: sourceSchema.optional(),
+  broadcast: z
+    .object({ host: z.string().uuid(), kind: z.enum(['site', 'file', 'screen']) })
+    .optional(),
   duration: z.number().finite().positive().max(604800).optional(),
 });
 export type MediaInput = z.infer<typeof mediaSchema>;
@@ -60,6 +63,7 @@ export interface Chat {
   at: number;
   text?: string;
   image?: string;
+  imageFile?: { id: string; type: string; size: number };
 }
 export interface Snapshot {
   code: string;
@@ -91,6 +95,7 @@ export const clientMessageSchema = z.discriminatedUnion('type', [
     protocol: z.literal(PROTOCOL),
   }),
   z.object({ type: z.literal('leave') }),
+  z.object({ type: z.literal('unshare'), base: z.number().int().nonnegative(), op: id }),
   z.object({
     type: z.literal('media'),
     base: z.number().int().nonnegative(),
@@ -145,6 +150,7 @@ export const clientMessageSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('probe'), nonce: id }),
   z.object({
     type: z.literal('signal'),
+    purpose: z.enum(['cache', 'broadcast']).optional(),
     to: id,
     mediaId: id,
     epoch: z.number().int().nonnegative(),
@@ -173,6 +179,7 @@ export type ServerMessage =
   | { type: 'probe'; nonce: string }
   | {
       type: 'signal';
+      purpose?: 'cache' | 'broadcast';
       from: string;
       mediaId: string;
       epoch: number;

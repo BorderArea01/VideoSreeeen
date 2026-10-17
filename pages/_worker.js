@@ -6,6 +6,7 @@ export default {
     if (
       ['/ws', '/healthz', '/config'].includes(path) ||
       path.startsWith('/cache-plan/') ||
+      path.startsWith('/images/') ||
       path.startsWith('/media/')
     )
       return env.WATCH.fetch(request);

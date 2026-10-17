@@ -5,10 +5,15 @@ import { fileURLToPath } from 'node:url';
 import { WebSocketServer, type WebSocket } from 'ws';
 import { clientMessageSchema } from '../shared/protocol';
 import { RoomError, Rooms, type Room } from './rooms';
+import { RoomImages, IMAGE_LIMIT } from './images';
+import { ImageFiles } from './image-files';
+import { once } from 'node:events';
 import { MediaRelay } from './media';
 
 export function createApp(options: { now?: () => number; origins?: string[] } = {}) {
   const rooms = new Rooms(options.now);
+  const imageFiles = new ImageFiles(),
+    images = new RoomImages(rooms, imageFiles);
   const relay = new MediaRelay(rooms);
   const root = resolve(fileURLToPath(new URL('../dist/', import.meta.url)));
   const allowed =
@@ -33,18 +38,80 @@ export function createApp(options: { now?: () => number; origins?: string[] } = 
       res.setHeader('Access-Control-Allow-Origin', req.headers.origin);
       res.setHeader('Vary', 'Origin');
     }
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Range');
-    res.setHeader('Access-Control-Allow-Methods', 'GET,HEAD,OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Range,Authorization,X-Member-Id');
+    res.setHeader('Access-Control-Allow-Methods', 'GET,HEAD,POST,OPTIONS');
     if (req.method === 'OPTIONS') {
       res.writeHead(204).end();
       return;
     }
-    if (!['GET', 'HEAD'].includes(req.method ?? '')) {
+    if (
+      !['GET', 'HEAD'].includes(req.method ?? '') &&
+      !(req.method === 'POST' && req.url?.startsWith('/images/'))
+    ) {
       res.writeHead(405).end();
       return;
     }
     try {
       const url = new URL(req.url ?? '/', 'http://localhost');
+      if (url.pathname.startsWith('/images/')) {
+        if (req.method === 'POST' && Number(req.headers['content-length']) > IMAGE_LIMIT) {
+          req.resume();
+          res
+            .writeHead(413, { 'Content-Type': 'text/plain; charset=utf-8' })
+            .end('图片不能超过 20 MiB');
+          return;
+        }
+        const headers = new Headers();
+        for (const [key, value] of Object.entries(req.headers))
+          if (typeof value === 'string') headers.set(key, value);
+        let drain = () => {};
+        const body =
+          req.method === 'POST'
+            ? new ReadableStream<Uint8Array>(
+                {
+                  start(controller) {
+                    req.pause();
+                    const data = (chunk: Buffer) => {
+                      controller.enqueue(chunk);
+                      req.pause();
+                    };
+                    const end = () => controller.close(),
+                      fail = (e: Error) => controller.error(e);
+                    req.on('data', data);
+                    req.once('end', end);
+                    req.once('error', fail);
+                    drain = () => {
+                      req.off('data', data);
+                      req.off('end', end);
+                      req.off('error', fail);
+                      if (!req.destroyed) req.resume();
+                    };
+                  },
+                  pull() {
+                    req.resume();
+                  },
+                  cancel() {
+                    drain();
+                  },
+                },
+                { highWaterMark: 0 },
+              )
+            : undefined;
+        const request = new Request(url, {
+          method: req.method,
+          headers,
+          ...(body ? { body, duplex: 'half' } : {}),
+        } as RequestInit);
+        const response = await images.handle(request);
+        drain();
+        res.statusCode = response.status;
+        response.headers.forEach((value, key) => res.setHeader(key, value));
+        if (response.body)
+          for await (const chunk of response.body as any)
+            if (!res.write(chunk)) await once(res, 'drain');
+        res.end();
+        return;
+      }
       if (url.pathname === '/config') {
         res.setHeader('Content-Type', 'application/json');
         res.end(
@@ -64,7 +131,7 @@ export function createApp(options: { now?: () => number; origins?: string[] } = 
           JSON.stringify({
             ok: true,
             app: 'videosreeeen',
-            version: '0.3.1',
+            version: '0.4.0',
             rooms: rooms.rooms.size,
           }),
         );
@@ -212,6 +279,7 @@ export function createApp(options: { now?: () => number; origins?: string[] } = 
   const sweeper = setInterval(() => {
     rooms.sweep();
     relay.sweep();
+    void images.sweep().catch(() => {});
   }, 5000);
   sweeper.unref();
   const close = async () => {
@@ -219,6 +287,7 @@ export function createApp(options: { now?: () => number; origins?: string[] } = 
     for (const ws of wss.clients) ws.terminate();
     await new Promise<void>((resolve) => wss.close(() => resolve()));
     await new Promise<void>((resolve) => server.close(() => resolve()));
+    await imageFiles.close();
   };
   return { server, rooms, relay, close };
 }
@@ -226,7 +295,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   const app = createApp();
   const port = Number(process.env.PORT ?? 8787);
   app.server.listen(port, process.env.HOST ?? '0.0.0.0', () =>
-    console.log(`VideoSreeeen 0.3.1 listening on ${port}`),
+    console.log(`VideoSreeeen 0.4.0 listening on ${port}`),
   );
   for (const signal of ['SIGINT', 'SIGTERM'] as const)
     process.once(signal, () => {

@@ -19,7 +19,7 @@ const desktop = await electron.launch({
   env: { ...process.env, VS_DEV_URL: origin },
   timeout: 30000,
 });
-const evidence: Record<string, unknown> = { origin, https: true, version: '0.3.1' },
+const evidence: Record<string, unknown> = { origin, https: true, version: '0.4.0' },
   failures: string[] = [];
 try {
   const seed = await desktop.firstWindow(),
@@ -58,6 +58,7 @@ try {
     {},
     { timeout: 30000 },
   );
+  await seed.locator('#cache-options').evaluate((e) => ((e as HTMLDetailsElement).open = true));
   await seed.locator('#mode-toggle').click();
   await seed.locator('#cache-button').click();
   await seed.waitForFunction(

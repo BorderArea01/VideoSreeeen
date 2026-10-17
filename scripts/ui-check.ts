@@ -49,11 +49,21 @@ try {
   await second.locator('#send-button').click();
   await first.getByText('<img src=x onerror=alert(1)>', { exact: true }).waitFor();
   assert.equal(await first.locator('.bubble img').count(), 0);
-  const image = Buffer.from('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7', 'base64');
+  const image = Buffer.concat([
+    Buffer.from('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7', 'base64'),
+    Buffer.alloc(2 * 1024 * 1024),
+  ]);
   await first
     .locator('#image-input')
     .setInputFiles({ name: 'hello.gif', mimeType: 'image/gif', buffer: image });
   await second.locator('.bubble img').waitFor();
+  await second.locator('.bubble img').click();
+  await second.locator('#image-dialog').waitFor();
+  assert.ok(
+    await second.locator('#image-full').evaluate((e) => (e as HTMLImageElement).naturalWidth > 0),
+  );
+  await second.locator('[data-close="image-dialog"]').click();
+  evidence.chatImageBytes = image.length;
   await first.locator('#emoji-button').click();
   await first.getByRole('button', { name: '🍿', exact: true }).click();
   assert.equal(await first.locator('#chat-input').inputValue(), '🍿');
@@ -104,6 +114,7 @@ try {
       duration: (v as HTMLVideoElement).duration,
     })),
   };
+  await first.locator('#cache-options').evaluate((e) => ((e as HTMLDetailsElement).open = true));
   await first.locator('#mode-toggle').click();
   await first.locator('#cache-button').click();
   await second.locator('#cache-button').click();
@@ -182,6 +193,7 @@ try {
       {},
       { timeout: 30000 },
     );
+    await page.locator('#cache-options').evaluate((e) => ((e as HTMLDetailsElement).open = true));
     await page.locator('#mode-toggle').click();
     await page.locator('#cache-button').click();
     await page.waitForFunction(

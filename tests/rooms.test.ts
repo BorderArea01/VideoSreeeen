@@ -43,6 +43,54 @@ function fixture() {
     },
   };
 }
+
+test('画面共享按提供者及媒体隔离，保留多人裁决，离线暂停且不能伪装提供者', () => {
+  const f = fixture();
+  const media = { ...direct, broadcast: { host: f.first.id, kind: 'file' as const } };
+  f.rooms.act(f.room, f.first, { type: 'media', op: 'share', base: 0, media });
+  assert.throws(
+    () =>
+      f.rooms.act(f.room, f.second, { type: 'media', op: 'forged', base: f.room.revision, media }),
+    /自己的画面/,
+  );
+  assert.throws(
+    () =>
+      f.rooms.act(f.room, f.first, {
+        type: 'mode',
+        op: 'cache',
+        base: f.room.revision,
+        mode: 'cache',
+      }),
+    /不使用共同缓存/,
+  );
+  f.rooms.act(f.room, f.second, {
+    type: 'signal',
+    purpose: 'broadcast',
+    to: f.first.id,
+    mediaId: f.room.media!.id,
+    epoch: f.room.epoch,
+    data: { kind: 'description', type: 'answer', sdp: 'test' },
+  });
+  assert.equal((f.a as any).messages.at(-1).purpose, 'broadcast');
+  f.rooms.act(f.room, f.second, {
+    type: 'control',
+    op: 'play',
+    base: f.room.revision,
+    action: 'play',
+  });
+  f.rooms.disconnect(f.room, f.first, f.a);
+  assert.equal(f.room.playback.paused, true);
+  assert.throws(
+    () =>
+      f.rooms.act(f.room, f.second, {
+        type: 'control',
+        op: 'nohost',
+        base: f.room.revision,
+        action: 'play',
+      }),
+    /离线/,
+  );
+});
 test('多人控制：相同版本只有第一条操作生效，过期操作不能覆盖', () => {
   const f = fixture();
   f.rooms.act(f.room, f.first, { type: 'media', op: 'media', base: 0, media: direct });

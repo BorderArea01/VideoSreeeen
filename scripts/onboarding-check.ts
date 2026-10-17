@@ -53,7 +53,10 @@ try {
   await first.locator('#source-form button').click();
   await first.locator('#browser-title').filter({ hasText: '等待客户端识别视频' }).waitFor();
   assert.equal(await first.locator('#play-button').isEnabled(), false);
-  assert.equal(await first.locator('#browser-cache').isVisible(), false);
+  assert.equal(
+    await first.locator('#cache-options').evaluate((e) => (e as HTMLDetailsElement).open),
+    false,
+  );
   await first.locator('#browser-help').click();
   assert.equal(
     await first.locator('#watch-help').evaluate((e) => (e as HTMLDetailsElement).open),
@@ -119,12 +122,13 @@ try {
   await first.locator('#source-url').fill(`${origin}/unplayable.mp4`);
   await first.locator('#source-form button').click();
   await second.locator('#browser-title').filter({ hasText: '无法直接播放' }).waitFor();
-  await second.locator('#browser-cache').waitFor();
+  assert.equal(await second.locator('#mode-toggle').getAttribute('aria-checked'), 'false');
   await second.screenshot({
     path: resolve('.local/screenshots/source-failed-mobile.png'),
     fullPage: true,
   });
-  await second.locator('#browser-cache').click();
+  await second.locator('#cache-options > summary').click();
+  await second.locator('#mode-toggle').click();
   await second.locator('#cache-overlay').waitFor();
   await second.locator('#leave-button').click();
   await first.locator('#leave-button').click();

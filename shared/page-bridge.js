@@ -16,6 +16,7 @@
   };
   let cachedVideo = null,
     lastScan = 0;
+  let focused = null;
   const current = () => {
     const now = performance.now();
     if (cachedVideo?.isConnected && now - lastScan < 1500) return cachedVideo;
@@ -98,6 +99,60 @@
     return null;
   }
   window.__VS = {
+    focus(enabled) {
+      if (!enabled) {
+        if (focused) {
+          for (const [node, style] of focused.styles) {
+            if (style === null) node.removeAttribute('style');
+            else node.setAttribute('style', style);
+          }
+          focused.video.controls = focused.controls;
+          focused = null;
+        }
+        return true;
+      }
+      if (focused) return true;
+      const video = current();
+      if (!video) return false;
+      const target =
+        video.closest('.bpx-player-container,.dplayer,.video-js,.xgplayer,.art-video-player') ||
+        video;
+      const styles = new Map();
+      const set = (node, values) => {
+        if (!styles.has(node)) styles.set(node, node.getAttribute('style'));
+        for (const [key, value] of Object.entries(values))
+          node.style.setProperty(key, value, 'important');
+      };
+      for (let node = target; node?.parentElement; node = node.parentElement) {
+        for (const sibling of node.parentElement.children)
+          if (sibling !== node) set(sibling, { visibility: 'hidden' });
+        set(node.parentElement, {
+          transform: 'none',
+          filter: 'none',
+          perspective: 'none',
+          contain: 'none',
+          overflow: 'visible',
+          visibility: 'visible',
+        });
+      }
+      set(document.documentElement, { overflow: 'hidden' });
+      set(target, {
+        position: 'fixed',
+        inset: '0',
+        width: '100vw',
+        height: '100vh',
+        'max-width': 'none',
+        'max-height': 'none',
+        'z-index': '2147483647',
+        'object-fit': 'contain',
+        background: '#000',
+        visibility: 'visible',
+        display: 'block',
+      });
+      focused = { video, controls: video.controls, styles };
+      if (target === video) video.controls = true;
+      return true;
+    },
     sample() {
       const video = current();
       if (!video) return { available: false, title: document.title };

@@ -22,7 +22,7 @@ const browser = await chromium.launch({
 });
 let desktop: Awaited<ReturnType<typeof electron.launch>> | undefined;
 const evidence: Record<string, any> = {
-  version: '0.3.1',
+  version: '0.4.0',
   origin,
   source,
   windowsClient: process.env.VS_PACKAGED_APP ? 'packaged' : 'development',
@@ -64,7 +64,9 @@ try {
   await seed.locator('#source-url').fill(source);
   await seed.locator('#source-form button').click();
   // No click on the extraction button: the real native player must attach its source automatically.
-  await receiver.locator('#mode-toggle:not([disabled])').waitFor({ timeout: 45000 });
+  await receiver
+    .locator('#mode-toggle:not([disabled])')
+    .waitFor({ state: 'attached', timeout: 45000 });
   assert.ok(state.media.source);
   evidence.automaticSource = {
     kind: state.media.source.kind,
@@ -84,12 +86,10 @@ try {
   );
   evidence.browserDirect = {
     readyState: await receiver.locator('video').evaluate((v) => (v as HTMLVideoElement).readyState),
-    fallbackVisible: await receiver.locator('#browser-cache').isVisible(),
+    fallbackVisible: await receiver.locator('#browser-hint').isVisible(),
   };
-  if (evidence.browserDirect.readyState < 2) {
-    assert.equal(evidence.browserDirect.fallbackVisible, true);
-    await receiver.locator('#browser-cache').click();
-  } else await receiver.locator('#mode-toggle').click();
+  await receiver.locator('#cache-options').evaluate((e) => ((e as HTMLDetailsElement).open = true));
+  await receiver.locator('#mode-toggle').click();
   await seed.locator('#cache-button:not([disabled])').click();
   await seed.waitForFunction(
     () => document.querySelector('#cache-title')!.textContent === '本机已准备好',

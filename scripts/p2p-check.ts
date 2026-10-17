@@ -126,6 +126,7 @@ async function share(page: Page) {
   await page.locator('#source-url').fill(sourceUrl);
   await page.locator('#source-form button').click();
   await page.waitForFunction(() => document.querySelector('video')!.readyState >= 2);
+  await page.locator('#cache-options').evaluate((e) => ((e as HTMLDetailsElement).open = true));
   await page.locator('#mode-toggle').click();
 }
 async function invite(page: Page) {

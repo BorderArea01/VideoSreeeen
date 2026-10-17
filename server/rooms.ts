@@ -222,6 +222,7 @@ export class Rooms {
     seat.rtt = null;
     seat.disconnectedAt = this.now();
     seat.cache = this.idleCache(room.epoch);
+    if (room.media?.broadcast?.host === seat.id && !room.playback.paused) this.paused(room);
     if (leave) room.members.delete(seat.id);
     this.pauseForBarrier(room);
     this.finishIfEveryoneEnded(room);
@@ -270,7 +271,11 @@ export class Rooms {
     room.touched = this.now();
     if (message.type === 'signal') {
       if (
-        room.mode !== 'cache' ||
+        ((message.purpose ?? 'cache') === 'cache'
+          ? room.mode !== 'cache'
+          : room.mode !== 'stream' ||
+            !room.media?.broadcast ||
+            (room.media.broadcast.host !== seat.id && room.media.broadcast.host !== message.to)) ||
         room.cleaned ||
         room.media?.id !== message.mediaId ||
         room.epoch !== message.epoch
@@ -280,6 +285,7 @@ export class Rooms {
       if (!target?.online || target.id === seat.id) return;
       this.send(target.socket, {
         type: 'signal',
+        purpose: message.purpose,
         from: seat.id,
         mediaId: message.mediaId,
         epoch: message.epoch,
@@ -297,12 +303,35 @@ export class Rooms {
         throw new RoomError('conflict', '另一位成员刚刚操作了播放器，已同步最新状态，请重新操作');
     }
     switch (message.type) {
+      case 'unshare': {
+        if (room.media?.broadcast?.host !== seat.id)
+          throw new RoomError('not_host', '只有提供者可以结束共享');
+        this.broadcast(room, { type: 'cleanup', mediaId: room.media.id, epoch: room.epoch });
+        room.media = null;
+        room.mode = 'stream';
+        room.epoch++;
+        room.cleaned = false;
+        room.mediaToken = token();
+        room.playback = {
+          position: 0,
+          paused: true,
+          rate: 1,
+          at: this.now(),
+          revision: room.playback.revision + 1,
+          actor: seat.id,
+          intent: 'snapshot',
+        };
+        this.bump(room);
+        break;
+      }
       case 'media': {
+        if (message.media.broadcast && message.media.broadcast.host !== seat.id)
+          throw new RoomError('invalid_host', '只能共享自己的画面');
         const upgrade =
           room.mode === 'stream' &&
           room.media?.url === message.media.url &&
           !room.media.source &&
-          !!message.media.source;
+          (!!message.media.source || message.media.broadcast?.kind === 'site');
         const position = upgrade
           ? positionAt(
               room.playback.position,
@@ -314,6 +343,7 @@ export class Rooms {
         if (room.media)
           this.broadcast(room, { type: 'cleanup', mediaId: room.media.id, epoch: room.epoch });
         room.media = { ...message.media, id: randomUUID() };
+        if (room.media.broadcast) room.mode = 'stream';
         room.epoch++;
         room.cleaned = false;
         room.mediaToken = token();
@@ -335,6 +365,8 @@ export class Rooms {
       }
       case 'mode': {
         if (!room.media) throw new RoomError('no_media', '请先分享视频');
+        if (message.mode === 'cache' && room.media.broadcast)
+          throw new RoomError('broadcast_mode', '实时画面不使用共同缓存');
         if (message.mode === 'cache' && !room.media.source)
           throw new RoomError('no_source', '请先在客户端识别并共享可下载的视频源');
         this.broadcast(room, { type: 'cleanup', mediaId: room.media.id, epoch: room.epoch });
@@ -350,6 +382,10 @@ export class Rooms {
       }
       case 'control': {
         if (!room.media) throw new RoomError('no_media', '请先分享视频');
+        if (room.media.broadcast && !room.members.get(room.media.broadcast.host)?.online)
+          throw new RoomError('host_offline', '视频提供者已离线');
+        if (room.media.broadcast?.kind === 'screen' && ['seek', 'rate'].includes(message.action))
+          throw new RoomError('live_control', '屏幕共享请在提供方播放器调整进度和速度');
         if (room.mode === 'cache' && !this.cacheReady(room) && message.action === 'play')
           throw new RoomError('cache_wait', '等待所有成员完整缓存同一视频');
         let position = positionAt(
@@ -470,5 +506,25 @@ export class Rooms {
   mediaAccess(code: string, secret: string): Room | null {
     const room = this.rooms.get(code);
     return room && same(room.mediaToken, secret) ? room : null;
+  }
+  memberAccess(code: string, memberId: string, secret: string) {
+    const room = this.rooms.get(code),
+      seat = room?.members.get(memberId);
+    return room && seat?.online && same(seat.resume, secret) ? { room, seat } : null;
+  }
+  addImage(room: Room, seat: Seat, imageFile: NonNullable<Chat['imageFile']>) {
+    const entry: Chat = {
+      id: randomUUID(),
+      memberId: seat.id,
+      name: seat.name,
+      at: this.now(),
+      imageFile,
+    };
+    room.chat.push(entry);
+    room.chatBytes += Buffer.byteLength(JSON.stringify(entry));
+    while (room.chat.length > 100 || room.chatBytes > 2 * 1024 * 1024)
+      room.chatBytes -= Buffer.byteLength(JSON.stringify(room.chat.shift()));
+    room.touched = this.now();
+    this.broadcast(room);
   }
 }

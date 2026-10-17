@@ -10,6 +10,9 @@ const allowed = new Set([
   'cacheStart',
   'cacheClear',
   'cacheIO',
+  'captureSite',
+  'endCapture',
+  'update',
 ]);
 contextBridge.exposeInMainWorld('desktop', {
   call(method, payload) {

@@ -132,6 +132,7 @@ export class RoomPeers {
       this.send({ type: 'signal', to, mediaId: this.room.media.id, epoch: this.room.epoch, data });
   }
   receive(message: Extract<ServerMessage, { type: 'signal' }>) {
+    if (message.purpose === 'broadcast') return;
     if (!this.enabled) return;
     if (
       !this.room?.media ||
