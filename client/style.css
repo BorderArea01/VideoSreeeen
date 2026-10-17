@@ -991,6 +991,8 @@ dialog {
   border: 1px solid #564250;
   border-radius: 16px;
   box-shadow: 0 20px 100px #000a;
+  max-height: calc(100dvh - 30px);
+  overflow-y: auto;
 }
 dialog::backdrop {
   background: #050308bb;
@@ -1007,7 +1009,7 @@ dialog::backdrop {
   margin: 10px 0;
 }
 .dialog-copy {
-  font-size: 11px;
+  font-size: 13px;
   color: #b09bb1;
   line-height: 1.8;
   margin-bottom: 25px;
@@ -1034,7 +1036,7 @@ dialog input:focus {
   border-color: var(--orange);
 }
 .dialog-note {
-  font-size: 10px;
+  font-size: 12px;
   line-height: 1.8;
   color: #937d99;
 }
@@ -1047,9 +1049,75 @@ dialog input:focus {
   flex: 1;
 }
 .form-error {
-  font-size: 11px;
+  font-size: 12px;
   color: #ffad9c;
   line-height: 1.6;
+}
+.room-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--line);
+  background: #17121c;
+  border-radius: 9px;
+}
+.room-tabs button {
+  flex: 1;
+  padding: 11px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+}
+.room-tabs button[aria-pressed='true'] {
+  background: #44313a;
+  color: #ffd5bb;
+}
+.advanced {
+  border-top: 1px solid #47364d;
+  padding: 18px 0;
+}
+.advanced summary {
+  cursor: pointer;
+  font-size: 13px;
+  color: #e1cedc;
+}
+.advanced .dialog-note {
+  margin-bottom: 0;
+}
+.help-steps {
+  padding-left: 20px;
+  color: #b5a1b8;
+  font-size: 12px;
+  line-height: 1.9;
+}
+.help-steps li {
+  margin: 10px 0;
+}
+.help-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin: 10px 0 20px;
+}
+.dialog-wide {
+  width: 100%;
+  margin-top: 15px;
+}
+dialog input {
+  font-size: 16px;
+}
+dialog label {
+  font-size: 12px;
+}
+.hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px;
+}
+.hero-actions .text-button {
+  color: #e1c4d2;
 }
 .toast {
   position: fixed;
@@ -1260,6 +1328,23 @@ button {
   }
 }
 @media (max-width: 540px) {
+  .stage.lobby-stage {
+    height: 340px;
+    min-height: 340px;
+    aspect-ratio: auto;
+  }
+  .stage.lobby-stage .scene-footer {
+    display: none;
+  }
+  .hero-actions {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  .hero-actions .text-button {
+    padding: 6px 0;
+    font-size: 12px;
+  }
   .topbar {
     padding: 0 16px;
     height: 72px;

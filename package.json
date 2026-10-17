@@ -1,6 +1,6 @@
 {
   "name": "videosreeeen",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "description": "多人观影：Windows、Android 和浏览器，共同缓存与 WebSocket 同步",
   "license": "GPL-3.0-only",
@@ -19,6 +19,7 @@
     "package:windows": "electron-builder --win portable --x64",
     "test": "tsx --test --test-concurrency=1 tests/*.test.ts",
     "test:ui": "tsx scripts/ui-check.ts",
+    "test:onboarding": "tsx scripts/onboarding-check.ts",
     "format": "prettier --write \"**/*.{ts,mjs,cjs,js,json,css,html,yml,yaml,md,java}\"",
     "format:check": "prettier --check \"**/*.{ts,mjs,cjs,js,json,css,html,yml,yaml,md,java}\"",
     "check:worker": "tsc --noEmit -p worker/tsconfig.json",

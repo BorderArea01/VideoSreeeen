@@ -1,3 +1,4 @@
+import { configureRoomServer, openRoom, closeInvitation } from './room-ui';
 import assert from 'node:assert/strict';
 import { once } from 'node:events';
 import { createServer } from 'node:http';
@@ -90,10 +91,11 @@ function observe(page: Page) {
 async function create(page: Page, name: string) {
   observe(page);
   await page.goto(origin);
-  await page.locator('#room-button').click();
+  await configureRoomServer(page, origin);
+  await openRoom(page);
   await page.locator('#name-input').fill(name);
-  await page.locator('#server-input').fill(origin);
   await page.locator('#create-button').click();
+  await closeInvitation(page);
   await page
     .locator('#connection.online')
     .waitFor({ timeout: 15000 })
@@ -108,9 +110,8 @@ async function create(page: Page, name: string) {
 }
 async function join(page: Page, invite: string, name: string) {
   if (!(await page.evaluate(() => !!window.desktop))) await page.goto(invite);
-  await page.locator('#room-button').click();
+  await openRoom(page, 'join');
   await page.locator('#name-input').fill(name);
-  await page.locator('#server-input').fill(origin);
   await page.locator('#invite-input').fill(invite);
   await page.locator('#join-button').click();
   await page.locator('#connection.online').waitFor();

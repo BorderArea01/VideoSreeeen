@@ -1,3 +1,4 @@
+import { configureRoomServer, openRoom, closeInvitation } from './room-ui';
 import { _electron as electron } from 'playwright';
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
@@ -45,11 +46,13 @@ try {
   local = info.local;
   const health = (await (await fetch(info.local + '/healthz')).json()) as any;
   assert.equal(health.app, 'videosreeeen');
-  await page.locator('#room-button').click();
-  await page.locator('#name-input').fill('便携版验收');
   assert.equal(await page.locator('#server-input').inputValue(), 'https://videosreeeen.pages.dev');
-  await page.locator('#server-input').fill(info.share);
+  await configureRoomServer(page, info.share);
+  await openRoom(page);
+  await page.locator('#name-input').fill('便携版验收');
+
   await page.locator('#create-button').click();
+  await closeInvitation(page);
   await page.locator('#connection.online').waitFor();
   await page
     .locator('#source-url')
@@ -108,7 +111,7 @@ evidence.embeddedServerStopped = true;
 console.log('Packaged Windows application and embedded server passed');
 // Also launch the delivered portable wrapper. It extracts its own runtime and
 // exits after capturing a real window, without requiring Node/npm on the user PC.
-const portable = resolve('artifacts/windows/VideoSreeeen 0.2.0.exe');
+const portable = resolve('artifacts/windows/VideoSreeeen 0.3.0.exe');
 await access(portable);
 const screenshot = resolve(dir, 'windows-portable.png');
 await new Promise<void>((resolveDone, reject) => {

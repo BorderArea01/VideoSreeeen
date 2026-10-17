@@ -1,3 +1,4 @@
+import { configureRoomServer, openRoom, closeInvitation } from './room-ui';
 import { chromium, _electron as electron } from 'playwright';
 import assert from 'node:assert/strict';
 import { once } from 'node:events';
@@ -25,19 +26,19 @@ try {
   first.on('pageerror', (e) => failures.push(e.message));
   await first.goto(origin);
   await first.screenshot({ path: resolve(output, 'desktop-lobby.png'), fullPage: true });
-  await first.locator('#room-button').click();
+  await configureRoomServer(first, origin);
+  await openRoom(first);
   await first.locator('#name-input').fill('今晚的放映员');
-  await first.locator('#server-input').fill(origin);
   await first.locator('#create-button').click();
+  await closeInvitation(first);
   await first.locator('#connection.online').waitFor();
   const room = [...app.rooms.rooms.values()][0]!;
   const invite = `${origin}/#${room.code}:${room.token}`;
   const second = await context.newPage();
   second.on('pageerror', (e) => failures.push(e.message));
   await second.goto(invite);
-  await second.locator('#room-button').click();
+  await openRoom(second, 'join');
   await second.locator('#name-input').fill('远方的朋友');
-  await second.locator('#server-input').fill(origin);
   await second.locator('#join-button').click();
   await second.locator('#connection.online').waitFor();
   await first.locator('#member-count').filter({ hasText: '2' }).waitFor();
@@ -166,10 +167,11 @@ try {
     const page = await desktop.firstWindow();
     await page.locator('#platform').filter({ hasText: 'Windows 客户端' }).waitFor();
     await page.screenshot({ path: resolve(output, 'windows-native.png') });
-    await page.locator('#room-button').click();
+    await configureRoomServer(page, origin);
+    await openRoom(page);
     await page.locator('#name-input').fill('Windows 原生缓存验收');
-    await page.locator('#server-input').fill(origin);
     await page.locator('#create-button').click();
+    await closeInvitation(page);
     await page.locator('#connection.online').waitFor();
     await page
       .locator('#source-url')

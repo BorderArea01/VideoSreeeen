@@ -351,6 +351,25 @@ public class MainActivity extends Activity {
                     runOnUiThread(() -> {
                         try {
                             switch (method) {
+                                case "openBrowser": {
+                                    Uri target = Uri.parse(payload.getString("url"));
+                                    if (
+                                        !(
+                                            "https".equals(target.getScheme()) ||
+                                            "http".equals(target.getScheme())
+                                        ) ||
+                                        target.getHost() == null ||
+                                        target.getUserInfo() != null
+                                    ) throw new IllegalArgumentException("仅支持 HTTP/HTTPS 链接");
+                                    startActivity(
+                                        new android.content.Intent(
+                                            android.content.Intent.ACTION_VIEW,
+                                            target
+                                        )
+                                    );
+                                    resolve(id, new JSONObject(), null);
+                                    break;
+                                }
                                 case "openSite":
                                     openSite(payload.getString("url"));
                                     resolve(id, new JSONObject(), null);

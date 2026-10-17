@@ -1,0 +1,42 @@
+name: 使用问题
+description: 无法加入房间、播放、聊天或完成缓存
+title: '[问题] '
+body:
+  - type: markdown
+    attributes:
+      value: 请勿提交邀请链接、完整邀请码、登录 Cookie 或访问令牌。使用问题也可以反馈，无需先了解代码。
+  - type: dropdown
+    id: platform
+    attributes:
+      label: 使用入口
+      options:
+        - 浏览器（请在下方注明名称）
+        - Windows 客户端
+        - Android 客户端
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: 版本与系统
+      placeholder: 例如 0.3.0 / Windows 11；网页版请填浏览器和系统版本
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: 做了哪些操作，发生了什么？
+      description: 从哪个入口开始、在哪一步失败、界面上的提示；可以附遮盖私人信息后的截图。
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: 希望出现什么结果？
+    validations:
+      required: true
+  - type: textarea
+    id: network
+    attributes:
+      label: 视频与网络（播放或缓存问题时填写）
+      description: 站点名称、在线播放还是共同缓存、是否跨运营商；可附不含私人信息的公开视频页面。自建用户注明服务版本，无需提供私人服务器地址。

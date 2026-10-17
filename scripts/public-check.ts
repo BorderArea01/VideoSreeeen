@@ -1,3 +1,4 @@
+import { configureRoomServer, openRoom, closeInvitation } from './room-ui';
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
@@ -18,7 +19,7 @@ const desktop = await electron.launch({
   env: { ...process.env, VS_DEV_URL: origin },
   timeout: 30000,
 });
-const evidence: Record<string, unknown> = { origin, https: true, version: '0.2.0' },
+const evidence: Record<string, unknown> = { origin, https: true, version: '0.3.0' },
   failures: string[] = [];
 try {
   const seed = await desktop.firstWindow(),
@@ -34,14 +35,15 @@ try {
       } catch {}
     }),
   );
-  await seed.locator('#room-button').click();
+  await configureRoomServer(seed, origin);
+  await openRoom(seed);
   await seed.locator('#name-input').fill('公网 Windows 种子');
-  await seed.locator('#server-input').fill(origin);
   await seed.locator('#create-button').click();
+  await closeInvitation(seed);
   await seed.locator('#connection.online').waitFor();
   assert.ok(invite);
   await receiver.goto(invite);
-  await receiver.locator('#room-button').click();
+  await openRoom(receiver, 'join');
   await receiver.locator('#name-input').fill('公网网页接收端');
   await receiver.locator('#join-button').click();
   await receiver.locator('#connection.online').waitFor();
