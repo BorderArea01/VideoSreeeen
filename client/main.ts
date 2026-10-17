@@ -381,6 +381,11 @@ function adopt(snapshot: Snapshot) {
 }
 function render() {
   const joined = !!room;
+  if (!joined) {
+    $('sync-status').textContent = '等待加入房间';
+    $('position').textContent = $('duration').textContent = '00:00';
+    $<HTMLInputElement>('seek').value = '0';
+  }
   $('hero-create').innerHTML = joined
     ? `${icon('film', 18)} 选择今晚的视频 ${icon('arrow', 17)}`
     : `${icon('plus', 18)} 开启我们的放映室 ${icon('arrow', 17)}`;

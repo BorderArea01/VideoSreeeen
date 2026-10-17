@@ -103,6 +103,7 @@ try {
   await second.locator('[data-close="settings-dialog"]').first().click();
   await second.locator('#leave-button').click();
   await first.locator('#leave-button').click();
+  assert.equal(await second.locator('#sync-status').textContent(), '等待加入房间');
   await second.screenshot({
     path: resolve('.local/screenshots/onboarding-mobile-lobby.png'),
     fullPage: true,
