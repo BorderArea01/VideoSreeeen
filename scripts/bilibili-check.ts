@@ -21,10 +21,16 @@ const browser = await chromium.launch({
   args: ['--mute-audio', '--js-flags=--max-old-space-size=256', '--disable-extensions'],
 });
 let desktop: Awaited<ReturnType<typeof electron.launch>> | undefined;
-const evidence: Record<string, any> = { version: '0.3.1', origin, source };
+const evidence: Record<string, any> = {
+  version: '0.3.1',
+  origin,
+  source,
+  windowsClient: process.env.VS_PACKAGED_APP ? 'packaged' : 'development',
+};
 try {
   desktop = await electron.launch({
-    args: ['desktop/main.cjs', '--mute-audio'],
+    executablePath: process.env.VS_PACKAGED_APP ? resolve(process.env.VS_PACKAGED_APP) : undefined,
+    args: process.env.VS_PACKAGED_APP ? ['--mute-audio'] : ['desktop/main.cjs', '--mute-audio'],
     env: { ...process.env, VS_DEV_URL: origin },
     timeout: 30000,
   });
@@ -54,6 +60,7 @@ try {
   await receiver.locator('#name-input').fill('网页成员');
   await receiver.locator('#join-button').click();
   await receiver.locator('#connection.online').waitFor();
+  await seed.locator('#member-count').filter({ hasText: '2' }).waitFor();
   await seed.locator('#source-url').fill(source);
   await seed.locator('#source-form button').click();
   // No click on the extraction button: the real native player must attach its source automatically.
@@ -121,6 +128,7 @@ try {
   await receiver.waitForFunction(() => document.querySelector('video')!.currentTime > 1);
   await receiver.locator('#play-button').click();
   await receiver.waitForFunction(() => document.querySelector('video')!.paused);
+  await seed.waitForFunction(() => document.querySelector('video')!.paused);
   const a = await seed.locator('video').evaluate((node) => {
       const v = node as HTMLVideoElement;
       return { time: v.currentTime, paused: v.paused, duration: v.duration };

@@ -1,63 +1,56 @@
-# 0.3.0 验证记录
+# 0.3.1 验证记录
 
-日期：2026-10-18。Android + Windows；苹果只使用浏览器。此前的 [0.1.0](verification-0.1.md)、[0.2.0 验收历史](verification-0.2.md) 单独保留。
+日期：2026-10-18。修复用户报告的 B 站链接停留在“已共享原站页面”。历史记录：[0.3.0](verification-0.3.md)、[0.2.0](verification-0.2.md)、[0.1.0](verification-0.1.md)。
 
-运行时代码：[0847de0](https://github.com/BorderArea01/VideoSreeeen/commit/0847de0913697aa8a62052094faf70319df49d97)。本地产物与部署标识保存在 `artifacts/build-info.json`；不将安装包、下载的视频、临时邀请或认证信息提交到源码历史。
+运行时代码：[966d52b](https://github.com/BorderArea01/VideoSreeeen/commit/966d52b4a9d9ecee67882f1b0e631634c95d2f89)。本地产物和完整证据索引见 artifacts/build-info.json；不提交安装包、媒体内容、临时邀请或认证信息。
 
-## 已部署
+## 实现
 
-- 公共入口：**https://videosreeeen.pages.dev**。
-- Pages 部署：`337cb8d2-4967-4bc0-a0ca-e0e37eec36ed`，构建元数据提交与上述运行时代码一致。
-- 房间 Worker：`videosreeeen`，版本 `2275afff-af3c-4c85-ae21-f50bb9169c74`。Pages 使用内部 Service Binding 连接它；每个房间一个 SQLite Durable Object。
-- 未升级付费订阅，未配置 TURN 或视频中转。原有其他 Worker / Pages 项目没有修改。
-- `workers.dev` 在本机网络访问超时，因此增加 Pages 入口；Pages 已完成下述公网验证，不将域名可解析单独当作可用证据。
-- 从公共入口回读活动 JavaScript 与 CSS，逐字节核对与本轮构建一致：`index-BRqFeJZn.js` / `index-c8L2uK2H.css`。
+- 网页只有原站 URL 时显示“等待客户端识别视频”，禁用无效播放和缓存切换，提供邀请客户端与使用方法。直链加载失败时持续展示缓存兜底，HLS 不冒充支持浏览器完整缓存。
+- Windows / Android 在当前页面检测到可访问视频后自动共享一次源，保留手动重试。异步结果绑定媒体 ID，冲突沿用服务端版本裁决。
+- 同一页面第一次补充源保留播放时间线；媒体 ID 和缓存代次仍更新，换片仍重置。Windows 保留原站视图，不强制切换到可能遭源站拒绝的直接播放器。
+- B 站选择原站实际提供的普通 HTTPS 端口备源及 AVC/AAC 音轨，不拼接签名地址。切换缓存时等待原站关闭和旧缓存清理，避免过早点击。
 
-## 新手与邀请流程
+## 实际视频闭环
 
-- 实际 Edge 创建房间：只需昵称，建房界面不展示服务器或邀请码输入；创建成功自动展示服务端生成的邀请。
-- 打开完整邀请直接进入加入页。已保存其他服务器时，刷新邀请页仍使用邀请本身的服务器；不会覆盖用户默认配置。
-- 无效邀请在原表单报错并恢复按钮，修正后可直接重试。模拟剪贴板拒绝后，邀请仍可见、可选中手动复制。
-- 高级设置修改后，当前邀请与断线重连仍使用当前房间的实际服务器；验证恢复原成员身份，未在另一个服务器误建房间。
-- 两个真实成员入房、互发聊天，离开后界面恢复待加入状态。390 px 手机布局截图与实际加入按钮点击通过；邀请、设置面板和桌面界面均已截图检查。
-- 设置内新增新手指引、端能力差异、开源仓库和反馈入口；README、贡献指南与问题表单区分使用者和开发者。客户端公开下载、稳定发行签名与自动更新尚未完成。
-- 系统分享按浏览器能力显示，并保留复制方式；本轮没有操作系统分享面板或实际发送给他人。
+视频：[BV13Aa66LEAW](https://www.bilibili.com/video/BV13Aa66LEAW/)，原站标记 164 秒，本地视频轨时长 163.000688 秒。去除用户分享链接中的跟踪参数。
 
-## 自动测试与实际闭环
+- 本地 Node 服务与公网 Pages 均验证：真实 Windows 原站打开后自动共享 DASH；没有点击识别按钮。原站视图仍存在且能采样。
+- 公网直接媒体加载失败，显示可操作的共同缓存入口；并未把链接识别或 iframe 加载算作可播放。
+- Windows 完整下载约 5.6 MiB；网页从成员取得完整音视频，源站下载 0.0 MiB，测试阻断了网页的视频源和中转下载路径。服务端全员内容指纹门槛放行后才开始播放。
+- 最终公网验收使用实际打包的 Windows EXE 与一个 Edge 上下文。暂停后 Windows 0.901837 秒、网页 1.079762 秒，双方 paused 均为 true；网页音轨 0.958901 秒。
+- 双端能播放、暂停及拖动到末尾，触发真实 ended 事件后自动清理。验证采用开头实播与拖动到尾部，没有把它写成完整观看了 2 分 44 秒。
+- 首次成品原站识别等待超时，后续重试通过；不能保证源站每次加载成功。测试补充成员状态、暂停和拖动的确认等待，避免公网 RTT 下连续发旧版本操作。
+- 没有注入账户 Cookie、绕过登录/付费/DRM、开启视频中转或付费 TURN。
 
-- 20 项单元/集成测试通过；类型检查、共享前端、Node 后端、Workers 类型检查和部署试打包通过。
-- GitHub 云端 CI 本轮未运行。0.2 手动派发返回 `HTTP 422: Actions has been disabled for this user`；本轮未反复派发，不能标为 CI 通过。
-- 本地 workerd 经 Pages Service Binding 的真实 WebSocket：创建/加入、聊天、成员恢复、定向连接信令；主动休眠后原连接仍能恢复聊天和房间状态。没有连接的成员不能保持缓存 ready。
-- 单个 Edge 浏览器上下文：浏览器之间完整 P2P 缓存；阻断接收端视频源请求后仍取得全部 **1,128,375 字节**，接收端源站下载为 0。
-- 同时开始下载：两位成员各保存完整视频，测试视频源合计传出的有效分块正文为 **1,128,375 字节**，即一份视频；其余通过成员互传补齐。
-- 故意修改发出的数据帧：接收端拒绝不符合声明哈希的块，回退独立源站并取得正确内容，最终仍通过全员指纹门槛。
-- Windows → 浏览器，以及浏览器 → Windows 磁盘缓存均通过。包括浏览器无法访问源站时与 Windows 同时开始下载，以及 Windows 在另一成员已经缓存后中途加入。
-- 缓存可实际播放、全员结束后自动清理；做种成员退出后，已经完整缓存的接收端仍可播放并清理。
-- 实际公网 `https://videosreeeen.pages.dev`：建房、加入、双端聊天、WSS，以及 Windows 向浏览器传送完整视频、从本地缓存播放和结束清理。公网验证使用同一台电脑上的两个客户端，不等同于已验证跨运营商直连。
-- 测试视频使用 MDN 的 CC0 flower.mp4，不在仓库或客户端中分发。
+## 回归与成品
 
-## 安装包
+- 22 项测试、类型检查、前后端构建、Workers 类型检查及部署试打包通过。新手流程验证了无源提示、失败后的缓存入口和手机实际点击，截图已目视检查。
+- P2P 双向、同时下载、坏块拒绝与源站回退、成员退出、缓存播放与清理通过；Workers 实际 WebSocket、休眠恢复及聊天保留通过。
+- Windows 成品实际运行：默认公共地址、网页版按钮、本机服务、完整缓存播放/清理、便携启动和退出通过。ASAR 内活动前端和原站桥接脚本逐字节核对通过，测试前后的原有设置备份恢复。
+- Android 编译和 Lint 通过，0 错误、4 条提示；versionCode 4 / versionName 0.3.1，minSdk 26 / targetSdk 35。APK 活动前端和原站桥接与当前构建一致，默认连接公共服务。只生成 APK，未安装或操作任何设备。
 
-| 产物                                   | SHA-256                                                            |
-| -------------------------------------- | ------------------------------------------------------------------ |
-| Windows `VideoSreeeen 0.3.0.exe`       | `92DAD5A9CBC615800F66CB0629BD9445E9A3A928CE28491CF38AD66B04826AF8` |
-| Android `VideoSreeeen-0.3.0-debug.apk` | `0FE3C15B3C4FAA11C9D9F1BE2CE28B558F927A197F98BBB22C0CAFA1D5175DD5` |
+| 产物                         | 字节     | SHA-256                                                          |
+| ---------------------------- | -------- | ---------------------------------------------------------------- |
+| VideoSreeeen 0.3.1.exe       | 99643886 | 1925CF070D074068DA1B3D8EDBF63FCD6995D564F71188702EF1780128E30073 |
+| VideoSreeeen-0.3.1-debug.apk | 1887217  | 9CCDF5526758F4156E4BCE6441DCEA9731EE7A2B00097BDC6C0A3E98FF8DA4B5 |
 
-Windows 成品已实际运行：首次默认地址为公共 Pages 服务；顶部“打开网页版”按钮传给系统浏览器的地址正确，验收时拦截了系统打开动作，没有额外打开用户浏览器。内置 Node 服务、建房、视频播放、完整分块落盘与本地缓存播放/清理通过；关闭后内置服务停止。便携 EXE 自解压、真实窗口截图和退出通过。测试前后的已有连接设置备份并恢复。
+## 部署
 
-保留 0.2 对 Vite `envDir` 的修正，本轮再次验证成品默认地址。Windows EXE 为便携测试版，未提供发行证书签名或自动更新。
+- 公共入口：https://videosreeeen.pages.dev。
+- Pages：72cd21e0-c142-4654-aab6-ba372c91c6b7，元数据提交与上述运行时代码一致。
+- Worker videosreeeen：d01422bf-823a-470a-875c-67d9fb17438b；每房间一个 SQLite Durable Object，Pages 通过 Service Binding 使用同一房间服务。
+- 回读并比较线上活动前端与本地构建：./assets/index-BL5Le0S4.js 和 ./assets/index-COtY5BUb.css 完全一致。
+- 沿用已授权账号和原有项目，未升级付费、启用中继或改动其他项目。
 
-Android：编译和 Lint 通过，0 错误、4 条提示（WebView JavaScript、备份配置及两个保守磁盘空间检查）。APK 包名为 `io.github.borderarea01.videosreeeen`，versionCode 3 / versionName 0.3.0，minSdk 26 / targetSdk 35。解包核对其活动前端资源与当前构建完全相同，包含正确公共默认地址；为调试签名，尚无正式发行签名。**只生成 APK，没有安装或操作任何设备。**
+## 仍然存在的边界
 
-## 范围与尚未验收
+- 只有浏览器成员的房间，尚不能直接解析、控制 B 站等原站页面。至少需要一位 Windows / Android 成员；原站访问限制仍适用。普通外链播放器不能当作本项目的同步控制接口，参见 [B 站外链文档](https://player.bilibili.com/) 与 [同源策略](https://developer.mozilla.org/en-US/docs/Web/Security/Same-origin_policy)。
+- 苹果 Safari、Android 真机、后台/锁屏、跨运营商直连和长视频未验收；本轮使用同一电脑上的 Windows 与 Edge。
+- 浏览器缓存单轨 96 MiB、总计 128 MiB；原生最多 4 GiB。HLS 保留有限原生缓存，不支持浏览器完整缓存或 HLS P2P。
+- 本轮没有重跑喜番、蜜柑全流程；0.3 的探测记录不是全程实播证明。未启动模拟器或构建 Docker。
+- 客户端为开发测试包，尚未公开发行、配置稳定发行签名或自动更新。GitHub Actions 本轮未运行；此前账号级禁用记录见 0.2，未反复派发或将本地通过当作云端 CI 通过。
 
-- P2P 当前支持 MP4 / DASH 完整文件；HLS 保留有限、非加密完整下载，尚不互传。DASH 多轨有实现，但没有把目标 B 站长视频的全程实播列为已验收。
-- 浏览器单轨最多 96 MiB、合计最多 128 MiB；原生客户端最多 4 GiB，预留 256 MiB 磁盘。苹果 Safari、Android 真机、后台/锁屏、跨运营商网络和长视频尚未验收。
-- 本轮 Windows 原站探测：Bilibili 检测到 196 秒 DASH；喜番检测到 1420.132426 秒 MP4；蜜柑检测到 1420.224 秒 MP4。喜番此前访问失败，本轮可以探测到播放器与源；这些结果不等于三站长视频全程同步或缓存通过。
-- 默认没有 TURN；无法直连且无法下载源站时，会明确失败，不保证所有网络都能零中继观看。
-- 免费额度按账号汇总，使用仍受平台请求、活跃时长和存储配额限制。
-- 本轮未构建 Docker 镜像、未启动模拟器。
+所有高内存任务均由受控入口串行执行，检查真实 NRC-Win64-Shipping 和内存；未根据窗口标题判断、全局杀 Java 或操作其他设备。
 
-所有本地构建/测试串行经受控入口执行，检查实际 `NRC-Win64-Shipping` 与可用内存；仅清理所属进程，没有按窗口标题判定游戏，没有全局终止 Java。
-
-本机详细证据：`.local/onboarding-evidence.json`、`.local/ui-evidence.json`、`.local/p2p-evidence.json`、`.local/worker-evidence.json`、`.local/public-evidence.json`、`.local/package-evidence.json`、`.local/apk-evidence.json`；截图位于 `.local/screenshots/`。这些本地文件不提交仓库。
+本机证据：.local/onboarding-evidence.json、worker-evidence.json、p2p-evidence.json、bilibili-local-evidence.json、bilibili-evidence.json、package-evidence.json、apk-evidence.json、asar-evidence.json；截图位于 .local/screenshots。这些文件不提交仓库。
