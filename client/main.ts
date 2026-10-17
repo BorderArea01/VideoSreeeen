@@ -620,13 +620,28 @@ async function resizeSite() {
     return;
   }
   const rect = $('native-stage').getBoundingClientRect();
+  let bounds = { x: Math.max(0, rect.x), y: Math.max(0, rect.y), width: 0, height: 0 };
+  bounds.width = Math.max(0, Math.min(innerWidth, rect.right) - bounds.x);
+  bounds.height = Math.max(0, Math.min(innerHeight, rect.bottom) - bounds.y);
+  const panel = $('chat-panel');
+  if (panel.classList.contains('floating') && !$('sidebar').hidden) {
+    const chat = panel.getBoundingClientRect();
+    const right = bounds.x + bounds.width,
+      bottom = bounds.y + bounds.height;
+    if (chat.left < right && chat.right > bounds.x && chat.top < bottom && chat.bottom > bounds.y) {
+      const regions = [
+        { ...bounds, width: Math.max(0, chat.left - bounds.x - 8) },
+        { ...bounds, x: chat.right + 8, width: Math.max(0, right - chat.right - 8) },
+        { ...bounds, height: Math.max(0, chat.top - bounds.y - 8) },
+        { ...bounds, y: chat.bottom + 8, height: Math.max(0, bottom - chat.bottom - 8) },
+      ];
+      bounds = regions.sort((a, b) => b.width * b.height - a.width * a.height)[0]!;
+    }
+  }
   await nativeCall('siteBounds', {
-    x: rect.x,
-    y: rect.y,
-    width: rect.width,
-    height: rect.height,
+    ...bounds,
     viewportWidth: innerWidth,
-    hidden: false,
+    hidden: bounds.width < 96 || bounds.height < 64,
   }).catch(error);
 }
 const cache = new DeviceCache(cacheProgress);
@@ -897,7 +912,7 @@ $('chat-toggle').onclick = () => {
 };
 let dragging: { x: number; y: number; left: number; top: number } | null = null;
 $('chat-drag').onpointerdown = (event) => {
-  if ((event.target as HTMLElement).closest('button') || innerWidth < 850) return;
+  if ((event.target as HTMLElement).closest('button')) return;
   const panel = $('chat-panel');
   const r = panel.getBoundingClientRect();
   panel.classList.add('floating');
@@ -905,13 +920,27 @@ $('chat-drag').onpointerdown = (event) => {
   panel.style.top = r.top + 'px';
   dragging = { x: event.clientX, y: event.clientY, left: r.left, top: r.top };
   $('chat-drag').setPointerCapture(event.pointerId);
+  void resizeSite();
 };
 $('chat-drag').onpointermove = (event) => {
   if (!dragging) return;
   $('chat-panel').style.left =
-    Math.max(0, Math.min(innerWidth - 330, dragging.left + event.clientX - dragging.x)) + 'px';
+    Math.max(
+      0,
+      Math.min(
+        innerWidth - $('chat-panel').offsetWidth,
+        dragging.left + event.clientX - dragging.x,
+      ),
+    ) + 'px';
   $('chat-panel').style.top =
-    Math.max(0, Math.min(innerHeight - 120, dragging.top + event.clientY - dragging.y)) + 'px';
+    Math.max(
+      0,
+      Math.min(
+        innerHeight - $('chat-panel').offsetHeight,
+        dragging.top + event.clientY - dragging.y,
+      ),
+    ) + 'px';
+  void resizeSite();
 };
 $('chat-drag').onpointerup = () => {
   dragging = null;
@@ -920,6 +949,7 @@ $('chat-dock').onclick = () => {
   $('chat-panel').classList.remove('floating');
   $('chat-panel').style.left = '';
   $('chat-panel').style.top = '';
+  void resizeSite();
 };
 window.addEventListener('resize', () => {
   void resizeSite();

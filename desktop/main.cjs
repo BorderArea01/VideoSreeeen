@@ -118,8 +118,13 @@ async function openSite(url) {
   });
   const view = site;
   let timer;
+  let domReady;
   try {
     await Promise.race([
+      new Promise((resolve) => {
+        domReady = resolve;
+        view.webContents.once('dom-ready', domReady);
+      }),
       view.webContents.loadURL(validUrl(url)),
       new Promise((_, reject) => {
         timer = setTimeout(() => {
@@ -130,6 +135,8 @@ async function openSite(url) {
     ]);
   } finally {
     clearTimeout(timer);
+    if (domReady && !view.webContents.isDestroyed())
+      view.webContents.removeListener('dom-ready', domReady);
   }
   return {};
 }
@@ -160,7 +167,7 @@ app.whenReady().then(async () => {
     };
   }
   bridge = fs.readFileSync(path.join(__dirname, '../shared/page-bridge.js'), 'utf8');
-  cache = new DiskCache(path.join(app.getPath('cache'), 'VideoSreeeen', 'media'), (data) =>
+  cache = new DiskCache(path.join(app.getPath('userData'), 'cache', 'media'), (data) =>
     event('cache', data),
   );
   await cache.init();

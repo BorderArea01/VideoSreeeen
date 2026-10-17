@@ -1,8 +1,9 @@
 import { chromium, _electron as electron } from 'playwright';
 import assert from 'node:assert/strict';
 import { once } from 'node:events';
-import { mkdir, writeFile } from 'node:fs/promises';
-import { resolve } from 'node:path';
+import { createServer } from 'node:http';
+import { mkdir, writeFile, readdir } from 'node:fs/promises';
+import { resolve, join } from 'node:path';
 import { createApp } from '../server/index';
 
 const output = resolve('.local/screenshots');
@@ -127,8 +128,22 @@ try {
   );
   evidence.autoCleanup = room.cleaned;
   assert.ok(room.cleaned);
+  await first.waitForFunction(async () =>
+    (await caches.keys()).every((key) => !key.startsWith('videosreeeen-')),
+  );
+  evidence.browserCacheStorageEmpty = true;
   await second.close();
   await first.setViewportSize({ width: 390, height: 844 });
+  await first.locator('#chat-drag').scrollIntoViewIfNeeded();
+  const mobileDrag = await first.locator('#chat-drag').boundingBox();
+  assert.ok(mobileDrag);
+  await first.mouse.move(mobileDrag.x + 30, mobileDrag.y + 20);
+  await first.mouse.down();
+  await first.mouse.move(70, 180);
+  await first.mouse.up();
+  assert.ok(await first.locator('#chat-panel').evaluate((e) => e.classList.contains('floating')));
+  await first.locator('#chat-dock').click();
+  evidence.mobileChatDrag = true;
   await first.screenshot({ path: resolve(output, 'mobile-room.png'), fullPage: true });
   assert.ok(await first.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
   await context.close();
@@ -182,8 +197,37 @@ try {
       {},
       { timeout: 20000 },
     );
+    await page.waitForFunction(() =>
+      document.querySelector('#mode-description')!.textContent!.includes('本机应用缓存已清理'),
+    );
+    const cacheRoot = join(
+      await desktop.evaluate(({ app }) => app.getPath('userData')),
+      'cache',
+      'media',
+    );
+    assert.deepEqual(await readdir(cacheRoot), []);
+    evidence.windowsCacheDirectoryEmpty = true;
     evidence.windowsNativeDiskCache = 'downloaded, played from disk, automatically cleared';
     console.log('Windows native disk cache passed');
+    const fixture = createServer((request, response) => {
+      if (request.url === '/') {
+        response.setHeader('Content-Type', 'text/html');
+        response.end('<html><body>Ready<iframe src="/pending"></iframe></body></html>');
+      }
+    });
+    fixture.listen(0, '127.0.0.1');
+    await once(fixture, 'listening');
+    const fixtureUrl = `http://127.0.0.1:${(fixture.address() as any).port}`;
+    try {
+      const start = Date.now();
+      await page.evaluate((url) => window.desktop!.call('openSite', { url }), fixtureUrl);
+      assert.ok(Date.now() - start < 5000);
+      evidence.domReadyWithPendingIframe = true;
+    } finally {
+      await page.evaluate(() => window.desktop!.call('closeSite'));
+      fixture.closeAllConnections();
+      await new Promise<void>((done) => fixture.close(() => done()));
+    }
     const sites = [
       ['bilibili', 'https://www.bilibili.com/video/BV1KQp565ENm/'],
       ['xifan', 'https://next.xifanacg.com/anime/151/play/1985?source=xfy2'],
