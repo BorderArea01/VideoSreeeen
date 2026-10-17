@@ -1,6 +1,6 @@
 # 0.4.0 验证记录
 
-验收日期：2026-10-18。运行时代码提交：`1948f376fd388c3fa1ff9e851fbb0f794c68a36b`。后续仅更新测试脚本和验证文档；发布标签对应同一运行时代码。
+验收日期：2026-10-18。运行时代码提交：`1948f376fd388c3fa1ff9e851fbb0f794c68a36b`。后续仅调整测试、发布脚本和文档；发布标签对应同一运行时代码。
 
 ## 已实现与自动验证
 
@@ -38,7 +38,7 @@
 
 ## 分发产物
 
-发布文件已准备到 `artifacts/release/0.4.0/`，包括两端客户端、latest.yml、blockmap、Android update.json 和 SHA256SUMS.txt；公开发布通过 `release:publish` 单独完成。安装包来源与更新机制见 [updates.md](updates.md)。
+发布文件已准备到 `artifacts/release/0.4.0/`，包括两端客户端、latest.yml、blockmap、Android update.json 和 SHA256SUMS.txt；Release v0.4.0 已创建、7 个 GitHub 资产摘要均与本地一致；但匿名访问个人主页、仓库和最新 Release 均为 404，Windows 实际在线更新检查也返回 404，公共分发仍未通过。具体证据与需账号本人处理的步骤见 [github-access.md](github-access.md)。安装包来源与更新机制见 [updates.md](updates.md)。
 
 | 产物                     |      字节数 | SHA-256                                                            |
 | ------------------------ | ----------: | ------------------------------------------------------------------ |

@@ -27,6 +27,8 @@
 
 **客户端：[Windows 安装版](https://github.com/BorderArea01/VideoSreeeen/releases/latest/download/VideoSreeeen-Setup.exe) · [Android APK](https://github.com/BorderArea01/VideoSreeeen/releases/latest/download/VideoSreeeen-Android.apk) · [全部版本与校验和](https://github.com/BorderArea01/VideoSreeeen/releases)。**
 
+当前 GitHub 账号的匿名公开访问异常：主页、仓库和 Release 返回 404，公共下载与在线更新暂不可用；安装包已生成并上传，详情和支持请求草稿见 [github-access.md](docs/github-access.md)。网页与房间服务可使用。
+
 Windows 安装版支持应用内下载和重启更新，便携版仍提供。Android 应用内下载后交给系统确认安装，正式版保持固定包名和签名，不需要卸载旧版；之前的 debug APK 与首个正式 APK 签名不同，不能直接覆盖。苹果设备使用网页版。发布与签名维护见 [updates.md](docs/updates.md)。
 
 原站的登录、画质与付费权限仍由原站决定，提供方自行完成验证。浏览器不能直接控制跨站 iframe；可以接收成员共享的实时音视频。免费公共服务只传房间状态、信令和聊天附件，视频不经 Cloudflare；目前没有付费 TURN，P2P 不能直连时可使用链接同步。
