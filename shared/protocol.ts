@@ -42,6 +42,8 @@ export interface CacheStatus {
   fingerprint?: string;
   error?: string;
   epoch: number;
+  peerBytes?: number;
+  sourceBytes?: number;
 }
 export interface Member {
   id: string;
@@ -116,6 +118,8 @@ export const clientMessageSchema = z.discriminatedUnion('type', [
     state: z.enum(['downloading', 'ready', 'error', 'idle']),
     progress: z.number().finite().min(0).max(1),
     bytes: z.number().int().min(0).max(17179869184),
+    peerBytes: z.number().int().nonnegative().max(17179869184).optional(),
+    sourceBytes: z.number().int().nonnegative().max(17179869184).optional(),
     fingerprint: z
       .string()
       .regex(/^[a-f0-9]{64}$/)
@@ -138,6 +142,26 @@ export const clientMessageSchema = z.discriminatedUnion('type', [
     duration: z.number().finite().positive().max(604800),
   }),
   z.object({ type: z.literal('ping'), sentAt: z.number().finite() }),
+  z.object({ type: z.literal('probe'), nonce: id }),
+  z.object({
+    type: z.literal('signal'),
+    to: id,
+    mediaId: id,
+    epoch: z.number().int().nonnegative(),
+    data: z.discriminatedUnion('kind', [
+      z.object({
+        kind: z.literal('description'),
+        type: z.enum(['offer', 'answer']),
+        sdp: z.string().max(32000),
+      }),
+      z.object({
+        kind: z.literal('candidate'),
+        candidate: z.string().max(2000),
+        sdpMid: z.string().nullable(),
+        sdpMLineIndex: z.number().int().nonnegative().nullable(),
+      }),
+    ]),
+  }),
   z.object({ type: z.literal('snapshot') }),
 ]);
 export type ClientMessage = z.infer<typeof clientMessageSchema>;
@@ -146,4 +170,12 @@ export type ServerMessage =
   | { type: 'state'; room: Snapshot }
   | { type: 'error'; code: string; message: string; room?: Snapshot }
   | { type: 'pong'; sentAt: number }
+  | { type: 'probe'; nonce: string }
+  | {
+      type: 'signal';
+      from: string;
+      mediaId: string;
+      epoch: number;
+      data: Extract<ClientMessage, { type: 'signal' }>['data'];
+    }
   | { type: 'cleanup'; mediaId: string; epoch: number };

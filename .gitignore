@@ -3,6 +3,8 @@ dist/
 dist-server/
 artifacts/
 .local/
+.wrangler/
+.dev.vars
 *.log
 .env
 android/.gradle/

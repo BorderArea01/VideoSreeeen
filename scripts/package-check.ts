@@ -9,7 +9,7 @@ await mkdir(dir, { recursive: true });
 const evidence: Record<string, unknown> = {};
 const app = await electron.launch({
   executablePath: resolve('artifacts/windows/win-unpacked/VideoSreeeen.exe'),
-  args: ['--mute-audio'],
+  args: ['--mute-audio', '--user-data-dir=' + resolve('.local/package-profile')],
   timeout: 30000,
 });
 let local = '';
@@ -20,6 +20,22 @@ try {
     if (message.type() === 'error') console.log('packaged browser:', message.text().slice(0, 300));
   });
   assert.ok(page.url().startsWith('file:'));
+  await page.locator('#web-entry').waitFor();
+  await app.evaluate(({ shell }) => {
+    (globalThis as any).__openExternal = shell.openExternal;
+    shell.openExternal = async (url) => {
+      (globalThis as any).__webEntryURL = url;
+    };
+  });
+  await page.locator('#web-entry').click();
+  assert.equal(
+    await app.evaluate(() => (globalThis as any).__webEntryURL),
+    'https://videosreeeen.pages.dev/',
+  );
+  await app.evaluate(({ shell }) => {
+    shell.openExternal = (globalThis as any).__openExternal;
+  });
+  evidence.webEntryButton = true;
   const info = await page.evaluate(() => window.desktop!.call('serverInfo'));
   assert.ok(info?.local);
   local = info.local;
@@ -27,7 +43,8 @@ try {
   assert.equal(health.app, 'videosreeeen');
   await page.locator('#room-button').click();
   await page.locator('#name-input').fill('便携版验收');
-  assert.equal(await page.locator('#server-input').inputValue(), info.share);
+  assert.equal(await page.locator('#server-input').inputValue(), 'https://videosreeeen.pages.dev');
+  await page.locator('#server-input').fill(info.share);
   await page.locator('#create-button').click();
   await page.locator('#connection.online').waitFor();
   await page
@@ -42,6 +59,20 @@ try {
   await page.locator('#play-button').click();
   await page.waitForFunction(() => document.querySelector('video')!.currentTime > 0.3);
   await page.locator('#play-button').click();
+  await page.locator('#mode-toggle').click();
+  await page.locator('#cache-button').click();
+  await page.waitForFunction(
+    () => document.querySelector('video')!.getAttribute('src')?.startsWith('vs-cache:'),
+    {},
+    { timeout: 45000 },
+  );
+  await page.locator('#play-button').click();
+  await page.waitForFunction(
+    () => document.querySelector('#mode-description')!.textContent!.includes('本机应用缓存已清理'),
+    {},
+    { timeout: 20000 },
+  );
+  evidence.packagedBlockCachePlaybackAndCleanup = true;
   evidence.packagedApp = {
     fileOrigin: true,
     embeddedServer: health.ok,
@@ -64,7 +95,7 @@ evidence.embeddedServerStopped = true;
 console.log('Packaged Windows application and embedded server passed');
 // Also launch the delivered portable wrapper. It extracts its own runtime and
 // exits after capturing a real window, without requiring Node/npm on the user PC.
-const portable = resolve('artifacts/windows/VideoSreeeen 0.1.0.exe');
+const portable = resolve('artifacts/windows/VideoSreeeen 0.2.0.exe');
 await access(portable);
 const screenshot = resolve(dir, 'windows-portable.png');
 await new Promise<void>((resolveDone, reject) => {

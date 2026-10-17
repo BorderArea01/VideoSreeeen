@@ -121,6 +121,10 @@ final class MediaCache {
                     conn.setConnectTimeout(20000);
                     conn.setReadTimeout(20000);
                     conn.setRequestProperty("Accept-Encoding", "identity");
+                    if (plan.has("referer")) conn.setRequestProperty(
+                        "Referer",
+                        plan.getString("referer")
+                    );
                     int code = conn.getResponseCode();
                     if (code != 200) throw new IOException("视频下载失败 (" + code + ")");
                     long expected = conn.getContentLengthLong(),

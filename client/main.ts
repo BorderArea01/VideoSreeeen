@@ -6,6 +6,7 @@ import { PROTOCOL, parseInvite } from '../shared/invite';
 import { describeUrl } from '../shared/sites';
 import { positionAt, reconcile } from '../shared/sync';
 import { DeviceCache } from './cache';
+import { RoomPeers } from './peers';
 import { isNative, nativeCall, onNative, platform, type NativeCache, type Sample } from './native';
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -25,7 +26,7 @@ const save = (key: string, value: string) => {
 };
 
 $('app').innerHTML = `
-<header class="topbar"><a class="brand" href="#" aria-label="VideoSreeeen 首页"><span class="brand-mark">${icon('film', 24)}</span><span>Video<span class="brand-light">Sreeeen</span><small>一起，把时间留给电影。</small></span></a><div class="top-actions"><span id="connection" class="connection"><i></i>尚未连接</span><span id="platform" class="platform"></span>${button('settings-button', '连接设置', 'settings')}<button id="room-button" class="button accent small">${icon('plus', 17)} 创建 / 加入房间</button></div></header>
+<header class="topbar"><a class="brand" href="#" aria-label="VideoSreeeen 首页"><span class="brand-mark">${icon('film', 24)}</span><span>Video<span class="brand-light">Sreeeen</span><small>一起，把时间留给电影。</small></span></a><div class="top-actions"><span id="connection" class="connection"><i></i>尚未连接</span><span id="platform" class="platform"></span><button id="web-entry" class="button soft small" hidden>打开网页版</button>${button('settings-button', '连接设置', 'settings')}<button id="room-button" class="button accent small">${icon('plus', 17)} 创建 / 加入房间</button></div></header>
 <main class="workspace"><section class="screen-column"><div class="room-heading"><div><div class="eyebrow">YOUR SHARED SCREEN</div><h1 id="room-title">同一刻，同一幕<span class="orange-dot">.</span></h1><p id="room-subtitle">不在同一个地方，也能分享同一段时光。</p></div><div class="heading-actions">${button('invite-button', '复制房间邀请', 'link')}${button('chat-toggle', '隐藏或显示聊天室', 'chat')}</div></div>
 <section id="stage" class="stage"><div id="welcome" class="welcome"><div class="scene-lines"></div><div class="scene-orb"></div><div class="frame-index">V / S <span>PRIVATE CINEMA</span></div><div class="welcome-text"><span class="tag">距离很远，故事很近</span><h2>今晚的电影，<br>想和你一起看。</h2><p>创建一个放映室，发送邀请。<br>剩下的，就交给这个夜晚。</p><button id="hero-create" class="button accent">${icon('plus', 18)} 开启我们的放映室 ${icon('arrow', 17)}</button></div><div class="scene-footer"><span>PRESS PLAY. STAY CLOSE.</span><span>01 — ∞</span></div></div><video id="video" playsinline preload="metadata" hidden></video><audio id="audio" preload="metadata"></audio><div id="native-stage" class="native-stage" hidden><div class="native-hint">正在客户端内打开原站…</div></div><div id="browser-hint" class="browser-hint" hidden>${icon('globe', 36)}<h3>已共享原站页面</h3><p>浏览器暂不能直接控制此网站的播放器。<br>请让一位客户端成员打开原站，识别视频源后共享给房间。</p></div><div id="cache-overlay" class="cache-overlay" hidden><span class="cache-icon">${icon('download', 28)}</span><h3 id="cache-title">先下载，再一起看</h3><p id="cache-description">每人完整缓存，等最慢的朋友准备好。</p><div class="cache-track"><i id="cache-progress"></i></div><button id="cache-button" class="button accent">开始本机缓存</button></div></section>
 <div class="transport"><button id="play-button" class="play-button" title="播放或暂停" aria-label="播放或暂停">${icon('play', 19)}</button><span id="position" class="time">00:00</span><input id="seek" aria-label="播放进度" type="range" min="0" max="100" step="0.1" value="0"><span id="duration" class="time muted">00:00</span><select id="rate" aria-label="播放速度"><option value="0.5">0.5×</option><option value="1" selected>1×</option><option value="1.25">1.25×</option><option value="1.5">1.5×</option><option value="2">2×</option></select>${button('fullscreen', '全屏', 'expand')}</div>
@@ -33,24 +34,33 @@ $('app').innerHTML = `
 <section class="mode-card"><div class="mode-copy"><span class="mode-symbol">${icon('download', 22)}</span><div><h3>共同缓存模式 <span class="pill">为慢网络准备</span></h3><p id="mode-description">所有人完整下载后再播放，看完自动清理缓存。</p></div></div><button id="mode-toggle" class="switch" role="switch" aria-checked="false" aria-label="共同缓存模式"><i></i></button></section><div class="screen-foot"><span>${icon('shield', 14)} 多人可控 · 自动同步</span><span id="sync-status">等待加入房间</span></div>
 </section>
 <aside id="sidebar" class="sidebar"><section class="members-card"><div class="section-heading"><span>${icon('users', 18)} 放映室成员 <b id="member-count">0</b></span><span class="live-label">${icon('signal', 14)} RTT</span></div><div id="members" class="members"><p class="empty-members">座位已经留好，<br>就等朋友们到场。</p></div><button id="sidebar-invite" class="invite-line">${icon('plus', 16)} 邀请朋友一起看</button></section><section id="chat-panel" class="chat-panel"><div id="chat-drag" class="chat-heading"><div>${icon('chat', 18)} 聊天室 <span class="tiny-dot"></span></div><div><span class="drag-hint">拖拽悬浮</span>${button('chat-dock', '停靠聊天室', 'expand')}</div></div><div id="chat-messages" class="chat-messages"><div id="chat-empty" class="chat-empty"><span>${icon('chat', 30)}</span><p>好故事，值得边看边聊。</p><small>加入房间后，消息会出现在这里。</small></div></div><div id="emoji-picker" class="emoji-picker" hidden></div><div class="chat-compose"><textarea id="chat-input" aria-label="聊天消息" placeholder="说点什么，分享这一刻…" rows="2" maxlength="2000"></textarea><div class="compose-actions"><div>${button('emoji-button', '选择表情', 'smile')}${button('image-button', '发送图片或 GIF 表情包', 'image')}<input id="image-input" type="file" accept="image/png,image/jpeg,image/gif,image/webp" hidden></div><button id="send-button" class="send-button" title="发送消息" aria-label="发送消息">${icon('send', 17)}</button></div><small>Enter 发送 · Shift + Enter 换行</small></div></section><div class="sidebar-foot">MADE FOR MOMENTS TOGETHER <span>✳</span></div></aside></main>
-<footer class="app-foot"><span>VideoSreeeen <b>0.1</b></span><span>让每一次播放，都有陪伴。</span><button id="leave-button" class="text-button" hidden>${icon('exit', 14)} 离开放映室</button></footer>
+<footer class="app-foot"><span>VideoSreeeen <b>0.2</b></span><span>让每一次播放，都有陪伴。</span><button id="leave-button" class="text-button" hidden>${icon('exit', 14)} 离开放映室</button></footer>
 <dialog id="room-dialog"><form id="room-form"><div class="dialog-heading"><div><div class="eyebrow">LET'S WATCH TOGETHER</div><h2>你的专属放映室</h2></div><button id="dialog-close" type="button" class="icon-button" aria-label="关闭">${icon('close')}</button></div><p class="dialog-copy">取个名字，带上朋友。无需注册，也不用安装扩展。</p><label>你的昵称<input id="name-input" maxlength="30" placeholder="让朋友认出你" required></label><label>房间服务器<input id="server-input" type="url" placeholder="https://你的服务器" required></label><label>邀请链接或邀请码 <span class="muted">（加入时填写）</span><input id="invite-input" placeholder="ABC234:邀请密钥"></label><p class="dialog-note">自己建房可以留空邀请码。局域网内，手机请填写电脑的局域网地址。</p><div class="dialog-buttons"><button id="create-button" type="submit" class="button accent">创建房间</button><button id="join-button" type="button" class="button outline">加入朋友的房间</button></div><p id="dialog-error" class="form-error" role="alert"></p></form></dialog><div id="toast" class="toast" role="status" hidden></div>`;
 
 $('platform').textContent = platform;
+$('web-entry').hidden = !window.desktop;
+$('web-entry').onclick = () => {
+  void nativeCall('openBrowser', {
+    url: activeServer || $<HTMLInputElement>('server-input').value,
+  }).catch(error);
+};
 const video = $<HTMLVideoElement>('video'),
   audio = $<HTMLAudioElement>('audio');
 const dialog = $<HTMLDialogElement>('room-dialog');
+const publicServer =
+  (import.meta as ImportMeta & { env: { VITE_PUBLIC_SERVER?: string } }).env.VITE_PUBLIC_SERVER ||
+  '';
 const defaultServer =
   /^https?:$/.test(location.protocol) && location.hostname !== 'videosreeeen.local'
     ? location.port === '5173'
       ? `${location.protocol}//${location.hostname}:8787`
       : location.origin
-    : 'http://127.0.0.1:8787';
+    : publicServer || 'http://127.0.0.1:8787';
 $<HTMLInputElement>('server-input').value = saved('server') || defaultServer;
 $<HTMLInputElement>('name-input').value = saved('name');
 if (parseInvite(location.hash.slice(1)))
   $<HTMLInputElement>('invite-input').value = location.hash.slice(1);
-if (window.desktop && !saved('server'))
+if (window.desktop && !saved('server') && !publicServer)
   void nativeCall('serverInfo')
     .then((info) => {
       if (info?.share) $<HTMLInputElement>('server-input').value = info.share;
@@ -72,6 +82,9 @@ let desiredSession = false,
   retries = 0,
   anchoredAt = 0,
   rtt: number | null = null;
+let mediaRelay = true;
+let clearing: Promise<void> = Promise.resolve();
+let cacheContext: { jobId: string; mediaId: string; epoch: number } | null = null;
 let hls: Hls | null = null,
   loadedMedia = '',
   loadedKind = '',
@@ -181,7 +194,34 @@ async function connect(kind: 'create' | 'join', reconnect = false) {
   ws?.close();
   connected = false;
   connectionView(reconnect ? '正在重新连接' : '正在连接');
-  const socket = new WebSocket(activeServer.replace(/^http/, 'ws') + '/ws');
+  mediaRelay = true;
+  peers.setIceServers([], false);
+  let roomRouting = false;
+  try {
+    const response = await fetch(activeServer + '/config', { signal: AbortSignal.timeout(8000) });
+    if (response.ok) {
+      const config = await response.json();
+      mediaRelay = config.mediaRelay !== false;
+      roomRouting = config.roomRouting === true;
+      peers.setIceServers(
+        Array.isArray(config.iceServers) ? config.iceServers : [],
+        config.p2p === true,
+      );
+    }
+  } catch {
+    mediaRelay = true;
+  }
+  const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  const code =
+    kind === 'join'
+      ? parseInvite(invite)!.code
+      : Array.from(
+          crypto.getRandomValues(new Uint8Array(6)),
+          (b) => alphabet[b % alphabet.length],
+        ).join('');
+  const socket = new WebSocket(
+    activeServer.replace(/^http/, 'ws') + '/ws' + (roomRouting ? '?room=' + code : ''),
+  );
   ws = socket;
   return new Promise<void>((resolve, reject) => {
     let welcomed = false;
@@ -225,6 +265,8 @@ async function connect(kind: 'create' | 'join', reconnect = false) {
             socket.close();
           } else toast(message.message);
         } else if (message.type === 'pong') rtt = Math.max(0, performance.now() - message.sentAt);
+        else if (message.type === 'probe') send({ type: 'probe', nonce: message.nonce });
+        else if (message.type === 'signal') peers.receive(message);
         else if (
           message.type === 'cleanup' &&
           room?.media?.id === message.mediaId &&
@@ -237,7 +279,12 @@ async function connect(kind: 'create' | 'join', reconnect = false) {
                 cleanupState = 'done';
                 render();
               }
-              toast('本轮本机应用缓存已清理');
+              if (
+                room?.media?.id === message.mediaId &&
+                room.epoch === message.epoch &&
+                room.finished
+              )
+                toast('本轮本机应用缓存已清理');
             })
             .catch((e) => {
               cleanupState = 'error';
@@ -259,6 +306,7 @@ async function connect(kind: 'create' | 'join', reconnect = false) {
       clearTimeout(timeout);
       if (ws !== socket) return;
       connected = false;
+      peers.close();
       pendingControl = false;
       connectionView('连接已断开');
       video.pause();
@@ -278,13 +326,18 @@ function adopt(snapshot: Snapshot) {
   const previous = room;
   const changed = previous?.media?.id !== snapshot.media?.id || previous?.epoch !== snapshot.epoch;
   if (changed) {
+    cacheContext = null;
     cleanupState = 'idle';
-    void clearPlayback();
+    clearing = clearPlayback();
     lastRevision = -1;
     lastRemoteSeq = -1;
     remoteFrame = '';
   }
   room = snapshot;
+  // Accept offers immediately. Native file cleanup may finish after signaling
+  // has already arrived; starting a new download still awaits `clearing`.
+  peers.configure(room, memberId);
+  if (changed) void clearing.catch(error);
   anchoredAt = performance.now() - snapshot.playbackAgeMs - (rtt ?? 0) / 2;
   render();
   if (
@@ -391,7 +444,12 @@ function render() {
       ? (mine.error ?? '缓存失败')
       : mine?.state === 'ready'
         ? '等待其他朋友准备好，再开始播放。'
-        : '视频会缓存到自己的设备，看完自动清理。';
+        : '优先从房间成员互传，连接失败时回退下载。看完自动清理。';
+  if (mine?.peerBytes !== undefined)
+    $('cache-description').textContent +=
+      ` 已从成员接收 ${(mine.peerBytes / 1024 ** 2).toFixed(1)} MiB，源站 ${((mine.sourceBytes ?? 0) / 1024 ** 2).toFixed(1)} MiB。`;
+  if (cacheNote && mine?.state === 'downloading')
+    $('cache-description').textContent += ' ' + cacheNote;
   $<HTMLButtonElement>('cache-button').disabled =
     cacheStartBusy || mine?.state === 'downloading' || mine?.state === 'ready';
   $('cache-button').textContent = room?.finished
@@ -471,6 +529,7 @@ async function clearPlayback() {
   await cache.clear().catch(error);
 }
 async function stopCachedPlayback() {
+  cacheContext = null;
   if (loadedKind === 'cache') {
     hls?.destroy();
     hls = null;
@@ -486,6 +545,8 @@ async function stopCachedPlayback() {
   await cache.clear();
 }
 function mediaPath(slot: string) {
+  if (!mediaRelay && room?.media?.source)
+    return slot === 'audio' ? room.media.source.audio! : room.media.source.video;
   return `${activeServer}/media/${room!.code}/${room!.mediaToken}/${slot}`;
 }
 async function setPlayer(src: string, audioSrc?: string, isHls = false) {
@@ -644,10 +705,21 @@ async function resizeSite() {
     hidden: bounds.width < 96 || bounds.height < 64,
   }).catch(error);
 }
-const cache = new DeviceCache(cacheProgress);
+const peers = new RoomPeers(send);
+const cache = new DeviceCache(cacheProgress, peers);
 let lastProgressSend = 0;
+let cacheNote = '';
 function cacheProgress(event: NativeCache) {
-  if (event.jobId !== cache.jobId || !room?.media || room.mode !== 'cache') return;
+  if (
+    event.jobId !== cache.jobId ||
+    !room?.media ||
+    room.mode !== 'cache' ||
+    cacheContext?.jobId !== event.jobId ||
+    cacheContext.mediaId !== room.media.id ||
+    cacheContext.epoch !== room.epoch
+  )
+    return;
+  if (event.state === 'downloading' && event.error) cacheNote = event.error;
   const now = performance.now();
   if (event.state !== 'downloading' || now - lastProgressSend > 800) {
     lastProgressSend = now;
@@ -658,6 +730,8 @@ function cacheProgress(event: NativeCache) {
       state: event.state,
       progress: event.progress,
       bytes: event.bytes,
+      peerBytes: event.peerBytes,
+      sourceBytes: event.sourceBytes,
       ...(event.fingerprint ? { fingerprint: event.fingerprint } : {}),
       ...(event.error ? { error: event.error } : {}),
     });
@@ -789,10 +863,20 @@ $('cache-button').onclick = () => {
       epoch = room.epoch;
     const jobId = crypto.randomUUID();
     cacheStartBusy = true;
+    cacheNote = '';
     send({ type: 'cache', mediaId, epoch, state: 'downloading', progress: 0, bytes: 0 });
     render();
     try {
-      await cache.start(jobId, activeServer, `/cache-plan/${room.code}/${room.mediaToken}`);
+      await clearing;
+      if (room?.media?.id !== mediaId || room.epoch !== epoch || !room.media.source) return;
+      peers.configure(room, memberId);
+      cacheContext = { jobId, mediaId, epoch };
+      await cache.start(
+        jobId,
+        activeServer,
+        `/cache-plan/${room.code}/${room.mediaToken}`,
+        room.media.source,
+      );
     } catch (e) {
       if (room?.media?.id === mediaId && room.epoch === epoch) {
         send({

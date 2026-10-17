@@ -45,13 +45,26 @@ export function createApp(options: { now?: () => number; origins?: string[] } = 
     }
     try {
       const url = new URL(req.url ?? '/', 'http://localhost');
+      if (url.pathname === '/config') {
+        res.setHeader('Content-Type', 'application/json');
+        res.end(
+          JSON.stringify({
+            mediaRelay: true,
+            p2p: true,
+            iceServers: JSON.parse(
+              process.env.ICE_SERVERS ?? '[{"urls":"stun:stun.cloudflare.com:3478"}]',
+            ),
+          }),
+        );
+        return;
+      }
       if (url.pathname === '/healthz') {
         res.setHeader('Content-Type', 'application/json');
         res.end(
           JSON.stringify({
             ok: true,
             app: 'videosreeeen',
-            version: '0.1.0',
+            version: '0.2.0',
             rooms: rooms.rooms.size,
           }),
         );
@@ -92,7 +105,7 @@ export function createApp(options: { now?: () => number; origins?: string[] } = 
   server.on('upgrade', (req, socket, head) => {
     const ip = req.socket.remoteAddress ?? 'unknown';
     if (
-      req.url !== '/ws' ||
+      new URL(req.url ?? '/', 'http://localhost').pathname !== '/ws' ||
       !originAllowed(req.headers.origin, req.headers.host) ||
       (connections.get(ip) ?? 0) >= 24
     ) {
@@ -108,7 +121,7 @@ export function createApp(options: { now?: () => number; origins?: string[] } = 
   wss.on('connection', (ws: WebSocket) => {
     let room: Room | null = null;
     let seat: ReturnType<Rooms['create']>['seat'] | null = null;
-    let tokens = 20;
+    let tokens = 100;
     let tick = Date.now();
     let invalid = 0;
     let pingAt = 0;
@@ -136,7 +149,7 @@ export function createApp(options: { now?: () => number; origins?: string[] } = 
     heartbeat.unref();
     ws.on('message', (raw) => {
       const now = Date.now();
-      tokens = Math.min(20, tokens + (now - tick) * 0.006);
+      tokens = Math.min(100, tokens + (now - tick) * 0.02);
       tick = now;
       if (tokens < 1) {
         ws.close(4008, 'rate limited');
@@ -213,7 +226,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   const app = createApp();
   const port = Number(process.env.PORT ?? 8787);
   app.server.listen(port, process.env.HOST ?? '0.0.0.0', () =>
-    console.log(`VideoSreeeen 0.1.0 listening on ${port}`),
+    console.log(`VideoSreeeen 0.2.0 listening on ${port}`),
   );
   for (const signal of ['SIGINT', 'SIGTERM'] as const)
     process.once(signal, () => {

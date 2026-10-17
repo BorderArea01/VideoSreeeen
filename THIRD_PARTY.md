@@ -7,6 +7,7 @@
 - hls.js：HLS 播放；Apache-2.0。
 - ws、Zod、ipaddr.js：WebSocket、消息校验与 IP 地址校验；MIT。
 - TypeScript、Vite、tsx、esbuild、Playwright：开发与验证工具，依原包许可证使用。
+- Wrangler、Miniflare、Cloudflare Workers Types：Cloudflare 构建、本地 workerd 验证和类型；MIT / Apache-2.0，依各包 LICENSE 保留。P2P 使用浏览器 WebRTC API 自行实现，没有将 WebTorrent 或公共 Tracker 打包进客户端。
 
 研究参考：
 
@@ -15,5 +16,8 @@
 - https://www.electronjs.org/docs/latest/api/web-contents-view
 - https://developer.android.com/reference/android/webkit/WebView
 - https://developer.android.com/reference/androidx/webkit/WebViewCompat
+- https://webtorrent.io/faq
+- https://github.com/Novage/p2p-media-loader
+- https://developers.cloudflare.com/durable-objects/best-practices/websockets/
 
 项目代码为独立实现，未整体导入这两个参考项目。测试真实视频使用 MDN 提供的 CC0 flower.mp4，只在验收时获取，不提交仓库或分发到安装包。

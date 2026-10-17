@@ -1,6 +1,6 @@
 {
   "name": "videosreeeen",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "description": "多人观影：Windows、Android 和浏览器，共同缓存与 WebSocket 同步",
   "license": "GPL-3.0-only",
@@ -20,7 +20,17 @@
     "test": "tsx --test --test-concurrency=1 tests/*.test.ts",
     "test:ui": "tsx scripts/ui-check.ts",
     "format": "prettier --write \"**/*.{ts,mjs,cjs,js,json,css,html,yml,yaml,md,java}\"",
-    "format:check": "prettier --check \"**/*.{ts,mjs,cjs,js,json,css,html,yml,yaml,md,java}\""
+    "format:check": "prettier --check \"**/*.{ts,mjs,cjs,js,json,css,html,yml,yaml,md,java}\"",
+    "check:worker": "tsc --noEmit -p worker/tsconfig.json",
+    "worker:dev": "wrangler dev --ip 127.0.0.1 --port 8788 --persist-to .local/cloudflare",
+    "worker:check": "wrangler deploy --dry-run --outdir .local/worker-build",
+    "worker:deploy": "wrangler deploy",
+    "test:p2p": "tsx scripts/p2p-check.ts",
+    "verify": "npm run format:check && npm test && npm run build && npm run check:worker && npm run worker:check",
+    "test:worker": "tsx scripts/worker-check.ts",
+    "pages:prepare": "node scripts/build-pages.mjs",
+    "pages:deploy": "npm run pages:prepare && wrangler --cwd pages pages deploy ../.local/pages-dist --project-name videosreeeen --branch main --commit-dirty=true",
+    "test:public": "tsx scripts/public-check.ts"
   },
   "dependencies": {
     "hls.js": "^1.6.13",
@@ -29,17 +39,20 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
+    "@cloudflare/workers-types": "^5.20261016.1",
     "@types/node": "^24.10.0",
     "@types/ws": "^8.18.1",
     "electron": "^40.0.0",
     "electron-builder": "^26.0.12",
     "esbuild": "^0.28.2",
+    "miniflare": "^5.20261012.1-beta",
     "playwright": "^1.58.0",
     "prettier": "^3.9.10",
     "prettier-plugin-java": "^2.11.0",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3",
-    "vite": "^7.3.1"
+    "vite": "^7.3.1",
+    "wrangler": "^4.151.1"
   },
   "build": {
     "appId": "io.github.borderarea01.videosreeeen",

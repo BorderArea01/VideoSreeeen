@@ -1,6 +1,7 @@
 const { contextBridge, ipcRenderer } = require('electron');
 const allowed = new Set([
   'serverInfo',
+  'openBrowser',
   'openSite',
   'closeSite',
   'siteBounds',
@@ -8,6 +9,7 @@ const allowed = new Set([
   'applySite',
   'cacheStart',
   'cacheClear',
+  'cacheIO',
 ]);
 contextBridge.exposeInMainWorld('desktop', {
   call(method, payload) {

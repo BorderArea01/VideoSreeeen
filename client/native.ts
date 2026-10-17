@@ -20,6 +20,8 @@ export interface NativeCache {
   jobId: string;
   entry?: string;
   audio?: string;
+  peerBytes?: number;
+  sourceBytes?: number;
 }
 declare global {
   interface Window {
@@ -78,10 +80,15 @@ export async function nativeCall(method: string, payload?: unknown): Promise<any
   if (!window.VSNative) throw new Error('此功能需要 Windows 或 Android 客户端');
   const id = crypto.randomUUID();
   return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => {
-      pending.delete(id);
-      reject(new Error('客户端响应超时'));
-    }, 20000);
+    const timer = setTimeout(
+      () => {
+        pending.delete(id);
+        reject(new Error('客户端响应超时'));
+      },
+      method === 'cacheIO' && (payload as { action?: string })?.action === 'finish'
+        ? 180000
+        : 20000,
+    );
     pending.set(id, { resolve, reject, timer });
     window.VSNative!.request(id, method, JSON.stringify(payload ?? {}));
   });

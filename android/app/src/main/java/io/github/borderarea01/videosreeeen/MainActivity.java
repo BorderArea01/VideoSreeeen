@@ -22,10 +22,12 @@ public class MainActivity extends Activity {
     private FrameLayout root;
     private String bridge;
     private MediaCache cache;
+    private BlockCache blocks;
     private volatile JSONObject sample = new JSONObject();
     private final List<JavaScriptReplyProxy> frames = new ArrayList<>();
     private final List<String> observed = Collections.synchronizedList(new ArrayList<>());
     private final ExecutorService calls = Executors.newSingleThreadExecutor();
+    private final ExecutorService ioCalls = Executors.newSingleThreadExecutor();
     private View fullScreen;
 
     @Override
@@ -55,6 +57,7 @@ public class MainActivity extends Activity {
                 bridge = output.toString("UTF-8");
             }
             cache = new MediaCache(new File(getCacheDir(), "viewing-media"), this::emit);
+            blocks = new BlockCache(new File(getCacheDir(), "viewing-media"));
         } catch (Exception e) {
             throw new IllegalStateException(e);
         }
@@ -315,11 +318,21 @@ public class MainActivity extends Activity {
         public void request(String id, String method, String raw) {
             if (
                 id == null ||
+                method == null ||
                 !id.matches("[a-f0-9-]{36}") ||
                 raw == null ||
                 raw.length() > 4 * 1024 * 1024
             ) return;
-            calls.execute(() -> {
+            if (method.equals("cacheClear")) {
+                try {
+                    blocks.cancel(new JSONObject(raw).getString("jobId"));
+                } catch (Exception e) {
+                    resolve(id, null, e.getMessage());
+                    return;
+                }
+            }
+            ExecutorService executor = method.startsWith("cache") ? ioCalls : calls;
+            executor.execute(() -> {
                 try {
                     JSONObject payload = new JSONObject(raw);
                     if (method.equals("cacheStart")) {
@@ -327,7 +340,12 @@ public class MainActivity extends Activity {
                         return;
                     }
                     if (method.equals("cacheClear")) {
+                        blocks.cancel(payload.getString("jobId"));
                         resolve(id, cache.clear(payload.getString("jobId")), null);
+                        return;
+                    }
+                    if (method.equals("cacheIO")) {
+                        resolve(id, blocks.call(payload), null);
                         return;
                     }
                     runOnUiThread(() -> {
@@ -468,8 +486,10 @@ public class MainActivity extends Activity {
 
     @Override
     protected void onDestroy() {
+        if (blocks != null) blocks.cancel("*");
         if (cache != null) cache.close();
         calls.shutdownNow();
+        ioCalls.shutdownNow();
         closeSite();
         if (ui != null) {
             ui.removeJavascriptInterface("VSNative");

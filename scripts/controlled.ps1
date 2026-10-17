@@ -20,6 +20,7 @@ $proc = $null
 try {
   $lock = [IO.File]::Open((Join-Path $guardDir 'build.lock'), 'OpenOrCreate', 'ReadWrite', 'None')
   $env:NODE_OPTIONS = '--max-old-space-size=384'
+  $env:WRANGLER_SEND_METRICS = 'false'
   $env:GRADLE_OPTS = '-Dorg.gradle.daemon=false -Dorg.gradle.workers.max=1 -Dorg.gradle.parallel=false'
   $env:CARGO_BUILD_JOBS = '1'
   $env:ELECTRON_BUILDER_COMPRESSION_LEVEL = '5'

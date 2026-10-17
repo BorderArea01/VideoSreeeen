@@ -1,5 +1,4 @@
 import { randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
-import type WebSocket from 'ws';
 import {
   parseInvite,
   type CacheStatus,
@@ -16,9 +15,15 @@ import { positionAt } from '../shared/sync';
 const token = () => randomBytes(24).toString('base64url');
 const same = (a: string, b: string) =>
   a.length === b.length && timingSafeEqual(Buffer.from(a), Buffer.from(b));
+export interface RoomSocket {
+  readyState: number;
+  bufferedAmount?: number;
+  send(raw: string): void;
+  close(code?: number, reason?: string): void;
+}
 interface Seat extends Member {
   resume: string;
-  socket: WebSocket | null;
+  socket: RoomSocket | null;
   disconnectedAt: number;
 }
 export interface Room {
@@ -37,6 +42,10 @@ export interface Room {
   ops: Map<string, true>;
   cleaned: boolean;
 }
+export type StoredRoom = Omit<Room, 'members' | 'ops'> & {
+  members: Array<[string, Omit<Seat, 'socket'>]>;
+  ops: string[];
+};
 export class RoomError extends Error {
   constructor(
     public code: string,
@@ -48,16 +57,50 @@ export class RoomError extends Error {
 export class Rooms {
   rooms = new Map<string, Room>();
   constructor(private now = () => Date.now()) {}
+  dump(room: Room): StoredRoom {
+    return {
+      ...room,
+      members: [...room.members].map(([id, { socket: _socket, ...seat }]) => [id, seat]),
+      ops: [...room.ops.keys()],
+    };
+  }
+  restore(saved: StoredRoom, sockets = new Map<string, RoomSocket>()) {
+    const room: Room = {
+      ...saved,
+      members: new Map(
+        saved.members.map(([id, seat]) => [
+          id,
+          {
+            ...seat,
+            socket: sockets.get(id) ?? null,
+            online: sockets.has(id),
+            ...(!sockets.has(id) && seat.online
+              ? { disconnectedAt: this.now(), cache: this.idleCache(saved.epoch), rtt: null }
+              : {}),
+          },
+        ]),
+      ),
+      ops: new Map(saved.ops.map((id) => [id, true])),
+    };
+    this.rooms.set(room.code, room);
+    this.pauseForBarrier(room);
+    return room;
+  }
   idleCache(epoch: number): CacheStatus {
     return { epoch, state: 'idle', progress: 0, bytes: 0 };
   }
-  create(name: string, socket: WebSocket): { room: Room; seat: Seat } {
+  create(name: string, socket: RoomSocket, preferredCode?: string): { room: Room; seat: Seat } {
     if (this.rooms.size >= 100) throw new RoomError('capacity', '服务器房间已满，请稍后再试');
     let code: string;
     const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
     do {
       code = Array.from(randomBytes(6), (b) => alphabet[b % alphabet.length]).join('');
     } while (this.rooms.has(code));
+    if (preferredCode) {
+      if (!/^[A-HJ-NP-Z2-9]{6}$/.test(preferredCode) || this.rooms.has(preferredCode))
+        throw new RoomError('occupied', '房间地址已被使用，请重新创建');
+      code = preferredCode;
+    }
     const room: Room = {
       code,
       token: token(),
@@ -85,7 +128,7 @@ export class Rooms {
     this.rooms.set(code, room);
     return { room, seat: this.addSeat(room, name, socket) };
   }
-  join(invite: string, name: string, socket: WebSocket, resume?: string) {
+  join(invite: string, name: string, socket: RoomSocket, resume?: string) {
     const parsed = parseInvite(invite);
     const room = parsed && this.rooms.get(parsed.code);
     if (!room || !same(room.token, parsed!.token))
@@ -104,7 +147,7 @@ export class Rooms {
     room.touched = this.now();
     return { room, seat };
   }
-  private addSeat(room: Room, name: string, socket: WebSocket): Seat {
+  private addSeat(room: Room, name: string, socket: RoomSocket): Seat {
     if (room.members.size >= 16) throw new RoomError('room_full', '房间最多 16 人');
     const seat: Seat = {
       id: randomUUID(),
@@ -159,9 +202,9 @@ export class Rooms {
       chat: room.chat,
     };
   }
-  send(socket: WebSocket | null, message: ServerMessage) {
+  send(socket: RoomSocket | null, message: ServerMessage) {
     if (socket?.readyState === 1) {
-      if (socket.bufferedAmount > 2 * 1024 * 1024) {
+      if ((socket.bufferedAmount ?? 0) > 2 * 1024 * 1024) {
         socket.close(4008, 'slow consumer');
         return;
       }
@@ -172,7 +215,7 @@ export class Rooms {
     const data = message ?? { type: 'state', room: this.snapshot(room) };
     for (const s of room.members.values()) this.send(s.socket, data as ServerMessage);
   }
-  disconnect(room: Room, seat: Seat, socket: WebSocket, leave = false) {
+  disconnect(room: Room, seat: Seat, socket: RoomSocket, leave = false) {
     if (seat.socket !== socket) return;
     seat.socket = null;
     seat.online = false;
@@ -225,6 +268,25 @@ export class Rooms {
     if (!seat.online || !room.members.has(seat.id))
       throw new RoomError('not_in_room', '请重新加入房间');
     room.touched = this.now();
+    if (message.type === 'signal') {
+      if (
+        room.mode !== 'cache' ||
+        room.cleaned ||
+        room.media?.id !== message.mediaId ||
+        room.epoch !== message.epoch
+      )
+        throw new RoomError('stale_signal', '缓存连接已失效');
+      const target = room.members.get(message.to);
+      if (!target?.online || target.id === seat.id) return;
+      this.send(target.socket, {
+        type: 'signal',
+        from: seat.id,
+        mediaId: message.mediaId,
+        epoch: message.epoch,
+        data: message.data,
+      });
+      return;
+    }
     if ('op' in message) {
       const key = `${seat.id}:${message.op}`;
       if (room.ops.has(key)) {
@@ -329,6 +391,8 @@ export class Rooms {
           fingerprint: message.fingerprint,
           error: message.error,
           epoch: room.epoch,
+          peerBytes: message.peerBytes,
+          sourceBytes: message.sourceBytes,
         };
         this.pauseForBarrier(room);
         break;

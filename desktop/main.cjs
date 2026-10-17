@@ -1,9 +1,19 @@
-const { app, BrowserWindow, WebContentsView, ipcMain, protocol, session } = require('electron');
+const {
+  app,
+  BrowserWindow,
+  WebContentsView,
+  ipcMain,
+  protocol,
+  session,
+  shell,
+} = require('electron');
 const fs = require('node:fs');
 const path = require('node:path');
 const { pathToFileURL } = require('node:url');
 const os = require('node:os');
 const { DiskCache } = require('./cache.cjs');
+const { BlockCache } = require('./blocks.cjs');
+let blocks;
 protocol.registerSchemesAsPrivileged([
   {
     scheme: 'vs-cache',
@@ -171,6 +181,7 @@ app.whenReady().then(async () => {
     event('cache', data),
   );
   await cache.init();
+  blocks = new BlockCache(cache);
   protocol.handle('vs-cache', (req) => cache.response(req));
   const siteSession = session.fromPartition('persist:sites');
   siteSession.setPermissionRequestHandler((_wc, _permission, callback) => callback(false));
@@ -211,6 +222,8 @@ app.whenReady().then(async () => {
     switch (method) {
       case 'serverInfo':
         return serverInfo;
+      case 'openBrowser':
+        return shell.openExternal(validUrl(data.url));
       case 'openSite':
         return openSite(data.url);
       case 'closeSite':
@@ -245,7 +258,10 @@ app.whenReady().then(async () => {
       case 'cacheStart':
         return cache.start(data);
       case 'cacheClear':
+        blocks.cancel(data.jobId);
         return cache.clear(data.jobId);
+      case 'cacheIO':
+        return blocks.call(data);
       default:
         throw new Error('未知命令');
     }

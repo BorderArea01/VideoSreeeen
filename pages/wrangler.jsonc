@@ -1,0 +1,7 @@
+{
+  "$schema": "../node_modules/wrangler/config-schema.json",
+  "name": "videosreeeen",
+  "pages_build_output_dir": "../.local/pages-dist",
+  "compatibility_date": "2026-10-01",
+  "services": [{ "binding": "WATCH", "service": "videosreeeen" }]
+}

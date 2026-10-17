@@ -10,5 +10,5 @@ if($RerunChecks){$gradleArguments+='--rerun-tasks'}
 & (Join-Path $PSScriptRoot 'controlled.ps1') -File $Gradle -Arguments $gradleArguments -PrioritizeBuildWhenNoGame
 $output=Join-Path $workspace 'artifacts/android'
 New-Item -ItemType Directory -Path $output -Force|Out-Null
-Copy-Item -LiteralPath (Join-Path $workspace 'android/app/build/outputs/apk/debug/app-debug.apk') -Destination (Join-Path $output 'VideoSreeeen-0.1.0-debug.apk')
-Get-FileHash -LiteralPath (Join-Path $output 'VideoSreeeen-0.1.0-debug.apk') -Algorithm SHA256
+Copy-Item -LiteralPath (Join-Path $workspace 'android/app/build/outputs/apk/debug/app-debug.apk') -Destination (Join-Path $output 'VideoSreeeen-0.2.0-debug.apk')
+Get-FileHash -LiteralPath (Join-Path $output 'VideoSreeeen-0.2.0-debug.apk') -Algorithm SHA256

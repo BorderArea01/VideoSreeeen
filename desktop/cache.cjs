@@ -84,7 +84,10 @@ class DiskCache {
         } else {
           const url = new URL(file.url);
           if (!['http:', 'https:'].includes(url.protocol)) throw new Error('缓存下载地址无效');
-          const response = await this.fetcher(url.href, { signal });
+          const response = await this.fetcher(url.href, {
+            signal,
+            headers: plan.referer ? { Referer: plan.referer } : undefined,
+          });
           if (!response.ok || !response.body) throw new Error(`视频下载失败 (${response.status})`);
           const expected = Number(response.headers.get('content-length') || 0);
           let count = 0;
