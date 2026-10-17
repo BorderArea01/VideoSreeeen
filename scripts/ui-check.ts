@@ -91,20 +91,16 @@ try {
   await second.locator('#play-button').click();
   await first.waitForFunction(() => document.querySelector('video')!.paused);
   evidence.sharedPlayback = {
-    first: await first
-      .locator('video')
-      .evaluate((v) => ({
-        time: (v as HTMLVideoElement).currentTime,
-        paused: (v as HTMLVideoElement).paused,
-        duration: (v as HTMLVideoElement).duration,
-      })),
-    second: await second
-      .locator('video')
-      .evaluate((v) => ({
-        time: (v as HTMLVideoElement).currentTime,
-        paused: (v as HTMLVideoElement).paused,
-        duration: (v as HTMLVideoElement).duration,
-      })),
+    first: await first.locator('video').evaluate((v) => ({
+      time: (v as HTMLVideoElement).currentTime,
+      paused: (v as HTMLVideoElement).paused,
+      duration: (v as HTMLVideoElement).duration,
+    })),
+    second: await second.locator('video').evaluate((v) => ({
+      time: (v as HTMLVideoElement).currentTime,
+      paused: (v as HTMLVideoElement).paused,
+      duration: (v as HTMLVideoElement).duration,
+    })),
   };
   await first.locator('#mode-toggle').click();
   await first.locator('#cache-button').click();

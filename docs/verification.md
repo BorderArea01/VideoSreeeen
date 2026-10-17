@@ -2,6 +2,11 @@
 
 日期：2026-10-18。首版 0.1.0。Android + Windows；苹果只使用浏览器。
 
+运行时代码来源：[bf1e56b](https://github.com/BorderArea01/VideoSreeeen/commit/bf1e56b9736a4d64608fe56caea01eec75bf94af)。本地产物位于 `artifacts/`，不将安装包或已下载视频提交到源码历史。
+
+- Windows `VideoSreeeen 0.1.0.exe` SHA-256：`0010CFF5A0FADFE8A7FEA2CCB646CC33F0307874470658E48481E5BA96827F91`
+- Android `VideoSreeeen-0.1.0-debug.apk` SHA-256：`5824B5EAD21B3E0D78D341B592F88B14AF6E540ECB536AFA1CCA0AE6D2889946`
+
 ## 已完成的验证
 
 - 类型检查、共享界面和 Node 服务端构建通过。
