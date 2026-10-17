@@ -2,18 +2,19 @@
 
 日期：2026-10-18。首版 0.1.0。Android + Windows；苹果只使用浏览器。
 
-运行时代码来源：[bf1e56b](https://github.com/BorderArea01/VideoSreeeen/commit/bf1e56b9736a4d64608fe56caea01eec75bf94af)。本地产物位于 `artifacts/`，不将安装包或已下载视频提交到源码历史。
+运行时代码来源：[5f1f4eb](https://github.com/BorderArea01/VideoSreeeen/commit/5f1f4ebf199ce28faf0a5fff809f0282703e46fa)。本地产物位于 `artifacts/`，不将安装包或已下载视频提交到源码历史。
 
-- Windows `VideoSreeeen 0.1.0.exe` SHA-256：`0010CFF5A0FADFE8A7FEA2CCB646CC33F0307874470658E48481E5BA96827F91`
-- Android `VideoSreeeen-0.1.0-debug.apk` SHA-256：`5824B5EAD21B3E0D78D341B592F88B14AF6E540ECB536AFA1CCA0AE6D2889946`
+- Windows `VideoSreeeen 0.1.0.exe` SHA-256：`871E4894A35B221FB04EF6CB107DD4A5246D62C35C1445E5C9946AE474ECFE39`
+- Android `VideoSreeeen-0.1.0-debug.apk` SHA-256：`BF5C82F0E438F9A268B976CCBD44D56313331A6A64A734428AB480DFDC6B2166`
 
 ## 已完成的验证
 
 - 类型检查、共享界面和 Node 服务端构建通过。
 - 15 项自动测试通过：真实 WebSocket 建房/加入/双端聊天、浏览器和 Windows 文件来源、邀请鉴权、控制冲突和去重、断线恢复、旧缓存代次、内容指纹、结束/离开清理、磁盘 Range 读取、下载中断与路径边界、原站手动操作和回声抑制、HLS 基础验证。
-- 单个 Edge 浏览器上下文中的两个真实页面：创建房间、复制邀请后加入、聊天、恶意 HTML 作为纯文本显示、GIF 表情、Emoji、聊天室拖拽、手机宽度布局。
+- 单个 Edge 浏览器上下文中的两个真实页面：创建房间、复制邀请后加入、聊天、恶意 HTML 作为纯文本显示、GIF 表情、Emoji、桌面/手机宽度下的聊天室拖拽与停靠、无横向溢出的手机布局。
 - 实际 CC0 视频 flower.mp4：两端播放/暂停；每端完整缓存 **1,128,375 字节**，内容指纹一致；随后使用各自本地缓存播放，全员自然结束后清理。
-- Windows 原生客户端：实际文件流式落盘，通过 `vs-cache://` 本地协议播放，结束后删除缓存。
+- Windows 原生客户端：实际文件流式落盘，通过 `vs-cache://` 本地协议播放，结束后删除缓存。额外检查 Windows 缓存目录与浏览器 Cache Storage 均为空，不能用播放器停止作为文件已删除的证据。
+- 原站主页面 DOM 就绪后即可进入，不等待无关子框架完全加载；使用一个保持请求不结束的 iframe 验证，主页面仍可在 5 秒内打开。
 - Windows 成品已实际验证：从文件加载的界面可建房并播放真实视频；内置服务健康检查通过，退出后服务不可再访问；便携 EXE 能自行解压运行、截图并退出。开发模式通过不能代替这项成品验证。
 - Android 调试 APK 构建和 Lint 通过（0 错误，保留 JavaScript 必需、备份配置和保守磁盘空间检查相关的 3 条提示）。不安装设备，遵照用户本轮“只生成 APK”的选择。
 
