@@ -9,12 +9,16 @@ await mkdir(dir, { recursive: true });
 const evidence: Record<string, unknown> = {};
 const app = await electron.launch({
   executablePath: resolve('artifacts/windows/win-unpacked/VideoSreeeen.exe'),
-  args: ['--mute-audio', '--user-data-dir=' + resolve('.local/package-profile')],
+  args: ['--mute-audio'],
   timeout: 30000,
 });
 let local = '';
+let previousSettings: Record<string, string> | undefined;
 try {
   const page = await app.firstWindow();
+  previousSettings = await page.evaluate(() => Object.fromEntries(Object.entries(localStorage)));
+  await page.evaluate(() => localStorage.clear());
+  await page.reload();
   await page.locator('#platform').filter({ hasText: 'Windows 客户端' }).waitFor();
   page.on('console', (message) => {
     if (message.type() === 'error') console.log('packaged browser:', message.text().slice(0, 300));
@@ -88,6 +92,15 @@ try {
   console.log('Packaged dialog:', await page.locator('#dialog-error').textContent());
   throw error;
 } finally {
+  if (previousSettings)
+    await (
+      await app.firstWindow()
+    )
+      .evaluate((settings) => {
+        localStorage.clear();
+        for (const [key, value] of Object.entries(settings)) localStorage.setItem(key, value);
+      }, previousSettings)
+      .catch(() => {});
   await app.close();
 }
 await assert.rejects(fetch(local + '/healthz'));
