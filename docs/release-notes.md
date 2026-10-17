@@ -6,7 +6,7 @@
 - 精简界面文案，常用说明移到悬停或折叠帮助。
 - Windows 安装版接入 GitHub Releases 更新；Android 应用内下载并校验更新，安装由系统确认，保持相同包名和发布签名。
 
-下载 `VideoSreeeen-Setup.exe` 获取 Windows 安装版（支持后续应用内更新）；`VideoSreeeen 0.4.0.exe` 为便携版。Android 使用 `VideoSreeeen-Android.apk`。SHA-256 见 `SHA256SUMS.txt`。
+下载 `VideoSreeeen-Setup.exe` 获取 Windows 安装版（支持后续应用内更新）；`VideoSreeeen-Portable-0.4.0.exe` 为便携版。Android 使用 `VideoSreeeen-Android.apk`。SHA-256 见 `SHA256SUMS.txt`。
 
 首次正式 APK 使用独立固定签名，不能覆盖旧的 debug 签名 APK；请勿为切换签名擅自卸载有数据的应用。苹果设备使用 [网页版](https://videosreeeen.pages.dev)。
 

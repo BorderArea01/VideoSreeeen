@@ -13,7 +13,7 @@ Android 从固定仓库的 `update.json` 获取版本号、单调增加的 versi
 1. 修改 package.json / package-lock.json 的版本、Android versionName / versionCode、服务健康版本与发布说明；完成测试和产物检查。
 2. 本机按受控入口构建 Windows 和 Android 发布包。APK 使用 `scripts/build-android.ps1 -Release`，不安装到任何设备。
 3. 提交并推送对应源码，然后运行 `npm run release:prepare`，在 `artifacts/release/<版本>/` 生成两端包、Windows 更新元数据、Android 更新清单与校验和。
-4. `npm run release:publish` 核对主分支提交和清洁工作树，先创建草稿并上传完整文件，确认资产数量后才公开。已存在的版本不覆盖；失败留在草稿，修复后人工核查重试。
+4. `npm run release:publish` 核对主分支提交和清洁工作树，先创建草稿并上传完整文件，确认全部资产的大小和服务端 SHA-256 后才公开。已公开版本不覆盖；失败保留草稿，同一提交且已有文件摘要一致时可继续上传缺失文件，不替换已有资产。
 
 Android 发布需要 `VS_ANDROID_KEYSTORE`、`VS_ANDROID_STORE_PASSWORD`，别名 `videosreeeen`。本机的固定签名保存在工作区之外的 `D:/CodexData/local-secrets/VideoSreeeen/`，仅当前 Windows 用户及 SYSTEM 可访问。密码文件由当前用户的 Windows DPAPI 保护，**复制 DPAPI 文件到其他机器不能作为可解密的密码备份**；迁移前须在当前用户下解密并保存到自己的密码管理器，再安全备份 keystore。任何签名文件或密码均不得提交到仓库。
 
