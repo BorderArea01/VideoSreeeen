@@ -96,4 +96,4 @@ Windows/Android：支持完整文件、分离音视频和有限、非加密 HLS�
 
 首版房间与聊天在内存中；进程重启后邀请失效，需要重新建房。空房间保留 15 分钟；断线席位等待 30 秒。首版不支持多节点共享房间。`/healthz` 提供健康检查，不包含邀请和成员令牌。
 
-更多设计见 [architecture.md](docs/architecture.md)。代码仓库：[BorderArea01/VideoSreeeen](https://github.com/BorderArea01/VideoSreeeen)。
+更多设计见 [architecture.md](docs/architecture.md)，参与和反馈见 [贡献指南](CONTRIBUTING.md)。代码仓库：[BorderArea01/VideoSreeeen](https://github.com/BorderArea01/VideoSreeeen)。
