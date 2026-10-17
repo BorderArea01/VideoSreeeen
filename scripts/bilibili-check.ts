@@ -145,6 +145,12 @@ try {
     input.value = String(value);
     input.dispatchEvent(new Event('change', { bubbles: true }));
   }, b.duration - 0.8);
+  // Wait for the server's seek acknowledgement before issuing the next
+  // revision-based command; public RTT is longer than the local test's RTT.
+  await receiver.waitForFunction(() => {
+    const v = document.querySelector('video')!;
+    return v.paused && v.currentTime > v.duration - 1.4;
+  });
   await receiver.locator('#play-button').click();
   for (const page of [seed, receiver])
     await page.waitForFunction(

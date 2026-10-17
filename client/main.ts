@@ -406,12 +406,15 @@ function render() {
   const joined = !!room;
   const sourceNeeded = !isNative && !!room?.media && !room.media.source;
   const blocked = sourceNeeded || sourceFailed;
+  const cacheAvailable = !!room?.media?.source && (isNative || room.media.source.kind !== 'hls');
   $('browser-hint').hidden = !blocked || room?.mode === 'cache';
   $('browser-title').textContent = sourceNeeded ? '等待客户端识别视频' : '当前视频地址无法直接播放';
   $('browser-description').textContent = sourceNeeded
     ? '房间已收到网页链接，还没有可播放的视频。请让一位 Windows / Android 成员加入并打开此视频，新版客户端会自动识别共享。只有浏览器成员时，目前无法直接同步 B 站等原站页面。'
-    : '源站可能拒绝了当前地址的访问，或浏览器不支持该格式。可以改用共同缓存：客户端先下载，网页从成员接收；也可以让客户端重新识别。';
-  $('browser-cache').hidden = !room?.media?.source;
+    : !cacheAvailable
+      ? '视频流未能直接播放。浏览器暂不支持完整 HLS 缓存，请用 Windows / Android 客户端观看，或换用 MP4 / DASH 视频源。'
+      : '源站可能拒绝了当前地址的访问，或浏览器不支持该格式。可以改用共同缓存：客户端先下载，网页从成员接收；也可以让客户端重新识别。';
+  $('browser-cache').hidden = !cacheAvailable;
   $<HTMLButtonElement>('play-button').disabled = !joined || blocked;
   $<HTMLButtonElement>('mode-toggle').disabled = !room?.media?.source;
   if (!joined) {
