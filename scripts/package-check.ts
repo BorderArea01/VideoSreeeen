@@ -111,7 +111,7 @@ evidence.embeddedServerStopped = true;
 console.log('Packaged Windows application and embedded server passed');
 // Also launch the delivered portable wrapper. It extracts its own runtime and
 // exits after capturing a real window, without requiring Node/npm on the user PC.
-const portable = resolve('artifacts/windows/VideoSreeeen 0.3.0.exe');
+const portable = resolve('artifacts/windows/VideoSreeeen 0.3.1.exe');
 await access(portable);
 const screenshot = resolve(dir, 'windows-portable.png');
 await new Promise<void>((resolveDone, reject) => {

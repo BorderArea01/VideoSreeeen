@@ -28,16 +28,16 @@ const save = (key: string, value: string) => {
 $('app').innerHTML = `
 <header class="topbar"><a class="brand" href="#" aria-label="VideoSreeeen 首页"><span class="brand-mark">${icon('film', 24)}</span><span>Video<span class="brand-light">Sreeeen</span><small>一起，把时间留给电影。</small></span></a><div class="top-actions"><span id="connection" class="connection"><i></i>尚未连接</span><span id="platform" class="platform"></span><button id="web-entry" class="button soft small" hidden>打开网页版</button>${button('settings-button', '设置与帮助', 'settings')}<button id="room-button" class="button accent small">${icon('plus', 17)} 创建 / 加入房间</button></div></header>
 <main class="workspace"><section class="screen-column"><div class="room-heading"><div><div class="eyebrow">YOUR SHARED SCREEN</div><h1 id="room-title">同一刻，同一幕<span class="orange-dot">.</span></h1><p id="room-subtitle">不在同一个地方，也能分享同一段时光。</p></div><div class="heading-actions">${button('invite-button', '复制房间邀请', 'link')}${button('chat-toggle', '隐藏或显示聊天室', 'chat')}</div></div>
-<section id="stage" class="stage"><div id="welcome" class="welcome"><div class="scene-lines"></div><div class="scene-orb"></div><div class="frame-index">V / S <span>PRIVATE CINEMA</span></div><div class="welcome-text"><span class="tag">距离很远，故事很近</span><h2>今晚的电影，<br>想和你一起看。</h2><p>创建一个放映室，发送邀请。<br>剩下的，就交给这个夜晚。</p><div class="hero-actions"><button id="hero-create" class="button accent">${icon('plus', 18)} 开启我们的放映室 ${icon('arrow', 17)}</button><button id="hero-join" class="text-button">我有邀请，加入朋友 →</button></div></div><div class="scene-footer"><span>PRESS PLAY. STAY CLOSE.</span><span>01 — ∞</span></div></div><video id="video" playsinline preload="metadata" hidden></video><audio id="audio" preload="metadata"></audio><div id="native-stage" class="native-stage" hidden><div class="native-hint">正在客户端内打开原站…</div></div><div id="browser-hint" class="browser-hint" hidden>${icon('globe', 36)}<h3>已共享原站页面</h3><p>浏览器暂不能直接控制此网站的播放器。<br>请让一位客户端成员打开原站，识别视频源后共享给房间。</p></div><div id="cache-overlay" class="cache-overlay" hidden><span class="cache-icon">${icon('download', 28)}</span><h3 id="cache-title">先下载，再一起看</h3><p id="cache-description">每人完整缓存，等最慢的朋友准备好。</p><div class="cache-track"><i id="cache-progress"></i></div><button id="cache-button" class="button accent">开始本机缓存</button></div></section>
+<section id="stage" class="stage"><div id="welcome" class="welcome"><div class="scene-lines"></div><div class="scene-orb"></div><div class="frame-index">V / S <span>PRIVATE CINEMA</span></div><div class="welcome-text"><span class="tag">距离很远，故事很近</span><h2>今晚的电影，<br>想和你一起看。</h2><p>创建一个放映室，发送邀请。<br>剩下的，就交给这个夜晚。</p><div class="hero-actions"><button id="hero-create" class="button accent">${icon('plus', 18)} 开启我们的放映室 ${icon('arrow', 17)}</button><button id="hero-join" class="text-button">我有邀请，加入朋友 →</button></div></div><div class="scene-footer"><span>PRESS PLAY. STAY CLOSE.</span><span>01 — ∞</span></div></div><video id="video" playsinline preload="metadata" hidden></video><audio id="audio" preload="metadata"></audio><div id="native-stage" class="native-stage" hidden><div class="native-hint">正在客户端内打开原站…</div></div><div id="browser-hint" class="browser-hint" hidden>${icon('globe', 36)}<h3 id="browser-title">等待客户端识别视频</h3><p id="browser-description"></p><div class="browser-actions"><button id="browser-cache" class="button accent" hidden>改用共同缓存</button><button id="browser-invite" class="button outline">邀请客户端成员</button><button id="browser-help" class="text-button">查看使用方法</button></div></div><div id="cache-overlay" class="cache-overlay" hidden><span class="cache-icon">${icon('download', 28)}</span><h3 id="cache-title">先下载，再一起看</h3><p id="cache-description">每人完整缓存，等最慢的朋友准备好。</p><div class="cache-track"><i id="cache-progress"></i></div><button id="cache-button" class="button accent">开始本机缓存</button></div></section>
 <div class="transport"><button id="play-button" class="play-button" title="播放或暂停" aria-label="播放或暂停">${icon('play', 19)}</button><span id="position" class="time">00:00</span><input id="seek" aria-label="播放进度" type="range" min="0" max="100" step="0.1" value="0"><span id="duration" class="time muted">00:00</span><select id="rate" aria-label="播放速度"><option value="0.5">0.5×</option><option value="1" selected>1×</option><option value="1.25">1.25×</option><option value="1.5">1.5×</option><option value="2">2×</option></select>${button('fullscreen', '全屏', 'expand')}</div>
 <section class="source-card"><div class="section-heading"><span>${icon('film', 18)} 今晚看什么</span><span id="provider" class="subtle">分享你喜欢的故事</span></div><form id="source-form" class="source-form"><span class="input-icon">${icon('link', 18)}</span><input id="source-url" type="url" aria-label="视频页面或视频文件地址" placeholder="粘贴 B 站、喜番、蜜柑或视频直链…" required><button class="button soft" type="submit">共享视频 ${icon('arrow', 16)}</button></form><div class="source-bottom"><div class="site-chips"><button data-site="bilibili">哔哩哔哩</button><button data-site="xifan">喜番</button><button data-site="mgn">蜜柑</button><span>+ 视频直链</span></div><button id="extract-button" class="text-button" hidden>${icon('link', 14)} 识别并共享原站视频源</button></div></section>
 <section class="mode-card"><div class="mode-copy"><span class="mode-symbol">${icon('download', 22)}</span><div><h3>共同缓存模式 <span class="pill">为慢网络准备</span></h3><p id="mode-description">所有人完整下载后再播放，看完自动清理缓存。</p></div></div><button id="mode-toggle" class="switch" role="switch" aria-checked="false" aria-label="共同缓存模式"><i></i></button></section><div class="screen-foot"><span>${icon('shield', 14)} 多人可控 · 自动同步</span><span id="sync-status">等待加入房间</span></div>
 </section>
 <aside id="sidebar" class="sidebar"><section class="members-card"><div class="section-heading"><span>${icon('users', 18)} 放映室成员 <b id="member-count">0</b></span><span class="live-label">${icon('signal', 14)} RTT</span></div><div id="members" class="members"><p class="empty-members">座位已经留好，<br>就等朋友们到场。</p></div><button id="sidebar-invite" class="invite-line">${icon('plus', 16)} 邀请朋友一起看</button></section><section id="chat-panel" class="chat-panel"><div id="chat-drag" class="chat-heading"><div>${icon('chat', 18)} 聊天室 <span class="tiny-dot"></span></div><div><span class="drag-hint">拖拽悬浮</span>${button('chat-dock', '停靠聊天室', 'expand')}</div></div><div id="chat-messages" class="chat-messages"><div id="chat-empty" class="chat-empty"><span>${icon('chat', 30)}</span><p>好故事，值得边看边聊。</p><small>加入房间后，消息会出现在这里。</small></div></div><div id="emoji-picker" class="emoji-picker" hidden></div><div class="chat-compose"><textarea id="chat-input" aria-label="聊天消息" placeholder="说点什么，分享这一刻…" rows="2" maxlength="2000"></textarea><div class="compose-actions"><div>${button('emoji-button', '选择表情', 'smile')}${button('image-button', '发送图片或 GIF 表情包', 'image')}<input id="image-input" type="file" accept="image/png,image/jpeg,image/gif,image/webp" hidden></div><button id="send-button" class="send-button" title="发送消息" aria-label="发送消息">${icon('send', 17)}</button></div><small>Enter 发送 · Shift + Enter 换行</small></div></section><div class="sidebar-foot">MADE FOR MOMENTS TOGETHER <span>✳</span></div></aside></main>
-<footer class="app-foot"><span>VideoSreeeen <b>0.3</b></span><span>让每一次播放，都有陪伴。</span><button id="leave-button" class="text-button" hidden>${icon('exit', 14)} 离开放映室</button></footer>
+<footer class="app-foot"><span>VideoSreeeen <b>0.3.1</b></span><span>让每一次播放，都有陪伴。</span><button id="leave-button" class="text-button" hidden>${icon('exit', 14)} 离开放映室</button></footer>
 <dialog id="room-dialog" aria-labelledby="room-dialog-title"><form id="room-form"><div class="dialog-heading"><div><div class="eyebrow">LET'S WATCH TOGETHER</div><h2 id="room-dialog-title">你的专属放映室</h2></div><button id="dialog-close" type="button" class="icon-button" aria-label="关闭">${icon('close')}</button></div><p class="dialog-copy">无需注册，也不用安装扩展。邀请由我们自动生成。</p><div class="room-tabs" role="group" aria-label="创建或加入"><button id="create-tab" type="button" aria-pressed="true">创建房间</button><button id="join-tab" type="button" aria-pressed="false">我有邀请</button></div><label>你的昵称<input id="name-input" maxlength="30" autocomplete="nickname" placeholder="让朋友认出你" required></label><div id="invite-field" hidden><label>朋友的邀请链接或完整邀请码<input id="invite-input" autocomplete="off" spellcheck="false" placeholder="粘贴朋友发来的邀请"></label><p id="invite-server-hint" class="dialog-note">推荐使用完整链接，可自动找到朋友的房间。</p></div><p id="create-note" class="dialog-note">建好房间后，把自动生成的邀请发给朋友即可。<br>无需设置房间号或密码。</p><div class="dialog-buttons"><button id="create-button" type="submit" class="button accent">创建房间并生成邀请</button><button id="join-button" type="submit" class="button accent" hidden>加入朋友的房间</button></div><p id="dialog-error" class="form-error" role="alert"></p></form></dialog>
 <dialog id="invite-dialog" aria-labelledby="invite-title"><div class="dialog-heading"><div><div class="eyebrow">SAVE A SEAT FOR YOUR FRIENDS</div><h2 id="invite-title">房间已备好，邀请朋友吧</h2></div><button data-close="invite-dialog" class="icon-button" aria-label="关闭">${icon('close')}</button></div><p class="dialog-copy">朋友打开链接，填个昵称就能加入。苹果设备直接用浏览器。</p><label>邀请链接<input id="invite-link" readonly aria-label="邀请链接"></label><div class="dialog-buttons"><button id="copy-link" class="button accent">${icon('copy', 16)} 复制邀请链接</button><button id="share-invite" class="button outline" hidden>系统分享</button></div><details class="advanced"><summary>使用邀请码加入</summary><label>完整邀请码<input id="invite-code" readonly></label><button id="copy-code" class="text-button">复制邀请码</button><p class="dialog-note">邀请码只适用于相同服务器；跨服务器请发送完整邀请链接。不要只发送六位房间号。</p></details><p id="invite-feedback" class="form-error" role="status"></p><p class="dialog-note">持有邀请的人可以加入，请只分享给同行的朋友。房间暂时有效；失效后请重新建房。</p><button data-close="invite-dialog" class="button soft dialog-wide">继续选片</button></dialog>
-<dialog id="settings-dialog" aria-labelledby="settings-title"><form id="settings-form"><div class="dialog-heading"><div><div class="eyebrow">MAKE YOURSELF AT HOME</div><h2 id="settings-title">设置与帮助</h2></div><button type="button" data-close="settings-dialog" class="icon-button" aria-label="关闭">${icon('close')}</button></div><p class="dialog-copy">默认服务已经准备好，直接建房或接受邀请就能使用。</p><details id="connection-details" class="advanced"><summary>高级 · 房间服务器</summary><p class="dialog-note">仅自建或局域网用户需要修改。保存后用于下一次建房或邀请码加入，不会切换当前房间。</p><label>服务器地址<input id="server-input" type="url" placeholder="https://你的服务器" required></label><div class="dialog-buttons"><button type="submit" class="button accent">保存设置</button><button id="reset-server" type="button" class="button outline">恢复默认</button></div><p id="settings-error" class="form-error" role="alert"></p><p id="settings-status" class="dialog-note" role="status"></p></details><details class="advanced"><summary>第一次使用 · 怎么一起看？</summary><ol class="help-steps"><li>创建房间，把邀请链接发给朋友；朋友打开后填写昵称即可加入。</li><li>在“今晚看什么”粘贴视频地址。大家都可以播放、暂停、拖动。</li><li>看 B 站等网站时，由 Windows / Android 客户端打开原站，开始播放后点“识别并共享原站视频源”。浏览器成员使用识别出的源观看。</li><li>网络较慢时开启共同缓存，每个人下载完成后一起播放，看完自动清理。</li></ol></details><details class="advanced"><summary>浏览器与客户端有什么区别？</summary><p class="dialog-note">浏览器可建房、聊天、看直链和客户端共享的源；不能直接控制第三方网站的播放器。浏览器完整缓存目前限总计 128 MiB；长视频缓存请用客户端。Windows / Android 可在应用内打开原站，苹果设备使用浏览器。</p></details><div class="help-links"><button id="project-link" type="button" class="text-button">开源项目与构建说明 ↗</button><button id="feedback-link" type="button" class="text-button">反馈问题 ↗</button></div><p class="dialog-note">GPL-3.0 · 无需注册。昵称会保存在本机；房间服务会处理昵称、聊天和同步信息。公共服务可能受免费额度或网络影响，也可以自行部署。</p><button data-close="settings-dialog" type="button" class="button soft dialog-wide">返回观影</button></form></dialog><div id="toast" class="toast" role="status" hidden></div>`;
+<dialog id="settings-dialog" aria-labelledby="settings-title"><form id="settings-form"><div class="dialog-heading"><div><div class="eyebrow">MAKE YOURSELF AT HOME</div><h2 id="settings-title">设置与帮助</h2></div><button type="button" data-close="settings-dialog" class="icon-button" aria-label="关闭">${icon('close')}</button></div><p class="dialog-copy">默认服务已经准备好，直接建房或接受邀请就能使用。</p><details id="connection-details" class="advanced"><summary>高级 · 房间服务器</summary><p class="dialog-note">仅自建或局域网用户需要修改。保存后用于下一次建房或邀请码加入，不会切换当前房间。</p><label>服务器地址<input id="server-input" type="url" placeholder="https://你的服务器" required></label><div class="dialog-buttons"><button type="submit" class="button accent">保存设置</button><button id="reset-server" type="button" class="button outline">恢复默认</button></div><p id="settings-error" class="form-error" role="alert"></p><p id="settings-status" class="dialog-note" role="status"></p></details><details id="watch-help" class="advanced"><summary>第一次使用 · 怎么一起看？</summary><ol class="help-steps"><li>创建房间，把邀请链接发给朋友；朋友打开后填写昵称即可加入。</li><li>在“今晚看什么”粘贴视频地址。大家都可以播放、暂停、拖动。</li><li>看 B 站等网站时，由 Windows / Android 客户端打开原站，检测到视频后会自动共享；未识别到时可点“识别并共享原站视频源”。浏览器成员使用识别出的源观看。</li><li>网络较慢时开启共同缓存，每个人下载完成后一起播放，看完自动清理。</li></ol></details><details class="advanced"><summary>浏览器与客户端有什么区别？</summary><p class="dialog-note">浏览器可建房、聊天、看直链和客户端共享的源；不能直接控制第三方网站的播放器。浏览器完整缓存目前限总计 128 MiB；长视频缓存请用客户端。Windows / Android 可在应用内打开原站，苹果设备使用浏览器。</p></details><div class="help-links"><button id="project-link" type="button" class="text-button">开源项目与构建说明 ↗</button><button id="feedback-link" type="button" class="text-button">反馈问题 ↗</button></div><p class="dialog-note">GPL-3.0 · 无需注册。昵称会保存在本机；房间服务会处理昵称、聊天和同步信息。公共服务可能受免费额度或网络影响，也可以自行部署。</p><button data-close="settings-dialog" type="button" class="button soft dialog-wide">返回观影</button></form></dialog><div id="toast" class="toast" role="status" hidden></div>`;
 
 $('platform').textContent = platform;
 $('web-entry').hidden = !window.desktop;
@@ -88,7 +88,11 @@ let desiredSession = false,
   anchoredAt = 0,
   rtt: number | null = null;
 let mediaRelay = true;
+let sourceFailed = false;
+let autoSharedMedia = '';
 let clearing: Promise<void> = Promise.resolve();
+let clearingBusy = false,
+  clearingTicket = 0;
 let cacheContext: { jobId: string; mediaId: string; epoch: number } | null = null;
 let hls: Hls | null = null,
   loadedMedia = '',
@@ -356,9 +360,28 @@ function adopt(snapshot: Snapshot) {
   const previous = room;
   const changed = previous?.media?.id !== snapshot.media?.id || previous?.epoch !== snapshot.epoch;
   if (changed) {
+    const keepSite =
+      isNative &&
+      siteOpen &&
+      previous?.mode === 'stream' &&
+      snapshot.mode === 'stream' &&
+      previous.media?.url === snapshot.media?.url &&
+      !!snapshot.media?.source &&
+      snapshot.media?.provider !== 'direct';
+    sourceFailed = false;
     cacheContext = null;
     cleanupState = 'idle';
-    clearing = clearPlayback();
+    clearingBusy = true;
+    const ticket = ++clearingTicket;
+    clearing = clearPlayback(keepSite);
+    void clearing
+      .finally(() => {
+        if (clearingTicket === ticket) {
+          clearingBusy = false;
+          render();
+        }
+      })
+      .catch(error);
     lastRevision = -1;
     lastRemoteSeq = -1;
     remoteFrame = '';
@@ -381,6 +404,16 @@ function adopt(snapshot: Snapshot) {
 }
 function render() {
   const joined = !!room;
+  const sourceNeeded = !isNative && !!room?.media && !room.media.source;
+  const blocked = sourceNeeded || sourceFailed;
+  $('browser-hint').hidden = !blocked || room?.mode === 'cache';
+  $('browser-title').textContent = sourceNeeded ? '等待客户端识别视频' : '当前视频地址无法直接播放';
+  $('browser-description').textContent = sourceNeeded
+    ? '房间已收到网页链接，还没有可播放的视频。请让一位 Windows / Android 成员加入并打开此视频，新版客户端会自动识别共享。只有浏览器成员时，目前无法直接同步 B 站等原站页面。'
+    : '源站可能拒绝了当前地址的访问，或浏览器不支持该格式。可以改用共同缓存：客户端先下载，网页从成员接收；也可以让客户端重新识别。';
+  $('browser-cache').hidden = !room?.media?.source;
+  $<HTMLButtonElement>('play-button').disabled = !joined || blocked;
+  $<HTMLButtonElement>('mode-toggle').disabled = !room?.media?.source;
   if (!joined) {
     $('sync-status').textContent = '等待加入房间';
     $('position').textContent = $('duration').textContent = '00:00';
@@ -490,14 +523,16 @@ function render() {
   if (cacheNote && mine?.state === 'downloading')
     $('cache-description').textContent += ' ' + cacheNote;
   $<HTMLButtonElement>('cache-button').disabled =
-    cacheStartBusy || mine?.state === 'downloading' || mine?.state === 'ready';
+    clearingBusy || cacheStartBusy || mine?.state === 'downloading' || mine?.state === 'ready';
   $('cache-button').textContent = room?.finished
     ? '重新准备这一部'
     : mine?.state === 'ready'
       ? '等待全员就绪'
-      : mine?.state === 'downloading'
-        ? '正在下载…'
-        : '开始本机缓存';
+      : clearingBusy
+        ? '正在准备缓存…'
+        : mine?.state === 'downloading'
+          ? '正在下载…'
+          : '开始本机缓存';
   $('extract-button').hidden =
     !isNative || !room?.media || room.media.provider === 'direct' || caching;
   $('welcome').hidden = !!room?.media;
@@ -549,7 +584,8 @@ function renderChat() {
     messages.scrollTop = messages.scrollHeight;
   lastChatLength = room?.chat.length ?? 0;
 }
-async function clearPlayback() {
+async function clearPlayback(keepSite = false) {
+  sourceFailed = false;
   playerGeneration++;
   loadedMedia = '';
   loadedKind = '';
@@ -563,9 +599,12 @@ async function clearPlayback() {
   audio.load();
   video.hidden = true;
   $('browser-hint').hidden = true;
-  $('native-stage').hidden = true;
-  siteOpen = false;
-  if (isNative) await nativeCall('closeSite').catch(error);
+  if (!keepSite) {
+    $('native-stage').hidden = true;
+    siteOpen = false;
+    siteSample = null;
+    if (isNative) await nativeCall('closeSite').catch(error);
+  }
   await cache.clear().catch(error);
 }
 async function stopCachedPlayback() {
@@ -590,6 +629,7 @@ function mediaPath(slot: string) {
   return `${activeServer}/media/${room!.code}/${room!.mediaToken}/${slot}`;
 }
 async function setPlayer(src: string, audioSrc?: string, isHls = false) {
+  sourceFailed = false;
   const generation = ++playerGeneration;
   hls?.destroy();
   hls = null;
@@ -621,7 +661,18 @@ async function setPlayer(src: string, audioSrc?: string, isHls = false) {
 async function loadStream(media: NonNullable<Snapshot['media']>) {
   loadedMedia = media.id;
   loadedKind = 'stream';
-  if (media.source) {
+  if (isNative && media.provider !== 'direct') {
+    const alreadyOpen = siteOpen;
+    video.hidden = true;
+    siteOpen = true;
+    $('native-stage').hidden = false;
+    try {
+      if (!alreadyOpen) await nativeCall('openSite', { url: media.url });
+      await resizeSite();
+    } catch (e) {
+      error(e);
+    }
+  } else if (media.source) {
     await hideSite(true);
     siteOpen = false;
     await setPlayer(
@@ -629,16 +680,6 @@ async function loadStream(media: NonNullable<Snapshot['media']>) {
       media.source.audio ? mediaPath('audio') : undefined,
       media.source.kind === 'hls',
     );
-  } else if (isNative) {
-    video.hidden = true;
-    siteOpen = true;
-    $('native-stage').hidden = false;
-    try {
-      await nativeCall('openSite', { url: media.url });
-      await resizeSite();
-    } catch (e) {
-      error(e);
-    }
   } else {
     video.hidden = true;
     $('browser-hint').hidden = false;
@@ -942,18 +983,30 @@ for (const node of document.querySelectorAll<HTMLButtonElement>('[data-site]'))
 $('extract-button').onclick = () => {
   void (async () => {
     if (!room?.media) return;
+    const mediaId = room.media.id;
     const sample = (await nativeCall('sampleSite')) as Sample;
-    const source = sample.source;
-    if (!source) throw new Error('还未识别到可共享的视频源，请在原站登录并开始播放，再重试');
-    const media: MediaInput = {
-      url: room.media.url,
-      provider: room.media.provider,
-      title: sample.title || room.media.title,
-      source,
-      ...(sample.duration && sample.duration > 0 ? { duration: sample.duration } : {}),
-    };
-    operation({ type: 'media', media });
+    shareSiteSource(sample, mediaId);
   })().catch(error);
+};
+function shareSiteSource(sample: Sample, mediaId: string) {
+  if (room?.media?.id !== mediaId) return;
+  if (!sample.source) throw new Error('尚未检测到视频源，请在原站按正常流程登录并开始播放，再重试');
+  const media: MediaInput = {
+    url: room.media.url,
+    provider: room.media.provider,
+    title: (sample.title || room.media.title).slice(0, 200),
+    source: sample.source,
+    ...(sample.duration && sample.duration > 0 ? { duration: sample.duration } : {}),
+  };
+  operation({ type: 'media', media });
+}
+$('browser-cache').onclick = () => operation({ type: 'mode', mode: 'cache' });
+$('browser-invite').onclick = () => {
+  void invite();
+};
+$('browser-help').onclick = () => {
+  $('settings-button').click();
+  $<HTMLDetailsElement>('watch-help').open = true;
 };
 $('play-button').onclick = () => {
   if (!room?.playback.paused) control('pause');
@@ -1032,9 +1085,18 @@ const ended = () => {
 };
 video.onended = ended;
 video.onloadedmetadata = () => applyPlayback(true);
-video.onerror = () => {
-  if (video.getAttribute('src')) toast('视频无法播放：源可能已过期或格式不受支持，请重新识别');
-};
+function playbackError() {
+  if (!video.getAttribute('src')) return;
+  if (room?.mode === 'stream') {
+    sourceFailed = true;
+    video.pause();
+    audio.pause();
+    video.hidden = true;
+    render();
+  } else toast('本地视频无法播放，请检查格式或换用客户端。');
+}
+video.onerror = playbackError;
+audio.onerror = playbackError;
 $('leave-button').onclick = () => {
   desiredSession = false;
   clearTimeout(reconnectTimer);
@@ -1203,7 +1265,11 @@ setInterval(() => {
       ? '离线 · 暂停控制'
       : room.mode === 'cache' && !room.cacheReady
         ? '等待完整缓存'
-        : `WebSocket 同步${rtt === null ? '' : ' · ' + Math.round(rtt) + ' ms'}`;
+        : sourceFailed
+          ? '视频未就绪 · 可改用共同缓存'
+          : !isNative && room.media && !room.media.source
+            ? '等待客户端识别视频'
+            : `WebSocket 同步${rtt === null ? '' : ' · ' + Math.round(rtt) + ' ms'}`;
   }
 }, 300);
 setInterval(() => {
@@ -1211,9 +1277,22 @@ setInterval(() => {
 }, 5000);
 setInterval(() => {
   if (!siteOpen || !connected || nativeBusy) return;
+  const expectedMediaId = room?.media?.id;
   void nativeCall('sampleSite')
     .then((sample: Sample) => {
+      if (!expectedMediaId || room?.media?.id !== expectedMediaId) return;
       siteSample = sample;
+      if (
+        !room.media.source &&
+        sample.available &&
+        sample.source &&
+        !pendingControl &&
+        autoSharedMedia !== expectedMediaId
+      ) {
+        autoSharedMedia = expectedMediaId;
+        shareSiteSource(sample, expectedMediaId);
+        return;
+      }
       if (!room?.media || !sample.available || !sample.action || sample.seq === undefined) return;
       if (sample.frame !== remoteFrame) {
         remoteFrame = sample.frame ?? '';

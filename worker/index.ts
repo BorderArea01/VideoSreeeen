@@ -50,7 +50,7 @@ export default {
         ok: true,
         app: 'videosreeeen',
         runtime: 'cloudflare',
-        version: '0.3.0',
+        version: '0.3.1',
         mediaRelay: false,
         p2p: true,
       });

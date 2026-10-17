@@ -30,6 +30,26 @@
       )[0];
     return cachedVideo;
   };
+  const trackUrl = (track) => {
+    const urls = [
+      track.baseUrl || track.base_url || track.url,
+      ...(track.backupUrl || track.backup_url || []),
+    ].filter((v) => typeof v === 'string' && /^https?:\/\//.test(v));
+    // Use a URL supplied by the original player, preferring ordinary HTTPS
+    // endpoints that can also be fetched by browsers and the Node relay.
+    return (
+      urls.find((v) => {
+        try {
+          const u = new URL(v);
+          return u.protocol === 'https:' && !u.port;
+        } catch {
+          return false;
+        }
+      }) ||
+      urls.find((v) => v.startsWith('https:')) ||
+      urls[0]
+    );
+  };
   for (const event of ['pointerdown', 'keydown', 'touchstart'])
     document.addEventListener(
       event,
@@ -54,16 +74,19 @@
           .filter((v) => (v.codecs || '').startsWith('avc'))
           .sort((a, b) => b.height - a.height)
           .find((v) => v.height <= 1080) || dash.video[0];
-      const a = [...dash.audio].sort((a, b) => b.bandwidth - a.bandwidth)[0];
+      const compatibleAudio = dash.audio.filter((a) => (a.codecs || '').startsWith('mp4a'));
+      const a = [...(compatibleAudio.length ? compatibleAudio : dash.audio)].sort(
+        (a, b) => b.bandwidth - a.bandwidth,
+      )[0];
       return {
         kind: 'dash',
-        video: v.baseUrl || v.base_url,
-        audio: a.baseUrl || a.base_url,
+        video: trackUrl(v),
+        audio: trackUrl(a),
         referer: location.href,
       };
     }
     if (data?.durl?.length === 1)
-      return { kind: 'file', video: data.durl[0].url, referer: location.href };
+      return { kind: 'file', video: trackUrl(data.durl[0]), referer: location.href };
     try {
       const player = window.player_aaaa;
       let raw = player?.url;

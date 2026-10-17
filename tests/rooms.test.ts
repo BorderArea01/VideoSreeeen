@@ -72,6 +72,57 @@ test('重复操作去重，且不能冒用其他成员的操作编号', () => {
   assert.equal(f.room.revision, revision);
   assert.throws(() => f.rooms.act(f.room, f.second, m));
 });
+test('首次识别同一原站的视频源保留当前时间线；换片仍重置进度', () => {
+  const f = fixture();
+  const page = {
+    url: 'https://www.bilibili.com/video/BV13Aa66LEAW/',
+    title: 'page',
+    provider: 'bilibili' as const,
+  };
+  f.rooms.act(f.room, f.first, { type: 'media', op: 'page', base: 0, media: page });
+  f.rooms.act(f.room, f.first, {
+    type: 'control',
+    op: 'seek',
+    base: f.room.revision,
+    action: 'seek',
+    position: 10,
+  });
+  f.rooms.act(f.room, f.first, {
+    type: 'control',
+    op: 'rate',
+    base: f.room.revision,
+    action: 'rate',
+    rate: 1.5,
+  });
+  f.rooms.act(f.room, f.first, {
+    type: 'control',
+    op: 'play',
+    base: f.room.revision,
+    action: 'play',
+  });
+  f.advance(2000);
+  const id = f.room.media!.id,
+    epoch = f.room.epoch;
+  f.rooms.act(f.room, f.first, {
+    type: 'media',
+    op: 'source',
+    base: f.room.revision,
+    media: { ...page, source: direct.source, duration: 164 },
+  });
+  assert.equal(f.room.playback.position, 13);
+  assert.equal(f.room.playback.paused, false);
+  assert.equal(f.room.playback.rate, 1.5);
+  assert.notEqual(f.room.media!.id, id);
+  assert.ok(f.room.epoch > epoch);
+  f.rooms.act(f.room, f.first, {
+    type: 'media',
+    op: 'other',
+    base: f.room.revision,
+    media: direct,
+  });
+  assert.equal(f.room.playback.position, 0);
+  assert.equal(f.room.playback.paused, true);
+});
 test('共同缓存：所有成员完成相同内容后才可播放，旧代次完成消息不生效', () => {
   const f = fixture();
   f.rooms.act(f.room, f.first, { type: 'media', op: 'm', base: 0, media: direct });

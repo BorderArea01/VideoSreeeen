@@ -49,6 +49,17 @@ try {
     mask: [first.locator('#invite-link')],
   });
   await closeInvitation(first);
+  await first.locator('#source-url').fill('https://www.bilibili.com/video/BV13Aa66LEAW/');
+  await first.locator('#source-form button').click();
+  await first.locator('#browser-title').filter({ hasText: '等待客户端识别视频' }).waitFor();
+  assert.equal(await first.locator('#play-button').isEnabled(), false);
+  assert.equal(await first.locator('#browser-cache').isVisible(), false);
+  await first.locator('#browser-help').click();
+  assert.equal(
+    await first.locator('#watch-help').evaluate((e) => (e as HTMLDetailsElement).open),
+    true,
+  );
+  await first.locator('[data-close="settings-dialog"]').first().click();
   await second.goto(invite);
   await second.locator('#room-dialog').waitFor();
   assert.equal(await second.locator('#join-tab').getAttribute('aria-pressed'), 'true');
@@ -101,6 +112,20 @@ try {
     fullPage: true,
   });
   await second.locator('[data-close="settings-dialog"]').first().click();
+  await second.screenshot({
+    path: resolve('.local/screenshots/source-needed-mobile.png'),
+    fullPage: true,
+  });
+  await first.locator('#source-url').fill(`${origin}/unplayable.mp4`);
+  await first.locator('#source-form button').click();
+  await second.locator('#browser-title').filter({ hasText: '无法直接播放' }).waitFor();
+  await second.locator('#browser-cache').waitFor();
+  await second.screenshot({
+    path: resolve('.local/screenshots/source-failed-mobile.png'),
+    fullPage: true,
+  });
+  await second.locator('#browser-cache').click();
+  await second.locator('#cache-overlay').waitFor();
   await second.locator('#leave-button').click();
   await first.locator('#leave-button').click();
   assert.equal(await second.locator('#sync-status').textContent(), '等待加入房间');
@@ -131,6 +156,7 @@ try {
         inviteServerOverride: true,
         serverPreferencePreserved: true,
         activeRoomPreserved: true,
+        unresolvedSourceIsActionable: true,
         reconnectUsesActiveServer: true,
         mobileWidth: 390,
         chat: true,

@@ -19,7 +19,7 @@ const desktop = await electron.launch({
   env: { ...process.env, VS_DEV_URL: origin },
   timeout: 30000,
 });
-const evidence: Record<string, unknown> = { origin, https: true, version: '0.3.0' },
+const evidence: Record<string, unknown> = { origin, https: true, version: '0.3.1' },
   failures: string[] = [];
 try {
   const seed = await desktop.firstWindow(),

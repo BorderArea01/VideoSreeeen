@@ -958,6 +958,36 @@ input[type='range'] {
   color: #aa96ac;
   line-height: 1.8;
 }
+.browser-hint p {
+  max-width: 540px;
+}
+.browser-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.browser-actions .button {
+  font-size: 12px;
+  padding: 10px 14px;
+}
+@media (max-width: 540px) {
+  .stage:has(.browser-hint:not([hidden])) {
+    min-height: 340px;
+  }
+  .browser-hint {
+    padding: 16px;
+  }
+  .browser-hint > svg {
+    width: 24px;
+    height: 24px;
+  }
+  .browser-hint h3 {
+    font-size: 17px;
+    margin: 12px 0;
+  }
+}
 .cache-overlay {
   z-index: 6;
 }

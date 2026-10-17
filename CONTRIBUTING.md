@@ -1,5 +1,7 @@
 # 参与 VideoSreeeen
 
+原站识别或 B 站链路改动可运行 `npm run test:bilibili`：默认测试本地 Node 服务，设置 `VS_PUBLIC_URL` 后测试指定公共入口。脚本使用公开的 `BV13Aa66LEAW`，访问真实原站并完整缓存一次，最后检查同步与清理；网络失败不能当作通过。请串行执行，不要把它放进高频 CI 或提交媒体内容。
+
 无需懂代码也能反馈：[提交使用问题](https://github.com/BorderArea01/VideoSreeeen/issues/new/choose)。请说明入口、版本、复现步骤和实际提示，不要附带邀请凭证、Cookie 或访问令牌。兼容站点的问题请提供可公开访问的页面。
 
 开发环境与构建步骤见 [README](README.md)，部署见 [Cloudflare 文档](docs/cloudflare.md)。浏览器开发可同时运行 `npm run dev` 和 `npm run dev:ui`；Windows / Android 复用同一前端，苹果设备走浏览器。

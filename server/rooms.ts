@@ -298,6 +298,19 @@ export class Rooms {
     }
     switch (message.type) {
       case 'media': {
+        const upgrade =
+          room.mode === 'stream' &&
+          room.media?.url === message.media.url &&
+          !room.media.source &&
+          !!message.media.source;
+        const position = upgrade
+          ? positionAt(
+              room.playback.position,
+              room.playback.paused,
+              room.playback.rate,
+              this.now() - room.playback.at,
+            )
+          : 0;
         if (room.media)
           this.broadcast(room, { type: 'cleanup', mediaId: room.media.id, epoch: room.epoch });
         room.media = { ...message.media, id: randomUUID() };
@@ -305,9 +318,9 @@ export class Rooms {
         room.cleaned = false;
         room.mediaToken = token();
         room.playback = {
-          position: 0,
-          paused: true,
-          rate: 1,
+          position: message.media.duration ? Math.min(position, message.media.duration) : position,
+          paused: upgrade ? room.playback.paused : true,
+          rate: upgrade ? room.playback.rate : 1,
           at: this.now(),
           revision: room.playback.revision + 1,
           actor: seat.id,
