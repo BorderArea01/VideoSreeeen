@@ -1,0 +1,19 @@
+# 第三方与参考
+
+本项目采用 GPL-3.0-only，完整许可证见 LICENSE。运行时第三方依赖各自保留原许可证；依赖精确版本见 package-lock.json。
+
+- Electron / Electron Builder：Windows 壳与打包；MIT，Chromium 另含其第三方声明，随 Electron 运行时分发。
+- AndroidX WebKit：Android WebView 跨 frame 的文档开始脚本与只读播放器探测；Apache-2.0。
+- hls.js：HLS 播放；Apache-2.0。
+- ws、Zod、ipaddr.js：WebSocket、消息校验与 IP 地址校验；MIT。
+- TypeScript、Vite、tsx、esbuild、Playwright：开发与验证工具，依原包许可证使用。
+
+研究参考：
+
+- https://github.com/sky1wu/Bili-SyncPlay （GPL-3.0）：多人状态裁决、分级纠偏、协议与运维边界。
+- https://github.com/VideoTogether/VideoTogether （MIT）：跨站播放器适配与跨设备观影场景。
+- https://www.electronjs.org/docs/latest/api/web-contents-view
+- https://developer.android.com/reference/android/webkit/WebView
+- https://developer.android.com/reference/androidx/webkit/WebViewCompat
+
+项目代码为独立实现，未整体导入这两个参考项目。测试真实视频使用 MDN 提供的 CC0 flower.mp4，只在验收时获取，不提交仓库或分发到安装包。

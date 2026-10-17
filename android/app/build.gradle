@@ -1,0 +1,17 @@
+plugins { id 'com.android.application' }
+android {
+    namespace 'io.github.borderarea01.videosreeeen'
+    compileSdk 35
+    defaultConfig { applicationId 'io.github.borderarea01.videosreeeen'; minSdk 26; targetSdk 35; versionCode 1; versionName '0.1.0' }
+    compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
+    buildTypes { release { minifyEnabled false } }
+    sourceSets { main { assets.srcDirs += [layout.buildDirectory.dir('generated/web-assets').get().asFile] } }
+}
+def copyWeb = tasks.register('copyWeb', Copy) {
+    from(rootProject.file('../dist'))
+    from(rootProject.file('../shared')) { include 'page-bridge.js' }
+    into(layout.buildDirectory.dir('generated/web-assets'))
+    doFirst { if (!rootProject.file('../dist/index.html').exists()) throw new GradleException('请先构建共享界面 npm run build') }
+}
+tasks.named('preBuild').configure { dependsOn(copyWeb) }
+dependencies { implementation 'androidx.webkit:webkit:1.12.1' }

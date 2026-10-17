@@ -1,0 +1,9 @@
+node_modules/
+dist/
+dist-server/
+artifacts/
+.local/
+android/.gradle/
+android/**/build/
+package-lock.json
+LICENSE

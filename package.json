@@ -1,0 +1,65 @@
+{
+  "name": "videosreeeen",
+  "version": "0.1.0",
+  "private": true,
+  "description": "多人观影：Windows、Android 和浏览器，共同缓存与 WebSocket 同步",
+  "license": "GPL-3.0-only",
+  "author": "BorderArea01",
+  "type": "module",
+  "main": "desktop/main.cjs",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "tsx server/index.ts",
+    "dev:ui": "vite --host 127.0.0.1",
+    "build": "tsc --noEmit && vite build && node scripts/build-server.mjs",
+    "start": "node dist-server/index.mjs",
+    "desktop": "electron desktop/main.cjs",
+    "package:windows": "electron-builder --win portable --x64",
+    "test": "tsx --test --test-concurrency=1 tests/*.test.ts",
+    "test:ui": "tsx scripts/ui-check.ts",
+    "format": "prettier --write \"**/*.{ts,mjs,cjs,js,json,css,html,yml,yaml,md,java}\"",
+    "format:check": "prettier --check \"**/*.{ts,mjs,cjs,js,json,css,html,yml,yaml,md,java}\""
+  },
+  "dependencies": {
+    "hls.js": "^1.6.13",
+    "ipaddr.js": "^2.3.0",
+    "ws": "^8.18.3",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.0",
+    "@types/ws": "^8.18.1",
+    "electron": "^40.0.0",
+    "electron-builder": "^26.0.12",
+    "esbuild": "^0.28.2",
+    "playwright": "^1.58.0",
+    "prettier": "^3.9.10",
+    "prettier-plugin-java": "^2.11.0",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3",
+    "vite": "^7.3.1"
+  },
+  "build": {
+    "appId": "io.github.borderarea01.videosreeeen",
+    "productName": "VideoSreeeen",
+    "asar": true,
+    "electronDist": "node_modules/electron/dist",
+    "files": [
+      "dist/**/*",
+      "dist-server/**/*",
+      "desktop/**/*",
+      "shared/page-bridge.js",
+      "LICENSE",
+      "THIRD_PARTY.md",
+      "package.json"
+    ],
+    "directories": {
+      "output": "artifacts/windows"
+    },
+    "win": {
+      "target": "portable"
+    }
+  }
+}

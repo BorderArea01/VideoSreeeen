@@ -1,0 +1,12 @@
+services:
+  videosreeeen:
+    build: .
+    restart: unless-stopped
+    ports:
+      - '8787:8787'
+    environment:
+      # Replace with your HTTPS web origin and any additional local development origins.
+      ALLOWED_ORIGINS: 'https://videosreeeen.local,http://localhost:5173,http://127.0.0.1:5173,null,file://'
+    mem_limit: 512m
+    cpus: 1
+    stop_grace_period: 15s
