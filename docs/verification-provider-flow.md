@@ -1,6 +1,6 @@
 # 提供者本地预览修复与验收
 
-2026-10-18。本轮已完成源码、构建和本地真实标签页共享验证；部署与公网验证结果将在完成后补充。
+2026-10-18。本轮已完成源码、构建、本地真实标签页共享验证及线上部署。公网静态文件与构建逐字节一致；公网浏览器播放复测被内存守卫中断，尚未通过。
 
 ## 修复内容
 
@@ -22,7 +22,18 @@
 - `test:p2p`：浏览器互传、同时下载、损坏块拒绝与源站回退、Windows 与浏览器双向分块传输、离房及结束清理通过。
 - `test:ui` 已完成浏览器播放、完整缓存与清理，以及 Windows 原生磁盘缓存；进入后续原站探测时，可用内存降至 1520 MiB，资源守卫停止所属任务。因此不将本次整个 UI 检查记为通过，也未自动重启该任务。
 
-本地证据：`.local/browser-share-evidence.json`、`.local/screenshots/provider-preview-before-ack.png`、`.local/screenshots/browser-tab-share.png`。这些运行记录未提交到仓库。
+本地证据：`.local/provider-preview-local-evidence.json`、`.local/screenshots/provider-preview-before-ack.png`、`.local/screenshots/browser-tab-share.png`。这些运行记录未提交到仓库。
+
+## 已部署
+
+- 入口：<https://videosreeeen.pages.dev>，运行时代码提交 `2c7a4439545dd07da41f7363dc9bb79b8e78ddad`，已推送 GitHub main。
+- Pages 部署 `e35ede0f-ff06-43a9-ac86-302bc85169a3`；Worker 版本 `11d032ea-267a-4746-b7c6-3892db5cf246`，沿用已授权账号和原有资源。
+- 线上 HTML 和活跃 JS / CSS 与本机构建逐字节一致，Pages 元数据提交匹配，健康检查 runtime 为 cloudflare。
+- JS `/assets/index-GkG2UGiG.js`，SHA-256 `07322791386c69b7e0f9b2a15276ff3a22446ef60b2a06c3e96bf1554e9bfd11`。
+- CSS `/assets/index-CvOf_f_s.css`，SHA-256 `bd2342ee20569c1be50e02f6adc6d931326cba45a76b8d94d4a5ce9fb35bb1e6`。
+- 随后通过正式网址启动 `test:browser-share`，可用内存降至 1449 MiB，资源守卫停止所属任务，未取得公网播放通过结果，也未后台自动重启。不能将文件部署核对称为公网播放验收通过。
+
+部署核对证据：`.local/public-web-source-evidence.json`。本轮仅更新网页版及房间服务，安装包未更新。
 
 ## 验证边界
 
