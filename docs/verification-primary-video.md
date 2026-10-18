@@ -40,3 +40,17 @@
 
 - [W3C MediaStream Recording](https://w3c.github.io/mediacapture-record/)
 - [WebM MSE 初始化、片段与随机接入点](https://www.w3.org/TR/mse-byte-stream-format-webm/)
+
+## 共享画面控件修正（2026-10-19）
+
+用户反馈共享画面下的暂停、进度与倍速不能操作原站。此前仍显示推算的播放时间与零时长，形成误导。
+
+- 标签页 / 屏幕共享及待确认预览移除播放、暂停、进度、时间和倍速。点击实时画面也不再发送房间暂停操作。
+- 观众保留真实的本机静音 / 取消静音和全屏；浏览器拒绝自动播放时，通过声音按钮授权播放。提供方预览保持静音，避免回声；改变画质或重新绑定接收源时保留本机静音选择。
+- 本地文件、视频直链及原生可控原站保留播放控制。文件回归检查实际提供端视频元素已暂停、拖动到 2 秒且倍速变为 1.25，未仅检查房间数字或按钮样式。
+- 服务端拒绝屏幕共享的时间线控制，防止旧版按钮继续暂停新客户端。提供者掉线仍暂停房间；只有提供者以原身份重新连接才自动恢复，观众重新连接不会恢复缺席的提供者。
+- `npm run verify` 通过，40 项测试、类型检查、构建及 Worker dry-run。真实本地文件与保留的 WebRTC 标签页采集回归通过。
+- 本地生成 720p 动态画面和音轨经过实际视频 WebSocket 解码，已验证控件隐藏、本机静音往返、自动播放拒绝后的声音按钮授权、真实全屏和零条房间时间线操作。桌面全页及 390 像素宽控件截图已目视检查。
+- 最终本地首屏 5768 ms；提供者实际关闭房间 WebSocket 后重新加入，观众新流恢复解码，不需要隐藏的播放按钮。新成员、清晰度切换、重新加入、停止清理通过，无页面错误。证据为 `.local/live-controls-local-evidence.json`。真实 workerd 的视频、休眠恢复、图片和聊天回归通过。
+
+依据：[HTMLMediaElement.duration（未知时长与实时媒体）](https://developer.mozilla.org/en-US/docs/Web/API/HTMLMediaElement/duration)、[HTMLMediaElement.muted（本机静音）](https://developer.mozilla.org/en-US/docs/Web/API/HTMLMediaElement/muted)。

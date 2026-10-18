@@ -27,6 +27,15 @@ try {
     });
   const host = await context.newPage(),
     guest = await context.newPage();
+  await host.addInitScript(() => {
+    const prototype = HTMLVideoElement.prototype as any;
+    const capture = prototype.captureStream;
+    if (capture)
+      prototype.captureStream = function () {
+        (window as any).__filePublisher = this;
+        return capture.call(this);
+      };
+  });
   if (process.env.VS_DENY_AUTOPLAY)
     await guest.addInitScript(() => {
       const original = HTMLMediaElement.prototype.play;
@@ -76,6 +85,15 @@ try {
   );
   assert.equal([...app.rooms.rooms.values()][0]!.mode, 'stream');
   assert.equal([...app.rooms.rooms.values()][0]!.media?.broadcast?.kind, 'file');
+  for (const page of [host, guest]) {
+    for (const id of ['play-button', 'position', 'seek', 'duration', 'rate'])
+      assert.equal(
+        await page.locator('#' + id).isVisible(),
+        true,
+        'File playback keeps real controls',
+      );
+    assert.equal(await page.locator('#live-sound').isVisible(), false);
+  }
   if (process.env.VS_DENY_AUTOPLAY) {
     await host.locator('#play-button').click();
     await guest.locator('#broadcast-status').filter({ hasText: '点击播放' }).waitFor();
@@ -96,11 +114,21 @@ try {
     { timeout: 20000 },
   );
   await guest.locator('#play-button').click();
+  if (!process.env.VS_FORCE_CANVAS)
+    await host.waitForFunction(() => (window as any).__filePublisher?.paused === true);
   await host.locator('#seek').evaluate((e) => {
     (e as HTMLInputElement).value = '2';
     e.dispatchEvent(new Event('change'));
   });
   await host.locator('#position').filter({ hasText: '00:02' }).waitFor();
+  await guest.locator('#rate').selectOption('1.25');
+  if (!process.env.VS_FORCE_CANVAS)
+    await host.waitForFunction(() => {
+      const source = (window as any).__filePublisher as HTMLVideoElement;
+      return (
+        source?.paused && Math.abs(source.currentTime - 2) < 0.25 && source.playbackRate === 1.25
+      );
+    });
   const sample = await guest.locator('#video').evaluate((e) => {
     const v = e as HTMLVideoElement;
     const stream = v.srcObject as MediaStream | null;

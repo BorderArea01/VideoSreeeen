@@ -143,6 +143,23 @@ export class Rooms {
       seat.cache = this.idleCache(room.epoch);
       seat.ended = false;
     } else seat = this.addSeat(room, name, socket);
+    // A live screen has no pause button to resume it after a transport outage.
+    // Only the returning publisher can restore its live state.
+    if (
+      room.media?.broadcast?.kind === 'screen' &&
+      room.media.broadcast.host === seat.id &&
+      room.playback.paused
+    ) {
+      room.playback = {
+        ...room.playback,
+        paused: false,
+        at: this.now(),
+        revision: room.playback.revision + 1,
+        intent: 'play',
+        actor: seat.id,
+      };
+      this.bump(room);
+    }
     this.pauseForBarrier(room);
     room.touched = this.now();
     return { room, seat };
@@ -390,8 +407,8 @@ export class Rooms {
         if (!room.media) throw new RoomError('no_media', '请先分享视频');
         if (room.media.broadcast && !room.members.get(room.media.broadcast.host)?.online)
           throw new RoomError('host_offline', '视频提供者已离线');
-        if (room.media.broadcast?.kind === 'screen' && ['seek', 'rate'].includes(message.action))
-          throw new RoomError('live_control', '屏幕共享请在提供方播放器调整进度和速度');
+        if (room.media.broadcast?.kind === 'screen')
+          throw new RoomError('live_control', '屏幕共享请在原站播放器操作');
         if (room.mode === 'cache' && !this.cacheReady(room) && message.action === 'play')
           throw new RoomError('cache_wait', '等待所有成员完整缓存同一视频');
         let position = positionAt(

@@ -332,8 +332,8 @@ try {
     { timeout: 25000 },
   );
   await guest.bringToFront();
-  if ((await guest.locator('#broadcast-status').textContent())?.includes('点击播放'))
-    await guest.locator('#play-button').click();
+  if ((await guest.locator('#broadcast-status').textContent())?.includes('开始观看'))
+    await guest.locator('#live-sound').click();
   await guest.waitForFunction(
     () => {
       const v = document.querySelector<HTMLVideoElement>('#video')!;
@@ -380,6 +380,8 @@ try {
   );
   assert.equal(await guest.locator('#seek').isEnabled(), false);
   assert.equal(await guest.locator('#rate').isEnabled(), false);
+  for (const id of ['play-button', 'position', 'seek', 'duration', 'rate'])
+    assert.equal(await guest.locator('#' + id).isVisible(), false);
   await host.locator('#live-status').filter({ hasText: '已连接 1 位观众' }).waitFor();
   assert.equal(
     await guest.locator('#broadcast-status').textContent(),

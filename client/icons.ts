@@ -10,6 +10,8 @@ const paths: Record<string, string> = {
   download: '<path d="M12 3v12m-5-5 5 5 5-5M4 16v5h16v-5"/>',
   play: '<path d="m8 4 13 8-13 8Z"/>',
   pause: '<path d="M8 4v16M16 4v16"/>',
+  volume: '<path d="m11 4-6 5H2v6h3l6 5ZM15 8a6 6 0 0 1 0 8M18 5a10 10 0 0 1 0 14"/>',
+  'volume-off': '<path d="m11 4-6 5H2v6h3l6 5ZM16 9l6 6M22 9l-6 6"/>',
   close: '<path d="m6 6 12 12M6 18 18 6"/>',
   copy: '<rect x="8" y="8" width="12" height="13" rx="2"/><path d="M16 8V3H3v13h5"/>',
   send: '<path d="m3 3 19 9-19 9 4-9-4-9Zm4 9h15"/>',

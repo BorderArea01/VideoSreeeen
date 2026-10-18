@@ -45,6 +45,37 @@ try {
   });
   const host = await context.newPage(),
     guest = await context.newPage();
+  // Keep autoplay rejection deterministic, and require the visible sound button
+  // to unlock real MediaSource decoding instead of sending a room play command.
+  await guest.addInitScript(() => {
+    const play = HTMLMediaElement.prototype.play;
+    let allowed = false;
+    document.addEventListener(
+      'pointerdown',
+      (event) => {
+        if ((event.target as Element)?.closest('#live-sound')) allowed = true;
+      },
+      true,
+    );
+    HTMLMediaElement.prototype.play = function () {
+      return this.id === 'video' && !allowed
+        ? Promise.reject(new DOMException('User gesture required', 'NotAllowedError'))
+        : play.call(this);
+    };
+  });
+  const controls: string[] = [];
+  for (const page of [host, guest])
+    page.on('websocket', (socket) => {
+      socket.on('framesent', (event) => {
+        if (typeof event.payload !== 'string') return;
+        try {
+          const message = JSON.parse(event.payload);
+          if (message.type === 'control') controls.push(message.action);
+        } catch {
+          /* Binary media is not a room command. */
+        }
+      });
+    });
   if (process.env.VS_RELAY_DEBUG)
     host.on('websocket', (socket) =>
       socket.on('framesent', (event) => {
@@ -57,6 +88,17 @@ try {
   const errors: string[] = [];
   for (const page of [host, guest]) page.on('pageerror', (error) => errors.push(error.message));
   await host.addInitScript(() => {
+    (window as any).__roomConnects = 0;
+    const Socket = window.WebSocket;
+    window.WebSocket = class extends Socket {
+      constructor(url: string | URL, protocols?: string | string[]) {
+        super(url, protocols);
+        if (new URL(url).pathname === '/ws') {
+          (window as any).__roomSocket = this;
+          (window as any).__roomConnects++;
+        }
+      }
+    };
     (window as any).__encoderCount = 0;
     window.MediaRecorder = class extends MediaRecorder {
       constructor(stream: MediaStream, options?: MediaRecorderOptions) {
@@ -117,6 +159,8 @@ try {
   await host.waitForFunction(
     () => document.querySelector<HTMLVideoElement>('#video')!.videoWidth === 1280,
   );
+  await guest.locator('#live-sound[aria-label="启用声音"]').waitFor();
+  await guest.locator('#live-sound').click();
   await guest.waitForFunction(
     () => {
       const video = document.querySelector<HTMLVideoElement>('#video')!;
@@ -146,6 +190,46 @@ try {
   });
   assert.equal(evidence.player.paused, false);
   assert.ok(evidence.player.audioBytes > 0, 'Actual audio decoding required');
+  for (const page of [host, guest]) {
+    for (const id of ['play-button', 'position', 'seek', 'duration', 'rate'])
+      assert.equal(
+        await page.locator('#' + id).isVisible(),
+        false,
+        id + ' is unavailable for live screen sharing',
+      );
+  }
+  assert.equal(await host.locator('#live-sound').isVisible(), false);
+  assert.equal(
+    await host.locator('#video').evaluate((v) => (v as HTMLVideoElement).muted),
+    true,
+    'Publisher preview must not echo',
+  );
+  await guest.locator('#live-sound').click();
+  assert.equal(await guest.locator('#video').evaluate((v) => (v as HTMLVideoElement).muted), true);
+  await guest.locator('#live-sound').click();
+  assert.equal(await guest.locator('#video').evaluate((v) => (v as HTMLVideoElement).muted), false);
+  await guest.locator('#video').click();
+  assert.equal(
+    await guest.locator('#video').evaluate((v) => (v as HTMLVideoElement).paused),
+    false,
+  );
+  await guest.locator('#fullscreen').click();
+  await guest.waitForFunction(() => document.fullscreenElement?.id === 'stage');
+  await guest.evaluate(() => document.exitFullscreen());
+  await guest.waitForFunction(() => !document.fullscreenElement);
+  assert.deepEqual(
+    controls,
+    [],
+    'Local live controls must never pause, seek or change the room rate',
+  );
+  evidence.liveControls = {
+    fakeControlsHidden: true,
+    autoplayUnlocked: true,
+    localMute: true,
+    publisherMuted: true,
+    fullscreen: true,
+    roomControlsSent: controls.length,
+  };
   const before = evidence.player.frames;
   await guest.waitForFunction(
     (before) =>
@@ -191,6 +275,11 @@ try {
   await guest.locator('[data-close="settings-dialog"]').first().click();
   await mkdir('.local/screenshots', { recursive: true });
   await guest.screenshot({ path: '.local/screenshots/broadcast-relay.png', fullPage: true });
+  await guest.setViewportSize({ width: 390, height: 844 });
+  await guest
+    .locator('.transport')
+    .screenshot({ path: '.local/screenshots/live-controls-mobile.png' });
+  await guest.setViewportSize({ width: 1280, height: 720 });
   const currentSource = await guest
     .locator('#video')
     .evaluate((video) => (video as HTMLVideoElement).currentSrc);
@@ -264,6 +353,29 @@ try {
     path: '.local/screenshots/broadcast-primary-provider.png',
     fullPage: true,
   });
+  await host.evaluate(() => (window as any).__roomSocket.close());
+  await host.waitForFunction(
+    () =>
+      (window as any).__roomConnects > 1 &&
+      (window as any).__roomSocket.readyState === WebSocket.OPEN,
+  );
+  await guest.waitForFunction(
+    (previous) => {
+      const v = document.querySelector<HTMLVideoElement>('#video')!;
+      return (
+        v.currentSrc !== previous &&
+        v.videoWidth === 1280 &&
+        !v.paused &&
+        v.getVideoPlaybackQuality().totalVideoFrames > 12
+      );
+    },
+    currentSource,
+    { timeout: 30000 },
+  );
+  evidence.publisherReconnect = true;
+  const reconnectedSource = await guest
+    .locator('#video')
+    .evaluate((v) => (v as HTMLVideoElement).currentSrc);
   await host.locator('#broadcast-quality').selectOption('smooth');
   await host.waitForFunction(
     () => (window as any).__encoderOptions.videoBitsPerSecond === 1_800_000,
@@ -278,7 +390,7 @@ try {
         video.getVideoPlaybackQuality().totalVideoFrames > 12
       );
     },
-    currentSource,
+    reconnectedSource,
     { timeout: 30000 },
   );
   evidence.qualityChange = { videoBitsPerSecond: 1_800_000, playbackResumed: true };
@@ -286,6 +398,8 @@ try {
   await guest.reload();
   await guest.locator('#name-input').fill('重新加入观众');
   await guest.locator('#join-button').click();
+  await guest.locator('#live-sound[aria-label="启用声音"]').waitFor();
+  await guest.locator('#live-sound').click();
   await guest.waitForFunction(
     () => {
       const v = document.querySelector<HTMLVideoElement>('#video')!;

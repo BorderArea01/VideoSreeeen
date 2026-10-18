@@ -32,7 +32,7 @@ $('app').innerHTML = `
 <header class="topbar"><a class="brand" href="#" aria-label="VideoSreeeen 首页"><span class="brand-mark">${icon('film', 24)}</span><span>Video<span class="brand-light">Sreeeen</span><small>多人同步观影</small></span></a><div class="top-actions"><span id="connection" class="connection"><i></i>尚未连接</span><span id="platform" class="platform"></span><button id="web-entry" class="button soft small" hidden>打开网页版</button>${button('settings-button', '设置与帮助', 'settings')}<button id="room-button" class="button accent small">${icon('plus', 17)} 创建 / 加入房间</button></div></header>
 <main class="workspace"><section class="screen-column"><div class="room-heading"><div><div class="eyebrow">YOUR SHARED SCREEN</div><h1 id="room-title">多人观影<span class="orange-dot">.</span></h1><p id="room-subtitle">创建房间或通过邀请加入。</p></div><div class="heading-actions">${button('invite-button', '复制房间邀请', 'link')}${button('chat-toggle', '隐藏或显示聊天室', 'chat')}</div></div>
 <section id="stage" class="stage"><div id="welcome" class="welcome"><div class="scene-lines"></div><div class="scene-orb"></div><div class="frame-index">V / S <span>PRIVATE CINEMA</span></div><div class="welcome-text"><span class="tag">链接 · 画面 · 本地视频</span><h2>选择视频，<br>开始同步观看。</h2><p>支持视频链接、实时画面和本地文件。</p><div class="hero-actions"><button id="hero-create" class="button accent">${icon('plus', 18)} 创建房间 ${icon('arrow', 17)}</button><button id="hero-join" class="text-button">通过邀请加入 →</button></div></div><div class="scene-footer"><span>PLAY · SYNC · SHARE</span><span>01 — ∞</span></div></div><video id="video" playsinline preload="metadata" hidden></video><audio id="audio" preload="metadata"></audio><div id="native-stage" class="native-stage" hidden><div class="native-hint">正在客户端内打开原站…</div></div><div id="browser-hint" class="browser-hint" hidden>${icon('globe', 36)}<h3 id="browser-title">选择播放方式</h3><p id="browser-description"></p><div class="browser-actions"><button id="browser-provide" class="button accent">提供视频给房间</button><button id="browser-takeover" class="button outline" hidden>改由我提供视频</button><button id="browser-local-video" class="button soft" title="选择本机视频，实时传给房间成员">打开视频文件</button></div><div class="browser-secondary"><button id="browser-invite" class="text-button" title="客户端成员也可识别视频源，或共享原站画面">邀请成员提供视频</button><button id="browser-help" class="text-button">使用方法</button></div></div><div id="cache-overlay" class="cache-overlay" hidden><span class="cache-icon">${icon('download', 28)}</span><h3 id="cache-title">等待完整缓存</h3><p id="cache-description">每人完整缓存，等最慢的朋友准备好。</p><div class="cache-track"><i id="cache-progress"></i></div><button id="cache-button" class="button accent">开始本机缓存</button></div></section>
-<div class="transport"><button id="play-button" class="play-button" title="播放或暂停" aria-label="播放或暂停">${icon('play', 19)}</button><span id="position" class="time">00:00</span><input id="seek" aria-label="播放进度" type="range" min="0" max="100" step="0.1" value="0"><span id="duration" class="time muted">00:00</span><select id="rate" aria-label="播放速度"><option value="0.5">0.5×</option><option value="1" selected>1×</option><option value="1.25">1.25×</option><option value="1.5">1.5×</option><option value="2">2×</option></select>${button('fullscreen', '全屏', 'expand')}</div>
+<div class="transport"><button id="play-button" class="play-button" title="播放或暂停" aria-label="播放或暂停">${icon('play', 19)}</button><button id="live-sound" class="icon-button" title="静音" aria-label="静音" hidden>${icon('volume', 19)}</button><span id="position" class="time">00:00</span><input id="seek" aria-label="播放进度" type="range" min="0" max="100" step="0.1" value="0"><span id="duration" class="time muted">00:00</span><select id="rate" aria-label="播放速度"><option value="0.5">0.5×</option><option value="1" selected>1×</option><option value="1.25">1.25×</option><option value="1.5">1.5×</option><option value="2">2×</option></select>${button('fullscreen', '全屏', 'expand')}</div>
 <section class="source-card"><div class="section-heading"><span>${icon('film', 18)} 视频来源</span><span id="provider" class="subtle">选择播放方式</span></div><form id="source-form" class="source-form"><span class="input-icon">${icon('link', 18)}</span><input id="source-url" type="url" aria-label="视频页面或视频文件地址" placeholder="粘贴 B 站、喜番、蜜柑或视频直链…" required><button class="button soft" type="submit" title="视频直链可直接播放；原站页面会进入提供视频流程">选择视频 ${icon('arrow', 16)}</button></form><div class="source-actions"><button id="local-video-button" class="button soft" type="button" title="选择文件后实时传给成员，不需要整部上传或共同缓存">打开视频文件</button><input id="local-video-input" type="file" accept="video/*,.mkv,.mp4,.webm,.mov" hidden><button id="broadcast-site" class="button soft" type="button" hidden title="只共享原站视图及声音；其他成员无需登录。开始前请在原站选好画质。">共享原站画面</button><button id="broadcast-screen" class="button soft" type="button" title="选择浏览器标签页并勾选共享声音">共享标签页 / 屏幕</button><button id="stop-broadcast" class="text-button" type="button" hidden>停止共享</button><span id="broadcast-status" class="subtle" role="status"></span></div><div class="source-bottom"><div class="site-chips"><button data-site="bilibili">哔哩哔哩</button><button data-site="xifan">喜番</button><button data-site="mgn">蜜柑</button><span>+ 视频直链</span></div><button id="extract-button" class="text-button" hidden>${icon('link', 14)} 识别并共享原站视频源</button></div></section>
 <details id="cache-options" class="cache-options"><summary title="默认关闭。只有大家都卡时才考虑完整缓存；实时画面不使用此模式。">共同缓存</summary><section class="mode-card"><div class="mode-copy"><span class="mode-symbol">${icon('download', 22)}</span><div><h3>共同缓存模式 <span class="pill">手动启用</span></h3><p id="mode-description">仅在大家都卡时使用；默认边播边看。</p></div></div><button id="mode-toggle" class="switch" role="switch" aria-checked="false" aria-label="共同缓存模式"><i></i></button></section></details><div class="screen-foot"><span>${icon('shield', 14)} 多人可控 · 自动同步</span><span id="sync-status">等待加入房间</span></div>
 </section>
@@ -138,6 +138,7 @@ let desiredSession = false,
 let mediaRelay = true;
 let sourceFailed = false;
 let playbackPermissionNeeded = false;
+let liveMuted = false;
 let autoSharedMedia = '';
 let publisher: HTMLVideoElement | null = null;
 let publisherStream: MediaStream | null = null;
@@ -212,6 +213,8 @@ function operation(message: Record<string, unknown>) {
     pendingControl = false;
 }
 function control(action: 'play' | 'pause' | 'seek' | 'rate', extra: Record<string, number> = {}) {
+  // Screen capture has no access to the source player's timeline or controls.
+  if (room?.media?.broadcast?.kind === 'screen' || hasPendingPreview()) return;
   operation({ type: 'control', action, ...extra });
 }
 function currentPosition() {
@@ -611,6 +614,14 @@ function playElement(element: HTMLMediaElement) {
       if (playRequests.get(element) === request) playRequests.delete(element);
     });
 }
+function renderLiveSound() {
+  const button = $('live-sound');
+  const label = playbackPermissionNeeded ? '启用声音' : liveMuted ? '取消静音' : '静音';
+  button.title = label;
+  button.setAttribute('aria-label', label);
+  button.setAttribute('aria-pressed', String(liveMuted));
+  button.innerHTML = icon(liveMuted || playbackPermissionNeeded ? 'volume-off' : 'volume', 19);
+}
 function renderLiveStatus() {
   const sharing = room?.media?.broadcast;
   const badge = $('live-status');
@@ -651,12 +662,14 @@ function renderLiveStatus() {
         ? '当前没有配置视频中继；如果双方网络无法直连，需要部署中继或改用各自播放。'
         : '';
     if (reception.state === 'offline') text = '共享者已离线，等待重新连接';
-    else if (broadcastFallback.active() && playbackPermissionNeeded) text = '点击播放以启用声音';
+    else if (broadcastFallback.active() && playbackPermissionNeeded)
+      text = sharing.kind === 'screen' ? '点击声音按钮开始观看' : '点击播放以启用声音';
     else if (broadcastFallback.active() && room?.playback.paused) text = '房间已暂停播放';
     else if (broadcastFallback.status()) text = broadcastFallback.status();
     else if (['failed', 'closed', 'disconnected'].includes(reception.state))
       text = '共享已开始 · 视频连接失败，正在重试' + (reception.hasTurn ? '' : ' · 当前未配置中继');
-    else if (playbackPermissionNeeded) text = '点击播放以启用声音';
+    else if (playbackPermissionNeeded)
+      text = sharing.kind === 'screen' ? '点击声音按钮开始观看' : '点击播放以启用声音';
     else if (reception.state !== 'connected') text = `共享已开始 · 正在连接 ${name}`;
     else if (room?.playback.paused) text = '房间已暂停播放';
     else if (video.srcObject && video.videoWidth > 0 && video.readyState >= 2)
@@ -673,6 +686,11 @@ function render() {
   const preview = hasPendingPreview();
   const sourceNeeded = !isNative && !!room?.media && !room.media.source && !room.media.broadcast;
   const blocked = !preview && (sourceNeeded || sourceFailed);
+  const liveScreen = room?.media?.broadcast?.kind === 'screen' || preview;
+  for (const id of ['play-button', 'position', 'seek', 'duration', 'rate'])
+    $(id).hidden = liveScreen;
+  $('live-sound').hidden = !liveScreen || preview || room?.media?.broadcast?.host === memberId;
+  renderLiveSound();
   const canShareTab = !isNative && !!navigator.mediaDevices?.getDisplayMedia;
   const providing = room?.media?.sharedBy === memberId || providingMediaId === room?.media?.id;
   const sourceMember = room?.members.find((m) => m.id === room?.media?.sharedBy);
@@ -1038,7 +1056,8 @@ async function loadStream(media: NonNullable<Snapshot['media']>) {
       siteOpen = false;
       video.hidden = false;
       $('native-stage').hidden = true;
-      video.muted = media.broadcast.host === memberId;
+      video.muted =
+        media.broadcast.host === memberId || (media.broadcast.kind === 'screen' && liveMuted);
     }
     if (!current()) return;
     configureBroadcast();
@@ -1211,7 +1230,9 @@ const broadcast = new BroadcastPeers(
     if (stream) {
       if (video.srcObject !== stream) video.srcObject = stream;
       video.hidden = false;
-      video.muted = room?.media?.broadcast?.host === memberId;
+      video.muted =
+        room?.media?.broadcast?.host === memberId ||
+        (room?.media?.broadcast?.kind === 'screen' && liveMuted);
       playElement(video);
     } else if (video.srcObject) {
       // Transport reconfiguration must not detach the publisher's local preview.
@@ -1239,7 +1260,7 @@ const broadcastFallback = new BroadcastRelayClient(
       video.srcObject = null;
       video.src = url;
       video.hidden = false;
-      video.muted = false;
+      video.muted = room?.media?.broadcast?.kind === 'screen' && liveMuted;
     } else if (previous && video.getAttribute('src') === previous) {
       video.removeAttribute('src');
       video.load();
@@ -1809,6 +1830,7 @@ $('browser-help').onclick = () => {
   $<HTMLDetailsElement>('watch-help').open = true;
 };
 $('play-button').onclick = () => {
+  if (room?.media?.broadcast?.kind === 'screen' || hasPendingPreview()) return;
   if (playbackPermissionNeeded && !room?.playback.paused) {
     playElement(video);
     if (publisher) playElement(publisher);
@@ -1829,7 +1851,19 @@ $('play-button').onclick = () => {
     control('play');
   }
 };
-video.onclick = () => $('play-button').click();
+$('live-sound').onclick = () => {
+  if ($('live-sound').hidden) return;
+  liveMuted = playbackPermissionNeeded ? false : !liveMuted;
+  video.muted = liveMuted;
+  // A user gesture unlocks local playback; it must not pause the whole room.
+  if (playbackPermissionNeeded) playElement(video);
+  renderLiveSound();
+};
+video.onclick = () => {
+  if (room?.media?.broadcast?.kind === 'screen' || hasPendingPreview()) {
+    if (playbackPermissionNeeded) $('live-sound').click();
+  } else $('play-button').click();
+};
 $<HTMLInputElement>('seek').onchange = () =>
   control('seek', { position: Number($<HTMLInputElement>('seek').value) });
 $<HTMLSelectElement>('rate').onchange = () =>
@@ -2090,16 +2124,18 @@ setInterval(() => {
   renderLiveStatus();
   if (room) {
     applyPlayback();
-    const position = currentPosition(),
-      duration =
-        room.media?.duration ||
-        (Number.isFinite(video.duration) ? video.duration : siteSample?.duration) ||
-        0;
-    $('position').textContent = clock(position);
-    $('duration').textContent = clock(duration);
-    const seek = $<HTMLInputElement>('seek');
-    seek.max = String(duration || 100);
-    if (document.activeElement !== seek) seek.value = String(position);
+    if (room.media?.broadcast?.kind !== 'screen' && !hasPendingPreview()) {
+      const position = currentPosition(),
+        duration =
+          room.media?.duration ||
+          (Number.isFinite(video.duration) ? video.duration : siteSample?.duration) ||
+          0;
+      $('position').textContent = clock(position);
+      $('duration').textContent = clock(duration);
+      const seek = $<HTMLInputElement>('seek');
+      seek.max = String(duration || 100);
+      if (document.activeElement !== seek) seek.value = String(position);
+    }
     $('sync-status').textContent = !connected
       ? '离线 · 暂停控制'
       : hasPendingPreview()

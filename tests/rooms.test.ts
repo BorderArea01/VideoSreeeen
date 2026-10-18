@@ -114,6 +114,38 @@ test('画面共享按提供者及媒体隔离，保留多人裁决，离线暂�
     /离线/,
   );
 });
+test('屏幕共享不接收虚假的时间线控制；提供者断线后以原身份恢复实时播放', () => {
+  const f = fixture();
+  f.rooms.act(f.room, f.first, {
+    type: 'media',
+    op: 'screen',
+    base: 0,
+    media: { ...direct, broadcast: { host: f.first.id, kind: 'screen' } },
+  });
+  const revision = f.room.revision;
+  for (const action of ['play', 'pause', 'seek', 'rate'] as const)
+    assert.throws(
+      () =>
+        f.rooms.act(f.room, f.second, {
+          type: 'control',
+          op: action,
+          base: revision,
+          action,
+          position: 10,
+          rate: 2,
+        }),
+      /原站播放器/,
+    );
+  assert.equal(f.room.revision, revision);
+  assert.equal(f.room.playback.paused, false);
+  f.rooms.disconnect(f.room, f.first, f.a);
+  assert.equal(f.room.playback.paused, true);
+  f.rooms.join(f.room.code + ':' + f.room.token, '乙', socket(), f.second.resume);
+  assert.equal(f.room.playback.paused, true, 'A viewer cannot resume an absent publisher');
+  f.rooms.join(f.room.code + ':' + f.room.token, '甲', socket(), f.first.resume);
+  assert.equal(f.room.playback.paused, false);
+  assert.equal(f.room.playback.actor, f.first.id);
+});
 test('多人控制：相同版本只有第一条操作生效，过期操作不能覆盖', () => {
   const f = fixture();
   f.rooms.act(f.room, f.first, { type: 'media', op: 'media', base: 0, media: direct });

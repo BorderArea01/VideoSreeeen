@@ -370,6 +370,9 @@ h1 {
   width: 27px;
   color: #d5c7c6;
 }
+.transport #fullscreen {
+  margin-left: auto;
+}
 .time {
   font-size: 10px;
   font-variant-numeric: tabular-nums;
