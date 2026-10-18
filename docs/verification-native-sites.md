@@ -52,4 +52,10 @@
 
 客户端版本与校验和对应 [v0.4.1 发布入口](https://github.com/BorderArea01/VideoSreeeen/releases/tag/v0.4.1)；上传流程先保留草稿，逐项核对 GitHub 返回的 SHA-256 和字节数后才发布，不覆盖旧版本。运行时代码对应上述部署提交，后续验证记录提交不改变已构建运行时。
 
+### 发布与公开下载边界
+
+GitHub 认证 API 已核对 v0.4.1 为 latest、非草稿，七个附件字节数与 SHA-256 均匹配本地成品，发布对应提交 `3bedd446ecfff6705a6e3bd355d64dd2f4f1d766`。但**未登录访问仓库、latest release API、0.4.1 和旧版 0.4.0 的 update.json 均返回 404**；通过现有 Clash 代理和不走代理分别复验结果相同，独立网页读取仓库也为 404。认证 API 显示仓库 PUBLIC，当前证据不能确定 GitHub 侧拒绝匿名访问的具体原因。
+
+因此只能声明发布已创建、附件在认证 API 下可核对，不能声明公开下载与在线自动更新已可用，也不将账户权限问题归咎于用户 Cookie 或本地播放器。保留 `artifacts/windows/VideoSreeeen-Setup.exe`、`artifacts/android/VideoSreeeen-Android.apk` 供本机取用；没有向客户端添加 GitHub 令牌或扩大付费授权。此前本地更新器测试证明元数据下载和校验逻辑，不代替这次公开分发的失败结果。
+
 没有使用真实登录、画面捕获、完整缓存或收费产品；不能将同机独立应用加正式公网房间服务验收描述为用户异地、登录后高清、Android 或 Safari 真机通过。
