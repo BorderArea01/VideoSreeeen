@@ -62,9 +62,9 @@ try {
   );
   await host.locator('#source-url').fill('https://www.bilibili.com/video/BV13Aa66LEAW/');
   await host.locator('#source-form button').click();
-  await host.locator('#browser-title').filter({ hasText: '选择播放方式' }).waitFor();
+  await host.locator('#provide-dialog').waitFor();
   const choosing = host.waitForEvent('filechooser');
-  await host.locator('#browser-local-video').click();
+  await host.locator('#provide-local-video').click();
   await (await choosing).setFiles(resolve('.local/flower.mp4'));
   await guest.waitForFunction(
     () => !!document.querySelector<HTMLVideoElement>('#video')?.srcObject,

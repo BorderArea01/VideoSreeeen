@@ -34,6 +34,15 @@ export class BroadcastPeers {
   owns(url: string) {
     return !!this.local?.active && this.localUrl === url;
   }
+  viewers() {
+    const viewers = this.room?.members.filter((m) => m.online && m.id !== this.me) ?? [];
+    const expected = viewers.length;
+    const connected = [...this.connections.values()].filter(
+      (connection) => connection.pc.connectionState === 'connected',
+    ).length;
+    const failed = viewers.filter((member) => this.retry.has(member.id)).length;
+    return { expected, connected, failed };
+  }
   configure(room: Snapshot | null, me: string) {
     const broadcast = room?.mode === 'stream' && room.media?.broadcast;
     const scope = broadcast ? `${room!.media!.id}:${room!.epoch}` : '';
@@ -133,8 +142,10 @@ export class BroadcastPeers {
     };
     pc.onconnectionstatechange = () => {
       if (pc.connectionState === 'failed') this.failed(id, c);
-      else if (pc.connectionState === 'connected') this.status('实时画面已连接');
-      else if (pc.connectionState === 'disconnected') this.status('画面连接中断，正在重连');
+      else if (pc.connectionState === 'connected') {
+        this.retry.delete(id);
+        this.status('实时画面已连接');
+      } else if (pc.connectionState === 'disconnected') this.status('画面连接中断，正在重连');
     };
     return c;
   }

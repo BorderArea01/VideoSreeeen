@@ -982,6 +982,39 @@ input[type='range'] {
 .browser-secondary .text-button {
   font-size: 11px;
 }
+.provide-steps {
+  display: grid;
+  gap: 8px;
+  margin-top: 18px;
+}
+.provide-steps .button {
+  width: 100%;
+  white-space: normal;
+}
+.provide-steps .dialog-note {
+  margin: 0 0 14px;
+}
+.provide-status {
+  color: var(--orange);
+  font-size: 12px;
+  line-height: 1.7;
+}
+.live-status {
+  position: absolute;
+  z-index: 4;
+  top: 12px;
+  left: 12px;
+  right: 12px;
+  width: fit-content;
+  max-width: calc(100% - 24px);
+  padding: 7px 11px;
+  border-radius: 7px;
+  color: #fff;
+  background: #17131cd9;
+  font-size: 12px;
+  line-height: 1.6;
+  pointer-events: none;
+}
 @media (max-width: 540px) {
   .stage:has(.browser-hint:not([hidden])) {
     min-height: 340px;

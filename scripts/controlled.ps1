@@ -2,12 +2,15 @@ param(
   [Parameter(Mandatory=$true)][string]$File,
   [string[]]$Arguments = @(),
   [switch]$PrioritizeBuildWhenNoGame,
+  # Use only with explicit authorization for the current game-running session.
+  # This does not bypass memory checks and is never persisted between runs.
+  [switch]$AllowGameThisRun,
   [int]$MinFreeMiB = 1536
 )
 $ErrorActionPreference = 'Stop'
 $workspace = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 function Assert-Resources {
-  if (Get-Process -Name 'NRC-Win64-Shipping' -ErrorAction SilentlyContinue) { throw '真实游戏进程 NRC-Win64-Shipping 正在运行，停止本任务。' }
+  if (-not $AllowGameThisRun -and (Get-Process -Name 'NRC-Win64-Shipping' -ErrorAction SilentlyContinue)) { throw '真实游戏进程 NRC-Win64-Shipping 正在运行，停止本任务。' }
   $free = (Get-CimInstance Win32_OperatingSystem).FreePhysicalMemory / 1024
   if ($free -lt $MinFreeMiB) { throw "可用内存 $([math]::Round($free)) MiB，低于 $MinFreeMiB MiB，停止本任务。" }
 }
@@ -30,7 +33,7 @@ try {
   if ($quoted.Count -gt 0) { $start.ArgumentList = $quoted -join ' ' }
   $proc = Start-Process @start
   $owned[[int]$proc.Id] = $proc.StartTime.ToUniversalTime()
-  if ($PrioritizeBuildWhenNoGame) { try { $proc.PriorityClass = 'AboveNormal' } catch {} }
+  if ($PrioritizeBuildWhenNoGame -and -not (Get-Process -Name 'NRC-Win64-Shipping' -ErrorAction SilentlyContinue)) { try { $proc.PriorityClass = 'AboveNormal' } catch {} }
   while (-not $proc.HasExited) {
     $all = @(Get-CimInstance Win32_Process)
     do {

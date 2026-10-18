@@ -44,6 +44,29 @@ function fixture() {
   };
 }
 
+test('原站提供者由服务端记录，标签页共享立即播放，文件仍等待播放操作', () => {
+  const f = fixture();
+  const page = { url: 'https://example.com/watch', title: '视频页面', provider: 'other' as const };
+  f.rooms.act(f.room, f.first, { type: 'media', op: 'page', base: 0, media: page });
+  assert.equal(f.rooms.snapshot(f.room).media?.sharedBy, f.first.id);
+  const input = clientMessageSchema.parse({
+    type: 'media',
+    op: 'stream',
+    base: f.room.revision,
+    media: { ...page, sharedBy: f.first.id, broadcast: { host: f.second.id, kind: 'screen' } },
+  });
+  f.rooms.act(f.room, f.second, input);
+  assert.equal(f.room.media?.sharedBy, f.second.id);
+  assert.equal(f.room.playback.paused, false);
+  f.rooms.act(f.room, f.first, {
+    type: 'media',
+    op: 'file',
+    base: f.room.revision,
+    media: { ...direct, broadcast: { host: f.first.id, kind: 'file' } },
+  });
+  assert.equal(f.room.playback.paused, true);
+});
+
 test('画面共享按提供者及媒体隔离，保留多人裁决，离线暂停且不能伪装提供者', () => {
   const f = fixture();
   const media = { ...direct, broadcast: { host: f.first.id, kind: 'file' as const } };

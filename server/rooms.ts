@@ -342,14 +342,20 @@ export class Rooms {
           : 0;
         if (room.media)
           this.broadcast(room, { type: 'cleanup', mediaId: room.media.id, epoch: room.epoch });
-        room.media = { ...message.media, id: randomUUID() };
+        const sharedBy = upgrade ? (room.media?.sharedBy ?? seat.id) : seat.id;
+        room.media = { ...message.media, id: randomUUID(), sharedBy };
         if (room.media.broadcast) room.mode = 'stream';
         room.epoch++;
         room.cleaned = false;
         room.mediaToken = token();
         room.playback = {
           position: message.media.duration ? Math.min(position, message.media.duration) : position,
-          paused: upgrade ? room.playback.paused : true,
+          paused:
+            message.media.broadcast?.kind === 'screen'
+              ? false
+              : upgrade
+                ? room.playback.paused
+                : true,
           rate: upgrade ? room.playback.rate : 1,
           at: this.now(),
           revision: room.playback.revision + 1,

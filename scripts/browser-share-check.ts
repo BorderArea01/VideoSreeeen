@@ -77,6 +77,30 @@ try {
     }),
   );
   for (const page of [host, guest]) page.on('pageerror', (e) => errors.push(e.message));
+  await host.addInitScript(() => {
+    // Delay the real server acknowledgement without replacing capture or media.
+    const queued: { socket: WebSocket; data: string }[] = [];
+    (window as any).__holdScreenState = false;
+    (window as any).__queuedScreenStates = () => queued.length;
+    (window as any).__flushScreenStates = () => {
+      (window as any).__holdScreenState = false;
+      for (const { socket, data } of queued.splice(0))
+        socket.dispatchEvent(new MessageEvent('message', { data }));
+    };
+    window.WebSocket = class extends WebSocket {
+      constructor(url: string | URL, protocols?: string | string[]) {
+        super(url, protocols);
+        this.addEventListener('message', (event) => {
+          if (!(window as any).__holdScreenState || typeof event.data !== 'string') return;
+          const message = JSON.parse(event.data);
+          if (message.type === 'state' && message.room?.media?.broadcast?.kind === 'screen') {
+            queued.push({ socket: this, data: event.data });
+            event.stopImmediatePropagation();
+          }
+        });
+      }
+    };
+  });
   await guest.addInitScript(() => {
     (window as any).__pcs = [];
     window.RTCPeerConnection = class extends RTCPeerConnection {
@@ -100,7 +124,10 @@ try {
   const began = Date.now();
   await host.locator('#source-url').fill(sourceUrl);
   await host.locator('#source-form button').click();
-  await guest.locator('#browser-title').filter({ hasText: '选择播放方式' }).waitFor();
+  await host.locator('#provide-dialog').waitFor();
+  await guest.locator('#browser-title').filter({ hasText: '开始共享' }).waitFor();
+  assert.equal(await guest.locator('#browser-open-site').isVisible(), false);
+  assert.equal(await guest.locator('#browser-share-tab').isVisible(), false);
   evidence.choiceShownMs = Date.now() - began;
   assert.equal(await host.locator('#play-button').isEnabled(), false);
   // Reject one picker request, then use the unchanged real API for successful capture.
@@ -113,11 +140,22 @@ try {
   });
   await host.locator('#browser-share-tab').click();
   await host.locator('#toast').filter({ hasText: '共享未开始' }).waitFor();
+  await host.locator('#provide-status').filter({ hasText: '共享未开始' }).waitFor();
   assert.equal(await host.locator('#browser-share-tab').isEnabled(), true);
   assert.equal(await guest.locator('#browser-hint').isVisible(), true);
   evidence.cancelKeepsRoomAndAllowsRetry = true;
+  await guest.locator('#leave-button').click();
+  await host.locator('#member-count').filter({ hasText: '1' }).waitFor();
   const popup = host.waitForEvent('popup');
   await host.locator('#browser-open-site').click();
+  assert.equal(
+    await host.locator('#provide-status').textContent(),
+    '尚未开始共享 · 返回后请完成第 2 步',
+  );
+  assert.equal(
+    await host.locator('#video').evaluate((v) => !!(v as HTMLVideoElement).srcObject),
+    false,
+  );
   const original = await popup;
   await original.waitForLoadState('domcontentloaded');
   assert.equal(new URL(original.url()).pathname, new URL(sourceUrl).pathname);
@@ -157,11 +195,13 @@ try {
   }, title);
   await host.evaluate(() => {
     const real = navigator.mediaDevices.getDisplayMedia.bind(navigator.mediaDevices);
+    (window as any).__holdScreenState = true;
     (window as any).__captureState = 'requesting';
     navigator.mediaDevices.getDisplayMedia = (options) =>
       real(options).then(
         (stream) => {
           (window as any).__captureState = 'captured';
+          (window as any).__captureTracks = stream.getTracks();
           return stream;
         },
         (error) => {
@@ -173,7 +213,64 @@ try {
   await host.bringToFront();
   await host.locator('#browser-share-tab').click();
   try {
-    await guest.locator('#browser-hint').waitFor({ state: 'hidden', timeout: 25000 });
+    await host.locator('#provide-dialog').waitFor({ state: 'hidden', timeout: 25000 });
+    await host.waitForFunction(
+      () => {
+        const video = document.querySelector<HTMLVideoElement>('#video')!;
+        return (
+          !!video.srcObject &&
+          video.videoWidth > 0 &&
+          !video.paused &&
+          video.muted &&
+          video.getVideoPlaybackQuality().totalVideoFrames > 10
+        );
+      },
+      {},
+      { timeout: 10000 },
+    );
+    await host.waitForFunction(() => (window as any).__queuedScreenStates() > 0);
+    await host.locator('#live-status').filter({ hasText: '本机预览' }).waitFor();
+    assert.equal(await host.locator('#browser-hint').isVisible(), false);
+    assert.equal(await host.locator('#play-button').isEnabled(), false);
+    evidence.previewBeforeRoomAcknowledgement = await host.locator('#video').evaluate((element) => {
+      const video = element as HTMLVideoElement;
+      const canvas = document.createElement('canvas');
+      canvas.width = 64;
+      canvas.height = 36;
+      const context = canvas.getContext('2d')!;
+      context.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
+      let nonBlackSamples = 0;
+      for (let i = 0; i < pixels.length; i += 4)
+        if (Math.max(pixels[i], pixels[i + 1], pixels[i + 2]) > 20) nonBlackSamples++;
+      return {
+        width: video.videoWidth,
+        height: video.videoHeight,
+        frames: video.getVideoPlaybackQuality().totalVideoFrames,
+        nonBlackSamples,
+      };
+    });
+    assert.ok(
+      (evidence.previewBeforeRoomAcknowledgement as { nonBlackSamples: number }).nonBlackSamples >
+        30,
+      'Provider preview must contain an image, not only decoded black frames',
+    );
+    await mkdir('.local/screenshots', { recursive: true });
+    await host.screenshot({
+      path: '.local/screenshots/provider-preview-before-ack.png',
+      fullPage: true,
+    });
+    await host.evaluate(() => (window as any).__flushScreenStates());
+    await host.locator('#live-status').filter({ hasText: '暂无观众' }).waitFor();
+    await host.waitForFunction(() => {
+      const video = document.querySelector<HTMLVideoElement>('#video')!;
+      return (
+        video.videoWidth > 0 &&
+        !video.paused &&
+        video.getVideoPlaybackQuality().totalVideoFrames > 10
+      );
+    });
+    evidence.publisherPreviewWithoutViewers = true;
   } catch (error) {
     evidence.failure = {
       capture: await host.evaluate(() => (window as any).__captureState),
@@ -184,13 +281,17 @@ try {
     console.log(JSON.stringify(evidence.failure));
     throw error;
   }
+  await guest.reload();
+  await guest.locator('#name-input').fill('直接观看');
+  await guest.locator('#join-button').click();
   await guest.waitForFunction(
     () => !!document.querySelector<HTMLVideoElement>('#video')?.srcObject,
     {},
     { timeout: 25000 },
   );
   await guest.bringToFront();
-  await guest.locator('#play-button').click();
+  if ((await guest.locator('#broadcast-status').textContent())?.includes('点击播放'))
+    await guest.locator('#play-button').click();
   await guest.waitForFunction(
     () => {
       const v = document.querySelector<HTMLVideoElement>('#video')!;
@@ -227,6 +328,7 @@ try {
   assert.ok(stats.some((s) => s.kind === 'audio' && s.bytes > 0));
   assert.equal(await guest.locator('#seek').isEnabled(), false);
   assert.equal(await guest.locator('#rate').isEnabled(), false);
+  await host.locator('#live-status').filter({ hasText: '已连接 1 位观众' }).waitFor();
   evidence.actualTabCapture = true;
   evidence.received = { sample, stats };
   await mkdir('.local/screenshots', { recursive: true });
@@ -234,6 +336,18 @@ try {
   await host.bringToFront();
   await host.locator('#stop-broadcast').click();
   await guest.waitForFunction(() => !document.querySelector<HTMLVideoElement>('#video')?.srcObject);
+  assert.equal(
+    await host.locator('#video').evaluate((v) => !!(v as HTMLVideoElement).srcObject),
+    false,
+  );
+  assert.equal(
+    await host.evaluate(() =>
+      (window as any).__captureTracks.every(
+        (track: MediaStreamTrack) => track.readyState === 'ended',
+      ),
+    ),
+    true,
+  );
   evidence.stopCleanup = true;
   // A browser without screen capture must offer supported alternatives immediately.
   await guest.evaluate(() =>
@@ -244,9 +358,11 @@ try {
   );
   await host.locator('#source-url').fill(sourceUrl);
   await host.locator('#source-form button').click();
-  await guest.locator('#browser-title').filter({ hasText: '选择播放方式' }).waitFor();
+  await guest.locator('#browser-title').filter({ hasText: '开始共享' }).waitFor();
+  await guest.locator('#browser-takeover').click();
+  await guest.locator('#provide-dialog').waitFor();
   assert.equal(await guest.locator('#browser-share-tab').isVisible(), false);
-  assert.equal(await guest.locator('#browser-local-video').isVisible(), true);
+  assert.equal(await guest.locator('#provide-local-video').isVisible(), true);
   await guest.setViewportSize({ width: 390, height: 844 });
   assert.equal(
     await guest.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
@@ -254,6 +370,8 @@ try {
   );
   await guest.screenshot({ path: '.local/screenshots/browser-source-mobile.png', fullPage: true });
   evidence.noCaptureAlternatives = true;
+  await host.locator('[data-close="provide-dialog"]').click();
+  await guest.locator('[data-close="provide-dialog"]').click();
   await host.locator('#leave-button').click();
   await guest.locator('#leave-button').click();
   assert.deepEqual(errors, []);

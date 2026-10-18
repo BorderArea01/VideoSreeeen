@@ -51,10 +51,12 @@ try {
   await closeInvitation(first);
   await first.locator('#source-url').fill('https://www.bilibili.com/video/BV13Aa66LEAW/');
   await first.locator('#source-form button').click();
-  await first.locator('#browser-title').filter({ hasText: '选择播放方式' }).waitFor();
+  await first.locator('#provide-dialog').waitFor();
+  await first.locator('#browser-title').filter({ hasText: '将视频提供给房间' }).waitFor();
   assert.equal(await first.locator('#browser-open-site').isVisible(), true);
   assert.equal(await first.locator('#browser-share-tab').isVisible(), true);
   assert.equal(await first.locator('#browser-local-video').isVisible(), true);
+  await first.locator('[data-close="provide-dialog"]').click();
   assert.equal(await first.locator('#play-button').isEnabled(), false);
   assert.equal(
     await first.locator('#cache-options').evaluate((e) => (e as HTMLDetailsElement).open),

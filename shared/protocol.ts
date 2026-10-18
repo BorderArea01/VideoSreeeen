@@ -28,7 +28,7 @@ export const mediaSchema = z.object({
   duration: z.number().finite().positive().max(604800).optional(),
 });
 export type MediaInput = z.infer<typeof mediaSchema>;
-export type Media = MediaInput & { id: string };
+export type Media = MediaInput & { id: string; sharedBy?: string };
 export interface Playback {
   position: number;
   rate: number;
