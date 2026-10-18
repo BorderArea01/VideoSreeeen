@@ -1,9 +1,10 @@
-新增客户端“设置与帮助 → 原站账号 · B 站登录”：在官方页面登录，会话仅保留本机，关闭窗口后刷新当前 B 站播放器。共同播放使用每位用户自己的原站权限，仍可选择共享画面给观众。
+0.4.2 完善观影界面：
 
-- 修复原站第一次拖动可能丢失，适配 B 站新版播放器的视频源信息。
-- Windows 双客户端实测通过 B 站游客 360p、蜜柑 1080p 的播放、暂停、进度、倍速及原站拖动同步；保留稀饭网页识别。
-- B 站提取地址仍可能被 CDN 拒绝，不能保证浏览器观众通过直链播放；蜜柑纯网页识别仍为实验支持。Android 登录后高清、Android 真机及 Safari/iOS 尚未验收。
+- 共同缓存收进“共同播放 → 网络卡顿时：先完整缓存”，默认关闭；全员完整下载后再播，看完清理，不用于实时共享画面。
+- 成员列表和底部统一使用服务端实测 RTT。约 5 秒采样，15 秒无新样本隐藏旧数字；这不是画面缓冲延迟。
+- 聊天室文字和 Emoji 实时弹幕，支持开关、隐藏聊天室和全屏。加入、重连及关闭期间消息不补播，图片仍在聊天室。
+- Windows 原站弹幕使用独立可信覆盖层，不把聊天注入原站页面。保留 B 站本机登录、原有共同播放与画面共享。
 
-Windows 安装版 VideoSreeeen-Setup.exe 支持应用内更新；便携版 VideoSreeeen-Portable-0.4.1.exe。Android 使用 VideoSreeeen-Android.apk，同一发布签名，更新由系统确认。没有安装或卸载任何设备应用。苹果设备使用 [网页版](https://videosreeeen.pages.dev)。校验见 SHA256SUMS.txt。
+Windows 安装版 VideoSreeeen-Setup.exe；便携版 VideoSreeeen-Portable-0.4.2.exe。Android 使用同一签名的 VideoSreeeen-Android.apk，更新需系统确认；本轮不安装设备。Android 真机与 Safari/iOS 尚未验收。
 
-实时共享画面默认走现有 WebSocket 转发，保持零付费授权，没有启用 TURN 或服务器托管登录会话。Windows 安装包没有 Authenticode 证书。源码许可证 GPL-3.0-only。
+网页入口：https://videosreeeen.pages.dev 。源码 GPL-3.0-only。GitHub 未登录公开下载此前仍返回 404，不能把认证 API 发布成功当作自动更新已可用；本机保留产物供直接取用。未启用收费产品。

@@ -40,9 +40,12 @@ try {
     `const {app}=require('electron');app.setPath('userData',${JSON.stringify(profile)});require(${JSON.stringify(resolve('desktop/main.cjs'))});`,
   );
   desktop = await electron.launch({
-    args: [entry, '--mute-audio'],
-    env: { ...process.env, VS_DEV_URL: origin },
+    ...(process.env.VS_PACKAGED_EXE ? { executablePath: process.env.VS_PACKAGED_EXE } : {}),
+    args: [process.env.VS_PACKAGED_EXE ? '--user-data-dir=' + profile : entry, '--mute-audio'],
+    env: { ...process.env, VS_DEV_URL: process.env.VS_PACKAGED_EXE ? '' : origin },
   });
+  assert.equal(await desktop.evaluate(({ app }) => app.getPath('userData')), profile);
+  evidence.packaged = !!process.env.VS_PACKAGED_EXE;
   const host = await desktop.firstWindow(),
     context = await browser.newContext(),
     guest = await context.newPage();
@@ -118,6 +121,50 @@ try {
     'Common playback must not capture or re-encode the original page',
   );
   assert.equal(await host.locator('#current-playback').textContent(), '当前：共同播放');
+  await desktop.evaluate(({ BrowserWindow }) => {
+    const main = BrowserWindow.getAllWindows().find((w) => !w.getParentWindow())!;
+    main.show();
+    main.focus();
+  });
+  const caption = '原站独立弹幕 🍿';
+  await guest.locator('#chat-input').fill(caption);
+  await guest.locator('#send-button').click();
+  const until = Date.now() + 15000;
+  let overlay: import('playwright').Page | undefined;
+  while (!overlay) {
+    overlay = desktop.windows().find((p) => p.url().endsWith('/shared/danmaku.html'));
+    assert.ok(Date.now() < until, 'Native overlay did not open');
+    if (!overlay) await host.waitForTimeout(100);
+  }
+  await overlay.waitForFunction((text) => {
+    const el = [...document.querySelectorAll('.danmaku-item')].find((n) => n.textContent === text);
+    return el && el.getBoundingClientRect().right < innerWidth - 20;
+  }, caption);
+  assert.equal(
+    await desktop.evaluate(
+      async ({ webContents }, input) => {
+        const original = webContents.getAllWebContents().find((w) => w.getURL() === input.source)!;
+        return original.executeJavaScript(
+          'document.body.innerText.includes(' + JSON.stringify(input.caption) + ')',
+        );
+      },
+      { source, caption },
+    ),
+    false,
+  );
+  await mkdir('.local/screenshots', { recursive: true });
+  await overlay.screenshot({ path: '.local/screenshots/native-danmaku.png' });
+  await host.locator('#danmaku-native-toggle').click();
+  await overlay.waitForFunction(
+    () => document.querySelectorAll('.danmaku-item').length === 0,
+    {},
+    { polling: 100 },
+  );
+  evidence.danmaku = {
+    independentLocalWindow: true,
+    originalPageContainsNoChat: true,
+    toggleClears: true,
+  };
   await mkdir('.local/screenshots', { recursive: true });
   await host.screenshot({ path: '.local/screenshots/native-common-playback.png', fullPage: true });
   // The native WebContentsView is a separate surface, absent from renderer-only

@@ -6,6 +6,7 @@ import { RoomImages, type ImageMeta } from '../server/images';
 import { BroadcastRelay } from '../server/broadcast-relay';
 import type { RelayHello } from '../shared/broadcast-relay';
 import { RoomSources } from '../server/site-source';
+import { startProbe, finishProbe } from '../server/latency';
 
 interface Env {
   ROOMS: DurableObjectNamespace<WatchRoom>;
@@ -56,7 +57,7 @@ export default {
         ok: true,
         app: 'videosreeeen',
         runtime: 'cloudflare',
-        version: '0.4.1',
+        version: '0.4.2',
         mediaRelay: false,
         broadcastRelay: true,
         p2p: true,
@@ -232,6 +233,7 @@ export class WatchRoom extends DurableObject<Env> {
           result = this.rooms.join(msg.invite, msg.name, socket, msg.resume);
         }
         c.memberId = result.seat.id;
+        result.seat.latencyEvents = msg.capabilities?.includes('latency-v1') === true;
         this.rooms.send(socket, {
           type: 'welcome',
           memberId: result.seat.id,
@@ -239,22 +241,24 @@ export class WatchRoom extends DurableObject<Env> {
           room: this.rooms.snapshot(result.room),
         });
         this.rooms.broadcast(result.room);
+        const nonce = startProbe(c, now);
+        if (nonce) this.rooms.send(socket, { type: 'probe', nonce });
       } else {
         const room = this.room,
           seat = c.memberId && room?.members.get(c.memberId);
         if (!room || !seat || seat.socket !== socket)
           throw new RoomError('not_in_room', '请先加入房间');
         if (msg.type === 'ping') {
-          this.rooms.send(socket, { type: 'pong', sentAt: msg.sentAt });
-          c.nonce = crypto.randomUUID();
-          c.probeAt = now;
-          this.rooms.send(socket, { type: 'probe', nonce: c.nonce });
+          this.rooms.send(socket, {
+            type: 'pong',
+            sentAt: msg.sentAt,
+            clock: this.rooms.clock(room),
+          });
+          const nonce = startProbe(c, now);
+          if (nonce) this.rooms.send(socket, { type: 'probe', nonce });
         } else if (msg.type === 'probe') {
-          if (c.nonce === msg.nonce && c.probeAt) {
-            seat.rtt = Math.max(0, now - c.probeAt);
-            c.nonce = undefined;
-            this.rooms.broadcast(room);
-          }
+          const elapsed = finishProbe(c, msg.nonce, now);
+          if (elapsed !== null) this.rooms.recordLatency(room, seat, socket, elapsed);
         } else if (msg.type === 'leave') {
           this.rooms.disconnect(room, seat, socket, true);
           c.memberId = undefined;

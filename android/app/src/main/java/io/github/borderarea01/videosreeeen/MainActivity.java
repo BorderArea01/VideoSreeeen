@@ -19,7 +19,10 @@ import org.json.JSONObject;
 
 public class MainActivity extends Activity {
 
-    private WebView ui, site;
+    private WebView ui, site, danmaku;
+    private boolean danmakuReady,
+        danmakuEnabled = true;
+    private final org.json.JSONArray danmakuPending = new org.json.JSONArray();
     private Dialog accountDialog;
     private FrameLayout root;
     private String bridge;
@@ -213,6 +216,14 @@ public class MainActivity extends Activity {
     }
 
     private void closeSite() {
+        if (danmaku != null) {
+            root.removeView(danmaku);
+            danmaku.stopLoading();
+            danmaku.destroy();
+            danmaku = null;
+            danmakuReady = false;
+        }
+        while (danmakuPending.length() > 0) danmakuPending.remove(0);
         frames.clear();
         observed.clear();
         sample = new JSONObject();
@@ -222,6 +233,107 @@ public class MainActivity extends Activity {
             site.destroy();
             site = null;
         }
+    }
+
+    private void layoutDanmaku() {
+        if (danmaku == null || site == null) return;
+        danmaku.setLayoutParams(
+            new FrameLayout.LayoutParams((FrameLayout.LayoutParams) site.getLayoutParams())
+        );
+        danmaku.setVisibility(
+            danmakuEnabled && site.getVisibility() == View.VISIBLE ? View.VISIBLE : View.INVISIBLE
+        );
+        danmaku.bringToFront();
+    }
+
+    private void pushDanmaku(JSONObject data) throws Exception {
+        danmakuEnabled = data.optBoolean("enabled", true);
+        if (data.optBoolean("clear") || !danmakuEnabled) {
+            while (danmakuPending.length() > 0) danmakuPending.remove(0);
+            if (danmaku != null) danmaku.evaluateJavascript("window.__VS_Danmaku?.clear()", null);
+        }
+        if (site == null || !danmakuEnabled || site.getVisibility() != View.VISIBLE) {
+            if (danmaku != null) danmaku.setVisibility(View.INVISIBLE);
+            return;
+        }
+        org.json.JSONArray entries = data.optJSONArray("messages");
+        if (entries != null) for (
+            int i = Math.max(0, entries.length() - 20);
+            i < entries.length();
+            i++
+        ) {
+            JSONObject entry = entries.optJSONObject(i);
+            if (entry == null || !entry.has("text")) continue;
+            String text = entry.optString("text");
+            if (text.length() > 2000) text = text.substring(0, 2000);
+            danmakuPending.put(new JSONObject().put("text", text));
+            if (danmakuPending.length() > 20) danmakuPending.remove(0);
+        }
+        if (danmaku == null && danmakuPending.length() > 0) {
+            danmaku = new WebView(this) {
+                @Override
+                public boolean dispatchTouchEvent(MotionEvent event) {
+                    return false;
+                }
+            };
+            configure(danmaku, false);
+            danmaku.getSettings().setAllowContentAccess(false);
+            danmaku.setBackgroundColor(Color.TRANSPARENT);
+            danmaku.setWebViewClient(
+                new WebViewClient() {
+                    @Override
+                    public boolean shouldOverrideUrlLoading(
+                        WebView view,
+                        WebResourceRequest request
+                    ) {
+                        return true;
+                    }
+
+                    @Override
+                    public WebResourceResponse shouldInterceptRequest(
+                        WebView view,
+                        WebResourceRequest request
+                    ) {
+                        String file = request.getUrl().getPath();
+                        if (
+                            !"videosreeeen.local".equals(request.getUrl().getHost()) ||
+                            !("/danmaku.html".equals(file) || "/danmaku.js".equals(file))
+                        ) return empty();
+                        try {
+                            return new WebResourceResponse(
+                                file.endsWith(".js") ? "text/javascript" : "text/html",
+                                "UTF-8",
+                                getAssets().open(file.substring(1))
+                            );
+                        } catch (Exception ignored) {
+                            return empty();
+                        }
+                    }
+
+                    @Override
+                    public void onPageFinished(WebView view, String url) {
+                        if (view != danmaku) return;
+                        danmakuReady = true;
+                        flushDanmaku();
+                    }
+                }
+            );
+            root.addView(danmaku, new FrameLayout.LayoutParams(1, 1));
+            danmaku.loadUrl("https://videosreeeen.local/danmaku.html");
+        }
+        layoutDanmaku();
+        flushDanmaku();
+    }
+
+    private void flushDanmaku() {
+        if (
+            danmaku == null || !danmakuReady || !danmakuEnabled || danmakuPending.length() == 0
+        ) return;
+        danmaku.evaluateJavascript(
+            "window.__VS_Danmaku.push(" + danmakuPending.toString() + ")",
+            null
+        );
+        while (danmakuPending.length() > 0) danmakuPending.remove(0);
     }
 
     private boolean isBilibiliLoginUrl(String value) {
@@ -417,6 +529,10 @@ public class MainActivity extends Activity {
                     runOnUiThread(() -> {
                         try {
                             switch (method) {
+                                case "danmaku":
+                                    pushDanmaku(payload);
+                                    resolve(id, new JSONObject(), null);
+                                    break;
                                 case "siteAccount":
                                     openSiteAccount();
                                     resolve(id, new JSONObject(), null);
@@ -479,6 +595,7 @@ public class MainActivity extends Activity {
                                             site.setVisibility(View.VISIBLE);
                                         }
                                     }
+                                    layoutDanmaku();
                                     resolve(id, new JSONObject(), null);
                                     break;
                                 case "sampleSite": {

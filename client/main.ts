@@ -4,6 +4,9 @@ import { icon } from './icons';
 import { PlaybackPicker, playbackPickerMarkup } from './playback-picker';
 import { resolveXifanPage, checkResolvedVideo } from './site-source';
 import { SiteActions } from './site-actions';
+import { Latencies } from './latency';
+import { DanmakuFeed } from './danmaku';
+import '../shared/danmaku.js';
 import type { ClientMessage, MediaInput, ServerMessage, Snapshot } from '../shared/protocol';
 import { PROTOCOL, parseInvite, serverOrigin, invitationServer } from '../shared/invite';
 import { describeUrl } from '../shared/sites';
@@ -40,10 +43,10 @@ ${playbackPickerMarkup}
 <details id="cache-options" class="cache-options"><summary title="默认关闭。只有大家都卡时才考虑完整缓存；实时画面不使用此模式。">共同缓存</summary><section class="mode-card"><div class="mode-copy"><span class="mode-symbol">${icon('download', 22)}</span><div><h3>共同缓存模式 <span class="pill">手动启用</span></h3><p id="mode-description">仅在大家都卡时使用；默认边播边看。</p></div></div><button id="mode-toggle" class="switch" role="switch" aria-checked="false" aria-label="共同缓存模式"><i></i></button></section></details><div class="screen-foot"><span id="control-summary">${icon('shield', 14)} 多人可控 · 自动同步</span><span id="sync-status">等待加入房间</span></div>
 </section>
 <aside id="sidebar" class="sidebar"><section class="members-card"><div class="section-heading"><span>${icon('users', 18)} 放映室成员 <b id="member-count">0</b></span><span class="live-label">${icon('signal', 14)} RTT</span></div><div id="members" class="members"><p class="empty-members">暂无成员</p></div><button id="sidebar-invite" class="invite-line">${icon('plus', 16)} 邀请成员</button></section><section id="chat-panel" class="chat-panel"><div id="chat-drag" class="chat-heading" title="拖拽可悬浮聊天室"><div>${icon('chat', 18)} 聊天室 <span class="tiny-dot"></span></div><div>${button('chat-dock', '停靠聊天室', 'expand')}</div></div><div id="chat-messages" class="chat-messages"><div id="chat-empty" class="chat-empty"><span>${icon('chat', 30)}</span><p>暂无消息</p><small>加入房间后，消息会出现在这里。</small></div></div><div id="emoji-picker" class="emoji-picker" hidden></div><div class="chat-compose"><textarea id="chat-input" title="Enter 发送，Shift + Enter 换行" aria-label="聊天消息" placeholder="发送消息…" rows="2" maxlength="2000"></textarea><div class="compose-actions"><div>${button('emoji-button', '选择表情', 'smile')}${button('image-button', '发送图片或 GIF 表情包', 'image')}<input id="image-input" type="file" accept="image/png,image/jpeg,image/gif,image/webp" hidden></div><button id="send-button" class="send-button" title="发送消息" aria-label="发送消息">${icon('send', 17)}</button></div></div></section><div class="sidebar-foot">VIDEOSREEEEN <span>✳</span></div></aside></main>
-<footer class="app-foot"><span>VideoSreeeen <b>0.4.1</b></span><span>GPL-3.0 · 开源</span><button id="leave-button" class="text-button" hidden>${icon('exit', 14)} 离开放映室</button></footer>
+<footer class="app-foot"><span>VideoSreeeen <b>0.4.2</b></span><span>GPL-3.0 · 开源</span><button id="leave-button" class="text-button" hidden>${icon('exit', 14)} 离开放映室</button></footer>
 <dialog id="room-dialog" aria-labelledby="room-dialog-title"><form id="room-form"><div class="dialog-heading"><div><div class="eyebrow">ROOM</div><h2 id="room-dialog-title">创建或加入房间</h2></div><button id="dialog-close" type="button" class="icon-button" aria-label="关闭">${icon('close')}</button></div><div class="room-tabs" role="group" aria-label="创建或加入"><button id="create-tab" type="button" aria-pressed="true">创建房间</button><button id="join-tab" type="button" aria-pressed="false">我有邀请</button></div><label>你的昵称<input id="name-input" maxlength="30" autocomplete="nickname" placeholder="输入昵称" required></label><div id="invite-field" hidden><label>朋友的邀请链接或完整邀请码<input id="invite-input" autocomplete="off" spellcheck="false" placeholder="粘贴朋友发来的邀请"></label><p id="invite-server-hint" class="dialog-note">推荐使用完整链接，可自动找到朋友的房间。</p></div><p id="create-note" hidden></p><div class="dialog-buttons"><button id="create-button" type="submit" class="button accent">创建房间并生成邀请</button><button id="join-button" type="submit" class="button accent" hidden>加入朋友的房间</button></div><p id="dialog-error" class="form-error" role="alert"></p></form></dialog>
 <dialog id="invite-dialog" aria-labelledby="invite-title"><div class="dialog-heading"><div><div class="eyebrow">INVITE</div><h2 id="invite-title">邀请成员</h2></div><button data-close="invite-dialog" class="icon-button" aria-label="关闭">${icon('close')}</button></div><p class="dialog-copy">朋友打开链接，填个昵称就能加入。苹果设备直接用浏览器。</p><label>邀请链接<input id="invite-link" readonly aria-label="邀请链接"></label><div class="dialog-buttons"><button id="copy-link" class="button accent">${icon('copy', 16)} 复制邀请链接</button><button id="share-invite" class="button outline" hidden>系统分享</button></div><details class="advanced"><summary>使用邀请码加入</summary><label>完整邀请码<input id="invite-code" readonly></label><button id="copy-code" class="text-button">复制邀请码</button><p class="dialog-note">邀请码只适用于相同服务器；跨服务器请发送完整邀请链接。不要只发送六位房间号。</p></details><p id="invite-feedback" class="form-error" role="status"></p><button data-close="invite-dialog" class="button soft dialog-wide">继续选片</button></dialog>
-<dialog id="settings-dialog" aria-labelledby="settings-title"><form id="settings-form"><div class="dialog-heading"><div><div class="eyebrow">SETTINGS</div><h2 id="settings-title">设置与帮助</h2></div><button type="button" data-close="settings-dialog" class="icon-button" aria-label="关闭">${icon('close')}</button></div><details class="advanced"><summary>版本与更新</summary><p class="dialog-note">Windows / Android 0.4.1</p><div class="dialog-buttons"><button id="update-action" type="button" class="button soft">检查更新</button><a class="button soft" href="https://github.com/BorderArea01/VideoSreeeen/releases/latest/download/VideoSreeeen-Setup.exe" target="_blank" rel="noopener noreferrer">Windows 安装版</a><a class="button soft" href="https://github.com/BorderArea01/VideoSreeeen/releases/latest/download/VideoSreeeen-Android.apk" target="_blank" rel="noopener noreferrer">Android APK</a></div><p id="update-status" class="dialog-note" role="status"></p></details><details id="connection-details" class="advanced"><summary>高级 · 房间服务器</summary><p class="dialog-note">仅自建或局域网用户需要修改。保存后用于下一次建房或邀请码加入，不会切换当前房间。</p><label>服务器地址<input id="server-input" type="url" placeholder="https://你的服务器" required></label><div class="dialog-buttons"><button type="submit" class="button accent">保存设置</button><button id="reset-server" type="button" class="button outline">恢复默认</button></div><p id="settings-error" class="form-error" role="alert"></p><p id="settings-status" class="dialog-note" role="status"></p></details><details id="watch-help" class="advanced"><summary>第一次使用 · 怎么一起看？</summary><ol class="help-steps"><li>创建房间，把邀请链接发给朋友；朋友打开后填写昵称即可加入。</li><li>视频直链可直接同步播放；原站链接会显示可用的播放方式。</li><li>电脑浏览器在“提供视频给房间”窗口完成两步：打开原站播放，再选择该标签页并勾选音频。完成后房间才会显示画面；原站负责播放进度。Windows 客户端也可共享原站画面，或识别视频源以使用同步播放、暂停和拖动。</li><li>默认边播边看。仅在大家都卡时，可手动开启共同缓存，完整下载后播放。</li></ol></details><details class="advanced"><summary>浏览器与客户端有什么区别？</summary><p class="dialog-note">浏览器可建房、聊天、看直链、共享本地文件和接收画面；支持屏幕共享的电脑浏览器还可提供视频标签页。网页不能自动读取第三方网站的播放器。浏览器完整缓存目前限总计 128 MiB；长视频缓存请用客户端。Windows / Android 可在应用内打开原站，苹果设备使用浏览器。</p></details><div class="help-links"><button id="project-link" type="button" class="text-button">开源项目与构建说明 ↗</button><button id="feedback-link" type="button" class="text-button">反馈问题 ↗</button></div><p class="dialog-note">GPL-3.0 · 无需注册。昵称会保存在本机；房间服务会处理昵称、聊天和同步信息。公共服务可能受免费额度或网络影响，也可以自行部署。</p><button data-close="settings-dialog" type="button" class="button soft dialog-wide">返回观影</button></form></dialog><div id="toast" class="toast" role="status" hidden></div>`;
+<dialog id="settings-dialog" aria-labelledby="settings-title"><form id="settings-form"><div class="dialog-heading"><div><div class="eyebrow">SETTINGS</div><h2 id="settings-title">设置与帮助</h2></div><button type="button" data-close="settings-dialog" class="icon-button" aria-label="关闭">${icon('close')}</button></div><details class="advanced"><summary>版本与更新</summary><p class="dialog-note">Windows / Android 0.4.2</p><div class="dialog-buttons"><button id="update-action" type="button" class="button soft">检查更新</button><a class="button soft" href="https://github.com/BorderArea01/VideoSreeeen/releases/latest/download/VideoSreeeen-Setup.exe" target="_blank" rel="noopener noreferrer">Windows 安装版</a><a class="button soft" href="https://github.com/BorderArea01/VideoSreeeen/releases/latest/download/VideoSreeeen-Android.apk" target="_blank" rel="noopener noreferrer">Android APK</a></div><p id="update-status" class="dialog-note" role="status"></p></details><details id="connection-details" class="advanced"><summary>高级 · 房间服务器</summary><p class="dialog-note">仅自建或局域网用户需要修改。保存后用于下一次建房或邀请码加入，不会切换当前房间。</p><label>服务器地址<input id="server-input" type="url" placeholder="https://你的服务器" required></label><div class="dialog-buttons"><button type="submit" class="button accent">保存设置</button><button id="reset-server" type="button" class="button outline">恢复默认</button></div><p id="settings-error" class="form-error" role="alert"></p><p id="settings-status" class="dialog-note" role="status"></p></details><details id="watch-help" class="advanced"><summary>第一次使用 · 怎么一起看？</summary><ol class="help-steps"><li>创建房间，把邀请链接发给朋友；朋友打开后填写昵称即可加入。</li><li>视频直链可直接同步播放；原站链接会显示可用的播放方式。</li><li>电脑浏览器在“提供视频给房间”窗口完成两步：打开原站播放，再选择该标签页并勾选音频。完成后房间才会显示画面；原站负责播放进度。Windows 客户端也可共享原站画面，或识别视频源以使用同步播放、暂停和拖动。</li><li>默认边播边看。仅在大家都卡时，可手动开启共同缓存，完整下载后播放。</li></ol></details><details class="advanced"><summary>浏览器与客户端有什么区别？</summary><p class="dialog-note">浏览器可建房、聊天、看直链、共享本地文件和接收画面；支持屏幕共享的电脑浏览器还可提供视频标签页。网页不能自动读取第三方网站的播放器。浏览器完整缓存目前限总计 128 MiB；长视频缓存请用客户端。Windows / Android 可在应用内打开原站，苹果设备使用浏览器。</p></details><div class="help-links"><button id="project-link" type="button" class="text-button">开源项目与构建说明 ↗</button><button id="feedback-link" type="button" class="text-button">反馈问题 ↗</button></div><p class="dialog-note">GPL-3.0 · 无需注册。昵称会保存在本机；房间服务会处理昵称、聊天和同步信息。公共服务可能受免费额度或网络影响，也可以自行部署。</p><button data-close="settings-dialog" type="button" class="button soft dialog-wide">返回观影</button></form></dialog><div id="toast" class="toast" role="status" hidden></div>`;
 
 $('platform').textContent = platform;
 const playbackPicker = new PlaybackPicker((choice) => {
@@ -54,6 +57,53 @@ $('link-capability').textContent = isNative
   : '每人独立加载视频，只同步进度，画质不经转码。支持视频直链、稀饭 xfy2 线路；蜜柑存储线路为实验识别。';
 if (!isNative) $<HTMLInputElement>('source-url').placeholder = '粘贴视频直链、稀饭或蜜柑播放页';
 $('site-source-options').hidden = !isNative;
+$('link-choice').append($('cache-options'));
+$('cache-options').querySelector('summary')!.textContent = '网络卡顿时：先完整缓存';
+$('cache-options').querySelector('summary')!.title =
+  '仅供可下载的视频：全员完整下载后再播放，看完清理。实时共享画面不使用此功能。';
+if (!isNative)
+  $('cache-options').insertAdjacentHTML(
+    'beforeend',
+    '<p class="dialog-note">网页完整缓存限 128 MiB，长视频请使用 Windows 或 Android 客户端。</p>',
+  );
+const latencies = new Latencies();
+document.querySelector<HTMLElement>('.members-card .live-label')!.title =
+  '到房间服务器的往返延迟，不代表画面缓冲延迟';
+const danmakuFeed = new DanmakuFeed();
+let danmakuEnabled = saved('danmaku') !== 'off';
+window.__VS_Danmaku.enable(danmakuEnabled);
+$('stage').insertAdjacentHTML(
+  'beforeend',
+  '<div class="stage-tools"><button id="danmaku-toggle" hidden type="button" aria-label="显示聊天弹幕" title="文字和 Emoji 实时飘过；不重放历史聊天" aria-pressed="true">弹幕 开</button></div>',
+);
+$('fullscreen').insertAdjacentHTML(
+  'beforebegin',
+  '<button id="danmaku-native-toggle" hidden class="icon-button" type="button" title="显示或隐藏聊天弹幕" aria-label="显示聊天弹幕">弹</button>',
+);
+$('danmaku-toggle').onclick = () => {
+  danmakuEnabled = !danmakuEnabled;
+  save('danmaku', danmakuEnabled ? 'on' : 'off');
+  window.__VS_Danmaku.enable(danmakuEnabled);
+  if (isNative && siteOpen)
+    void nativeCall('danmaku', { enabled: danmakuEnabled, clear: true }).catch(error);
+  renderDanmakuToggle();
+};
+$('danmaku-native-toggle').onclick = $('danmaku-toggle').onclick;
+function renderDanmakuToggle() {
+  $('danmaku-toggle').setAttribute('aria-pressed', String(danmakuEnabled));
+  $('danmaku-toggle').textContent = danmakuEnabled ? '弹幕 开' : '弹幕 关';
+  $('danmaku-toggle').hidden = !room?.media || (isNative && siteOpen);
+  $('danmaku-native-toggle').hidden = !room?.media || !isNative || !siteOpen;
+  $('danmaku-native-toggle').setAttribute('aria-pressed', String(danmakuEnabled));
+}
+function presentDanmaku(snapshot: Snapshot) {
+  const fresh = danmakuFeed.take(`${snapshot.code}:${memberId}`, snapshot.chat);
+  renderDanmakuToggle();
+  if (!fresh.length || !danmakuEnabled || !connected || !snapshot.media || document.hidden) return;
+  if (isNative && siteOpen) {
+    void nativeCall('danmaku', { enabled: true, messages: fresh }).catch(error);
+  } else window.__VS_Danmaku.push(fresh, $('stage'));
+}
 $('watch-help').insertAdjacentHTML(
   'beforebegin',
   `<details id="site-account-settings" class="advanced"><summary>原站账号 · B 站登录</summary>
@@ -331,6 +381,8 @@ async function connect(kind: 'create' | 'join', reconnect = false) {
   clearTimeout(reconnectTimer);
   ws?.close();
   connected = false;
+  rtt = null;
+  latencies.clear();
   connectionView(reconnect ? '正在重新连接' : '正在连接');
   mediaRelay = true;
   peers.setIceServers([], false);
@@ -374,8 +426,15 @@ async function connect(kind: 'create' | 'join', reconnect = false) {
       socket.send(
         JSON.stringify(
           kind === 'create'
-            ? { type: 'create', name, protocol: PROTOCOL }
-            : { type: 'join', name, protocol: PROTOCOL, invite, ...(resume ? { resume } : {}) },
+            ? { type: 'create', name, protocol: PROTOCOL, capabilities: ['latency-v1'] }
+            : {
+                type: 'join',
+                name,
+                protocol: PROTOCOL,
+                capabilities: ['latency-v1'],
+                invite,
+                ...(resume ? { resume } : {}),
+              },
         ),
       );
     socket.onmessage = (event) => {
@@ -412,8 +471,27 @@ async function connect(kind: 'create' | 'join', reconnect = false) {
             reject(new Error(message.message));
             socket.close();
           } else toast(message.message);
-        } else if (message.type === 'pong') rtt = Math.max(0, performance.now() - message.sentAt);
-        else if (message.type === 'probe') send({ type: 'probe', nonce: message.nonce });
+        } else if (message.type === 'latency') {
+          latencies.update(message.members, performance.now());
+          renderLatencies();
+        } else if (message.type === 'pong') {
+          const elapsed = performance.now() - message.sentAt;
+          if (elapsed >= 0 && elapsed < 15000) {
+            rtt = elapsed;
+            const clock = message.clock;
+            if (
+              clock &&
+              room &&
+              !pendingControl &&
+              clock.mediaId === (room.media?.id ?? null) &&
+              clock.epoch === room.epoch &&
+              clock.revision === room.playback.revision &&
+              Number.isFinite(clock.ageMs) &&
+              clock.ageMs >= 0
+            )
+              anchoredAt = performance.now() - clock.ageMs - elapsed / 2;
+          }
+        } else if (message.type === 'probe') send({ type: 'probe', nonce: message.nonce });
         else if (message.type === 'signal') {
           if (message.purpose === 'broadcast') broadcast.receive(message);
           else peers.receive(message);
@@ -456,6 +534,11 @@ async function connect(kind: 'create' | 'join', reconnect = false) {
       clearTimeout(timeout);
       if (ws !== socket) return;
       connected = false;
+      danmakuFeed.reset();
+      window.__VS_Danmaku.clear();
+      if (isNative && siteOpen)
+        void nativeCall('danmaku', { enabled: danmakuEnabled, clear: true }).catch(error);
+      latencies.clear();
       if (pendingBroadcastUrl) {
         pendingBroadcastUrl = '';
         releasePublisher();
@@ -526,6 +609,7 @@ function adopt(snapshot: Snapshot) {
     siteActions.reset();
   }
   room = snapshot;
+  latencies.update(snapshot.members, performance.now());
   // Accept offers immediately. Native file cleanup may finish after signaling
   // has already arrived; starting a new download still awaits `clearing`.
   peers.configure(room, memberId);
@@ -567,6 +651,7 @@ function adopt(snapshot: Snapshot) {
     void loadStream(snapshot.media);
   if (!previous || changed || previous.playback.revision !== snapshot.playback.revision)
     applyPlayback(true);
+  presentDanmaku(snapshot);
 }
 function openProvider() {
   if (!room?.media || room.media.broadcast || isNative) return;
@@ -717,6 +802,7 @@ function renderLiveStatus() {
   $('provide-status').textContent = text;
 }
 function render() {
+  renderDanmakuToggle();
   if (provideDialogMediaId && provideDialogMediaId !== room?.media?.id) closeProvider();
   const joined = !!room;
   const preview = hasPendingPreview();
@@ -766,7 +852,9 @@ function render() {
     !!room?.media?.source &&
     !room.media.broadcast &&
     (isNative || room.media.source.kind !== 'hls');
-  $('cache-options').hidden = !cacheAvailable && room?.mode !== 'cache';
+  $('cache-options').hidden = false;
+  $<HTMLButtonElement>('mode-toggle').disabled =
+    !joined || (!cacheAvailable && room?.mode !== 'cache');
   $('browser-hint').hidden = !blocked || room?.mode === 'cache';
   $('browser-title').textContent = sourceNeeded
     ? providing
@@ -782,7 +870,6 @@ function render() {
   $<HTMLButtonElement>('play-button').disabled = !room?.media || blocked || preview;
   for (const id of ['play-button', 'position', 'seek', 'duration', 'rate'])
     $(id).hidden = liveScreen || !media || blocked;
-  $<HTMLButtonElement>('mode-toggle').disabled = !cacheAvailable;
   $('broadcast-site').hidden = !window.desktop || !siteOpen || !!room?.media?.broadcast;
   $('broadcast-screen').hidden = !canShareTab;
   $('browser-provide').hidden = room?.media?.provider === 'direct' || (sourceNeeded && !providing);
@@ -890,11 +977,12 @@ function render() {
     info.append(name, detail);
     const latency = document.createElement('span');
     latency.className = `latency ${member.rtt !== null && member.rtt > 180 ? 'slow' : ''}`;
-    latency.textContent = member.online && member.rtt !== null ? `${member.rtt} ms` : '—';
+    latency.dataset.member = member.id;
     row.append(avatar, info, latency);
     members.append(row);
   }
   renderChat();
+  renderLatencies();
   const caching = room?.mode === 'cache';
   $('mode-toggle').setAttribute('aria-checked', String(!!caching));
   const hashes = new Set(
@@ -912,7 +1000,9 @@ function render() {
         : room!.cacheReady
           ? '大家都已准备好，可以一起开始播放。'
           : '等待所有成员完整缓存，期间无法开始播放。'
-      : '仅在大家都卡时使用；默认边播边看。';
+      : cacheAvailable
+        ? '有人边播边卡时再启用：每人完整下载，全部就绪后播放，看完自动清理。'
+        : '先选择可下载的视频源。全员下载完整后再看；共享画面不使用此功能。';
   const mine = room?.members.find((m) => m.id === memberId)?.cache;
   const needsCache = !!caching && (!room?.cacheReady || loadedKind !== 'cache');
   $('cache-overlay').hidden = !needsCache || preview;
@@ -964,6 +1054,33 @@ function render() {
     audio.pause();
   }
   void resizeSite();
+}
+function renderLatencies() {
+  for (const node of document.querySelectorAll<HTMLElement>('.latency[data-member]')) {
+    const online = connected && room?.members.some((m) => m.id === node.dataset.member && m.online);
+    const sample = latencies.read(node.dataset.member!, performance.now());
+    node.textContent = online ? sample.label : '—';
+    node.title = online ? sample.title : '成员未连接';
+    node.classList.toggle('slow', !!online && sample.rtt !== null && sample.rtt > 180);
+  }
+  renderNetworkStatus();
+}
+function renderNetworkStatus() {
+  if (!room) return;
+  $('sync-status').textContent = !connected
+    ? '离线 · 暂停控制'
+    : hasPendingPreview()
+      ? '本机预览 · 等待房间确认'
+      : room.mode === 'cache' && !room.cacheReady
+        ? '等待完整缓存'
+        : sourceFailed
+          ? '视频未就绪'
+          : room.media?.broadcast
+            ? $('live-status').textContent || '共享已开始'
+            : !isNative && room.media && !room.media.source
+              ? '视频尚未开始提供'
+              : `房间延迟 · ${latencies.read(memberId, performance.now()).label}`;
+  $('sync-status').title = latencies.read(memberId, performance.now()).title;
 }
 function renderChat() {
   const signature = room ? `${room.code}:${room.chat.at(-1)?.id ?? ''}:${room.chat.length}` : '';
@@ -1027,6 +1144,9 @@ function renderChat() {
   lastChatLength = room?.chat.length ?? 0;
 }
 async function clearPlayback(keepSite = false, keepPreview = false) {
+  window.__VS_Danmaku.clear();
+  if (isNative && siteOpen)
+    void nativeCall('danmaku', { enabled: danmakuEnabled, clear: true }).catch(error);
   if (!keepPreview) broadcastFallback.close();
   playbackPermissionNeeded = false;
   sourceFailed = false;
@@ -2129,6 +2249,8 @@ function playbackError() {
 video.onerror = playbackError;
 audio.onerror = playbackError;
 $('leave-button').onclick = () => {
+  danmakuFeed.reset();
+  latencies.clear();
   cancelSourceResolution();
   releasePublisher();
   desiredSession = false;
@@ -2317,24 +2439,16 @@ setInterval(() => {
       seek.max = String(duration || 100);
       if (document.activeElement !== seek) seek.value = String(position);
     }
-    $('sync-status').textContent = !connected
-      ? '离线 · 暂停控制'
-      : hasPendingPreview()
-        ? '本机预览 · 等待房间确认'
-        : room.mode === 'cache' && !room.cacheReady
-          ? '等待完整缓存'
-          : sourceFailed
-            ? '视频未就绪'
-            : room.media?.broadcast
-              ? $('live-status').textContent || '共享已开始'
-              : !isNative && room.media && !room.media.source
-                ? '视频尚未开始提供'
-                : `WebSocket 同步${rtt === null ? '' : ' · ' + Math.round(rtt) + ' ms'}`;
+    renderLatencies();
   }
 }, 300);
 setInterval(() => {
+  renderLatencies();
   if (connected) send({ type: 'ping', sentAt: performance.now() });
 }, 5000);
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && connected) send({ type: 'ping', sentAt: performance.now() });
+});
 setInterval(() => {
   if (!siteOpen || !connected || nativeBusy) return;
   const expectedMediaId = room?.media?.id;

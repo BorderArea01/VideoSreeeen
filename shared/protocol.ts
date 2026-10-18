@@ -38,6 +38,12 @@ export interface Playback {
   actor: string | null;
   intent: 'play' | 'pause' | 'seek' | 'rate' | 'snapshot';
 }
+export interface PlaybackClock {
+  mediaId: string | null;
+  epoch: number;
+  revision: number;
+  ageMs: number;
+}
 export interface CacheStatus {
   state: 'idle' | 'downloading' | 'ready' | 'error';
   progress: number;
@@ -53,6 +59,7 @@ export interface Member {
   name: string;
   online: boolean;
   rtt: number | null;
+  rttAgeMs?: number;
   cache: CacheStatus;
   ended: boolean;
 }
@@ -86,6 +93,7 @@ export const clientMessageSchema = z.discriminatedUnion('type', [
     type: z.literal('create'),
     name: z.string().trim().min(1).max(30),
     protocol: z.literal(PROTOCOL),
+    capabilities: z.array(z.literal('latency-v1')).max(4).optional(),
   }),
   z.object({
     type: z.literal('join'),
@@ -93,6 +101,7 @@ export const clientMessageSchema = z.discriminatedUnion('type', [
     invite: z.string().max(200),
     resume: z.string().max(100).optional(),
     protocol: z.literal(PROTOCOL),
+    capabilities: z.array(z.literal('latency-v1')).max(4).optional(),
   }),
   z.object({ type: z.literal('leave') }),
   z.object({ type: z.literal('unshare'), base: z.number().int().nonnegative(), op: id }),
@@ -175,8 +184,9 @@ export type ServerMessage =
   | { type: 'welcome'; memberId: string; resume: string; room: Snapshot }
   | { type: 'state'; room: Snapshot }
   | { type: 'error'; code: string; message: string; room?: Snapshot }
-  | { type: 'pong'; sentAt: number }
+  | { type: 'pong'; sentAt: number; clock?: PlaybackClock }
   | { type: 'probe'; nonce: string }
+  | { type: 'latency'; members: Array<Pick<Member, 'id' | 'rtt' | 'rttAgeMs'>> }
   | {
       type: 'signal';
       purpose?: 'cache' | 'broadcast';

@@ -11,6 +11,7 @@ import {
   type Snapshot,
 } from '../shared/protocol';
 import { positionAt } from '../shared/sync';
+import { RTT_TTL } from './latency';
 
 const token = () => randomBytes(24).toString('base64url');
 const same = (a: string, b: string) =>
@@ -22,6 +23,8 @@ export interface RoomSocket {
   close(code?: number, reason?: string): void;
 }
 interface Seat extends Member {
+  latencyEvents?: boolean;
+  rttAt?: number;
   resume: string;
   socket: RoomSocket | null;
   disconnectedAt: number;
@@ -140,6 +143,7 @@ export class Rooms {
       seat.online = true;
       seat.name = name;
       seat.rtt = null;
+      seat.rttAt = undefined;
       seat.cache = this.idleCache(room.epoch);
       seat.ended = false;
     } else seat = this.addSeat(room, name, socket);
@@ -208,16 +212,52 @@ export class Rooms {
       epoch: room.epoch,
       cacheReady: this.cacheReady(room),
       finished: room.cleaned,
-      members: [...room.members.values()].map(({ id, name, online, rtt, cache, ended }) => ({
-        id,
-        name,
-        online,
-        rtt,
-        cache,
-        ended,
+      members: [...room.members.values()].map((seat) => ({
+        ...this.latencySample(seat),
+        name: seat.name,
+        online: seat.online,
+        cache: seat.cache,
+        ended: seat.ended,
       })),
       chat: room.chat,
     };
+  }
+  clock(room: Room) {
+    return {
+      mediaId: room.media?.id ?? null,
+      epoch: room.epoch,
+      revision: room.playback.revision,
+      ageMs: Math.max(0, this.now() - room.playback.at),
+    };
+  }
+  private latencySample(seat: Seat) {
+    const age = seat.rttAt === undefined ? undefined : Math.max(0, this.now() - seat.rttAt);
+    return {
+      id: seat.id,
+      rtt: seat.online && age !== undefined && age < RTT_TTL ? seat.rtt : null,
+      ...(age === undefined ? {} : { rttAgeMs: age }),
+    };
+  }
+  recordLatency(room: Room, seat: Seat, socket: RoomSocket, rtt: number) {
+    if (
+      seat.socket !== socket ||
+      !seat.online ||
+      !Number.isFinite(rtt) ||
+      rtt < 0 ||
+      rtt >= RTT_TTL
+    )
+      return;
+    seat.rtt = rtt;
+    seat.rttAt = this.now();
+    const message: ServerMessage = {
+      type: 'latency',
+      members: [...room.members.values()].map((s) => this.latencySample(s)),
+    };
+    for (const member of room.members.values())
+      this.send(
+        member.socket,
+        member.latencyEvents ? message : { type: 'state', room: this.snapshot(room) },
+      );
   }
   send(socket: RoomSocket | null, message: ServerMessage) {
     if (socket?.readyState === 1) {
@@ -237,6 +277,7 @@ export class Rooms {
     seat.socket = null;
     seat.online = false;
     seat.rtt = null;
+    seat.rttAt = undefined;
     seat.disconnectedAt = this.now();
     seat.cache = this.idleCache(room.epoch);
     if (room.media?.broadcast?.host === seat.id && !room.playback.paused) this.paused(room);

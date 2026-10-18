@@ -243,6 +243,34 @@ h1 {
   border-radius: 0;
   aspect-ratio: auto;
 }
+.stage-tools {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 30;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.stage:hover .stage-tools,
+.stage:focus-within .stage-tools {
+  opacity: 1;
+}
+.stage-tools button {
+  border: 1px solid #ffffff38;
+  border-radius: 7px;
+  background: #16161dcc;
+  color: #fff;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+.stage-tools button[aria-pressed='false'] {
+  color: #bbb;
+}
+@media (hover: none) {
+  .stage-tools {
+    opacity: 1;
+  }
+}
 .welcome {
   height: 100%;
   position: relative;

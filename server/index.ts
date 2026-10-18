@@ -12,6 +12,7 @@ import { MediaRelay } from './media';
 import { BroadcastRelay } from './broadcast-relay';
 import { RoomSources } from './site-source';
 import { fetchSiteMetadata } from './site-fetch';
+import { startProbe, finishProbe, type ProbeState } from './latency';
 
 export function createApp(
   options: { now?: () => number; origins?: string[]; broadcastRelay?: boolean } = {},
@@ -152,7 +153,7 @@ export function createApp(
           JSON.stringify({
             ok: true,
             app: 'videosreeeen',
-            version: '0.4.1',
+            version: '0.4.2',
             rooms: rooms.rooms.size,
           }),
         );
@@ -227,7 +228,11 @@ export function createApp(
     let tokens = 100;
     let tick = Date.now();
     let invalid = 0;
-    let pingAt = 0;
+    const probeState: ProbeState = {};
+    const probe = () => {
+      const nonce = startProbe(probeState, Date.now());
+      if (nonce) rooms.send(ws, { type: 'probe', nonce });
+    };
     let pong = true;
     const authTimeout = setTimeout(() => {
       if (!seat) ws.close(4000, 'join timeout');
@@ -235,10 +240,6 @@ export function createApp(
     authTimeout.unref();
     ws.on('pong', () => {
       pong = true;
-      if (seat && pingAt) {
-        seat.rtt = Math.max(0, Date.now() - pingAt);
-        if (room) rooms.broadcast(room);
-      }
     });
     const heartbeat = setInterval(() => {
       if (!pong) {
@@ -246,7 +247,6 @@ export function createApp(
         return;
       }
       pong = false;
-      pingAt = Date.now();
       ws.ping();
     }, 5000);
     heartbeat.unref();
@@ -267,7 +267,17 @@ export function createApp(
         }
         const msg = parsed.data;
         if (msg.type === 'ping') {
-          rooms.send(ws, { type: 'pong', sentAt: msg.sentAt });
+          rooms.send(ws, {
+            type: 'pong',
+            sentAt: msg.sentAt,
+            ...(room ? { clock: rooms.clock(room) } : {}),
+          });
+          if (room && seat) probe();
+          return;
+        }
+        if (msg.type === 'probe') {
+          const elapsed = finishProbe(probeState, msg.nonce, now);
+          if (room && seat && elapsed !== null) rooms.recordLatency(room, seat, ws, elapsed);
           return;
         }
         if (msg.type === 'create' || msg.type === 'join') {
@@ -278,6 +288,9 @@ export function createApp(
               : rooms.join(msg.invite, msg.name, ws, msg.resume);
           room = result.room;
           seat = result.seat;
+          seat.latencyEvents = msg.capabilities?.includes('latency-v1') === true;
+          probeState.nonce = undefined;
+          probeState.probeAt = undefined;
           clearTimeout(authTimeout);
           rooms.send(ws, {
             type: 'welcome',
@@ -286,6 +299,7 @@ export function createApp(
             room: rooms.snapshot(room),
           });
           rooms.broadcast(room);
+          probe();
           return;
         }
         if (!room || !seat) throw new RoomError('not_in_room', '请先加入房间');
@@ -334,7 +348,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   const app = createApp();
   const port = Number(process.env.PORT ?? 8787);
   app.server.listen(port, process.env.HOST ?? '0.0.0.0', () =>
-    console.log(`VideoSreeeen 0.4.1 listening on ${port}`),
+    console.log(`VideoSreeeen 0.4.2 listening on ${port}`),
   );
   for (const signal of ['SIGINT', 'SIGTERM'] as const)
     process.once(signal, () => {

@@ -108,8 +108,10 @@ try {
   assert.equal(config.mediaRelay, false);
   assert.equal(config.broadcastRelay, true);
   const a = await client('ABC234');
-  a.send({ type: 'create', name: 'a', protocol: 1 });
+  a.send({ type: 'create', name: 'a', protocol: 1, capabilities: ['latency-v1'] });
   const welcome = await a.next('welcome');
+  a.send(await a.next('probe'));
+  await a.next('latency');
   const unknownSource = await fetch(origin + '/resolve-source/ABC234', {
     method: 'POST',
     body: '{}',
@@ -168,10 +170,14 @@ try {
   evidence.largeImage = { bytes: image.length, originalPreserved: true, hibernation: true };
   evidence.hibernation = { liveSocketsPreserved: true, chatPreserved: true };
   a.clear();
+  await new Promise((resolve) => setTimeout(resolve, 5100));
   a.send({ type: 'ping', sentAt: 123 });
   assert.equal((await a.next('pong')).sentAt, 123);
   const probe = await a.next('probe');
   a.send(probe);
+  const latency = await a.next('latency');
+  assert.equal(typeof latency.members.find((m: any) => m.id === welcome.memberId).rtt, 'number');
+  a.send({ type: 'snapshot' });
   const withRTT = await a.next('state');
   assert.equal(
     typeof withRTT.room.members.find((m: any) => m.id === welcome.memberId).rtt,

@@ -15,6 +15,7 @@ const { DiskCache } = require('./cache.cjs');
 const { BlockCache } = require('./blocks.cjs');
 const { popupTarget } = require('./navigation.cjs');
 let blocks;
+let danmaku;
 let captureUntil = 0;
 let update;
 protocol.registerSchemesAsPrivileged([
@@ -53,6 +54,8 @@ function event(type, data) {
   if (win && !win.isDestroyed()) win.webContents.send('native-event', type, data);
 }
 async function closeSite() {
+  danmaku?.clear();
+  danmaku?.update({ ...bounds, hidden: true });
   if (site) {
     const old = site;
     site = null;
@@ -226,6 +229,7 @@ app.whenReady().then(async () => {
       site.webContents.reload();
     }
   });
+  danmaku = new (require('./danmaku.cjs'))(win);
   update = require('./updates.cjs')(event);
   win.webContents.session.setDisplayMediaRequestHandler((request, callback) => {
     const allowed = request.frame === win.webContents.mainFrame && Date.now() < captureUntil;
@@ -243,6 +247,9 @@ app.whenReady().then(async () => {
     if (e.sender !== win.webContents || e.senderFrame !== win.webContents.mainFrame)
       throw new Error('不允许的调用');
     switch (method) {
+      case 'danmaku':
+        if (site) await danmaku.push(data);
+        return {};
       case 'siteAccount':
         openSiteAccount();
         return {};
@@ -282,6 +289,7 @@ app.whenReady().then(async () => {
           for (const key of ['x', 'y', 'width', 'height'])
             bounds[key] = Math.max(0, Math.min(10000, Math.round(Number(data[key]) || 0)));
           site.setBounds(data.hidden ? { x: 0, y: 0, width: 0, height: 0 } : bounds);
+          danmaku.update({ ...bounds, hidden: !!data.hidden });
         }
         return {};
       case 'applySite': {
