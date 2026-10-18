@@ -55,6 +55,18 @@
 
 诊断入口现已上线；跨网黑屏根因仍待用户双方实际连接报告，不将部署成功表述为远程视频已恢复。未启用 TURN 或新增计费服务。
 
+## 用户远程两端诊断
+
+用户随后提供同一线上 JS `index-Bz-IGdsh.js` 的观众与共享者报告，以下仅保留故障所需字段，不保存完整报告或成员信息。
+
+- 观众采样时间 2026-10-18 15:23:53 UTC：房间连接正常，screen 媒体，signaling stable，本地 answer、远端 offer；ICE checking、gathering complete。本地 host 5 / srflx 2，远端 srflx 2；无选中候选对，无 RTP 统计，播放器 0 帧、readyState 0。
+- 共享者采样时间 15:25:20 UTC：房间连接正常，本机视频 1874×874、readyState 4、未暂停、3800 帧。两条观众连接均为 signaling stable，本地 offer、远端 answer；ICE checking、gathering complete、无选中候选对，音视频发送字节均为 0、视频编码帧为 0。本地各有 host 5 / srflx 1，远端分别 srflx 3 与 4；均记录错误码 701。
+- 双方均未配置 TURN。报告时间不同，不能将两份候选数量视为同一次 ICE 代次的精确对应，也不能由此认定候选丢失。
+
+现场证据将故障定位到跨网 ICE 连通阶段：共享者采集/预览正常，offer 与 answer 已交换，并已在双方添加公网候选，但采样时没有可用选中路径；尚未进入媒体发送和解码阶段。不能把 0 编码帧单独判为编码器故障，也不能把单一 701 判为全部 STUN 不可达。具体 NAT、UDP 过滤、代理或候选处理根因仍未证实，不称远程黑屏已修复。
+
+当前仅 STUN 的部署不具备直连失败后的媒体中继兜底；继续重复部署相同构建不能提供这条缺失路径。遵守用户零付费限制，未启用 Cloudflare TURN。仅询问是否已有公网服务器可用于自建中继，不默认获得新服务、带宽费用或服务器写入授权。
+
 ## 资料
 
 - [MDN ICE restart](https://developer.mozilla.org/en-US/docs/Web/API/RTCPeerConnection/restartIce) 与 [WebRTC 官方重连样例](https://webrtc.github.io/samples/src/content/peerconnection/restart-ice/)。
