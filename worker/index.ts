@@ -3,6 +3,8 @@ import { Rooms, RoomError, type StoredRoom } from '../server/rooms';
 import { clientMessageSchema, parseInvite, type Chat } from '../shared/protocol';
 import { directPlan } from '../shared/cache-plan';
 import { RoomImages, type ImageMeta } from '../server/images';
+import { BroadcastRelay } from '../server/broadcast-relay';
+import type { RelayHello } from '../shared/broadcast-relay';
 
 interface Env {
   ROOMS: DurableObjectNamespace<WatchRoom>;
@@ -11,6 +13,8 @@ interface Env {
   ICE_SERVERS?: string;
 }
 interface Connection {
+  kind?: 'broadcast-relay';
+  relayAuth?: RelayHello;
   memberId?: string;
   opened: number;
   seen: number;
@@ -53,6 +57,7 @@ export default {
         runtime: 'cloudflare',
         version: '0.4.0',
         mediaRelay: false,
+        broadcastRelay: true,
         p2p: true,
       });
     else if (url.pathname === '/config')
@@ -60,9 +65,10 @@ export default {
         mediaRelay: false,
         p2p: true,
         roomRouting: true,
+        broadcastRelay: true,
         iceServers: JSON.parse(env.ICE_SERVERS ?? '[{"urls":"stun:stun.cloudflare.com:3478"}]'),
       });
-    else if (url.pathname === '/ws') {
+    else if (url.pathname === '/ws' || url.pathname === '/broadcast-relay') {
       if (request.headers.get('Upgrade')?.toLowerCase() !== 'websocket')
         return new Response('WebSocket required', { status: 426 });
       const code = url.searchParams.get('room');
@@ -92,6 +98,7 @@ export default {
 /** One authoritative room per object, using hibernatable sockets and SQLite-backed storage. */
 export class WatchRoom extends DurableObject<Env> {
   private rooms = new Rooms();
+  private broadcastRelay = new BroadcastRelay(this.rooms);
   private chatIds: string[] = [];
   private images = new RoomImages(
     this.rooms,
@@ -125,9 +132,14 @@ export class WatchRoom extends DurableObject<Env> {
       const sockets = new Map<string, WebSocket>();
       for (const socket of ctx.getWebSockets()) {
         const c = socket.deserializeAttachment() as Connection;
-        if (c?.memberId) sockets.set(c.memberId, socket);
+        if (!c?.kind && c?.memberId) sockets.set(c.memberId, socket);
       }
       this.rooms.restore(saved, sockets);
+      for (const socket of ctx.getWebSockets()) {
+        const c = socket.deserializeAttachment() as Connection;
+        if (c?.kind === 'broadcast-relay') this.broadcastRelay.connect(socket, c.relayAuth);
+      }
+      this.broadcastRelay.restored();
     });
   }
   private get room() {
@@ -153,8 +165,10 @@ export class WatchRoom extends DurableObject<Env> {
     const pair = new WebSocketPair(),
       [client, server] = Object.values(pair);
     const now = Date.now();
+    server.binaryType = 'arraybuffer';
     this.ctx.acceptWebSocket(server);
     server.serializeAttachment({
+      ...(url.pathname === '/broadcast-relay' ? { kind: 'broadcast-relay' as const } : {}),
       opened: now,
       seen: now,
       tokens: 100,
@@ -167,6 +181,16 @@ export class WatchRoom extends DurableObject<Env> {
   async webSocketMessage(socket: WebSocket, raw: string | ArrayBuffer) {
     const c = socket.deserializeAttachment() as Connection,
       now = Date.now();
+    if (c.kind === 'broadcast-relay') {
+      c.seen = now;
+      this.broadcastRelay.connect(socket, c.relayAuth);
+      c.relayAuth = this.broadcastRelay.message(
+        socket,
+        typeof raw === 'string' ? raw : new Uint8Array(raw),
+      );
+      socket.serializeAttachment(c);
+      return;
+    }
     if (typeof raw !== 'string' || raw.length > 400000) {
       socket.close(4002, 'invalid payload');
       return;
@@ -240,6 +264,7 @@ export class WatchRoom extends DurableObject<Env> {
         ...(c.memberId && this.room ? { room: this.rooms.snapshot(this.room) } : {}),
       });
     }
+    this.broadcastRelay.sweep();
     socket.serializeAttachment(c);
   }
   private async save() {
@@ -273,6 +298,11 @@ export class WatchRoom extends DurableObject<Env> {
     const c = socket.deserializeAttachment() as Connection,
       room = this.room,
       seat = c?.memberId && room?.members.get(c.memberId);
+    if (c?.kind === 'broadcast-relay') {
+      this.broadcastRelay.close(socket);
+      socket.close(1000, 'closed');
+      return;
+    }
     if (room && seat) {
       this.rooms.disconnect(room, seat, socket);
       await this.save();
@@ -289,6 +319,7 @@ export class WatchRoom extends DurableObject<Env> {
       }
     }
     this.rooms.sweep();
+    this.broadcastRelay.sweep();
     await this.images.sweep();
     await this.save();
     if (this.room || this.ctx.getWebSockets().length)

@@ -9,12 +9,14 @@ import { RoomImages, IMAGE_LIMIT } from './images';
 import { ImageFiles } from './image-files';
 import { once } from 'node:events';
 import { MediaRelay } from './media';
+import { BroadcastRelay } from './broadcast-relay';
 
 export function createApp(options: { now?: () => number; origins?: string[] } = {}) {
   const rooms = new Rooms(options.now);
   const imageFiles = new ImageFiles(),
     images = new RoomImages(rooms, imageFiles);
   const relay = new MediaRelay(rooms);
+  const broadcastRelay = new BroadcastRelay(rooms);
   const root = resolve(fileURLToPath(new URL('../dist/', import.meta.url)));
   const allowed =
     options.origins ??
@@ -117,6 +119,7 @@ export function createApp(options: { now?: () => number; origins?: string[] } = 
         res.end(
           JSON.stringify({
             mediaRelay: true,
+            broadcastRelay: true,
             p2p: true,
             iceServers: JSON.parse(
               process.env.ICE_SERVERS ?? '[{"urls":"stun:stun.cloudflare.com:3478"}]',
@@ -169,21 +172,36 @@ export function createApp(options: { now?: () => number; origins?: string[] } = 
     }
   });
   const wss = new WebSocketServer({ noServer: true, maxPayload: 400000, perMessageDeflate: false });
+  const mediaSockets = new WebSocketServer({
+    noServer: true,
+    maxPayload: 65556,
+    perMessageDeflate: false,
+  });
   server.on('upgrade', (req, socket, head) => {
     const ip = req.socket.remoteAddress ?? 'unknown';
+    const path = new URL(req.url ?? '/', 'http://localhost').pathname;
     if (
-      new URL(req.url ?? '/', 'http://localhost').pathname !== '/ws' ||
+      !['/ws', '/broadcast-relay'].includes(path) ||
       !originAllowed(req.headers.origin, req.headers.host) ||
       (connections.get(ip) ?? 0) >= 24
     ) {
       socket.end('HTTP/1.1 403 Forbidden\r\n\r\n');
       return;
     }
-    wss.handleUpgrade(req, socket, head, (ws) => {
+    const handler = path === '/broadcast-relay' ? mediaSockets : wss;
+    handler.handleUpgrade(req, socket, head, (ws) => {
       connections.set(ip, (connections.get(ip) ?? 0) + 1);
       ws.once('close', () => connections.set(ip, Math.max(0, (connections.get(ip) ?? 1) - 1)));
-      wss.emit('connection', ws);
+      handler.emit('connection', ws);
     });
+  });
+  mediaSockets.on('connection', (socket: WebSocket) => {
+    broadcastRelay.connect(socket);
+    socket.on('message', (raw, binary) =>
+      broadcastRelay.message(socket, binary ? new Uint8Array(raw as Buffer) : String(raw)),
+    );
+    socket.on('close', () => broadcastRelay.close(socket));
+    socket.on('error', () => {});
   });
   wss.on('connection', (ws: WebSocket) => {
     let room: Room | null = null;
@@ -278,6 +296,7 @@ export function createApp(options: { now?: () => number; origins?: string[] } = 
   });
   const sweeper = setInterval(() => {
     rooms.sweep();
+    broadcastRelay.sweep();
     relay.sweep();
     void images.sweep().catch(() => {});
   }, 5000);
@@ -285,6 +304,8 @@ export function createApp(options: { now?: () => number; origins?: string[] } = 
   const close = async () => {
     clearInterval(sweeper);
     for (const ws of wss.clients) ws.terminate();
+    for (const ws of mediaSockets.clients) ws.terminate();
+    await new Promise<void>((resolve) => mediaSockets.close(() => resolve()));
     await new Promise<void>((resolve) => wss.close(() => resolve()));
     await new Promise<void>((resolve) => server.close(() => resolve()));
     await imageFiles.close();

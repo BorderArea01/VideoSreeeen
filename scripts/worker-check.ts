@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { WebSocket } from 'ws';
 import { Miniflare, convertV4MiniflareOptions } from 'miniflare';
+import { RELAY_MIMES, relayPacket } from '../shared/broadcast-relay';
 
 const runtime = new Miniflare(
   convertV4MiniflareOptions({
@@ -18,6 +19,7 @@ const runtime = new Miniflare(
           routerConfig: { has_user_worker: true },
           run_worker_first: [
             '/ws',
+            '/broadcast-relay',
             '/healthz',
             '/config',
             '/cache-plan/*',
@@ -39,6 +41,7 @@ const runtime = new Miniflare(
           routerConfig: { has_user_worker: true },
           run_worker_first: [
             '/ws',
+            '/broadcast-relay',
             '/healthz',
             '/config',
             '/cache-plan/*',
@@ -93,6 +96,7 @@ try {
   const config = (await (await fetch(origin + '/config')).json()) as any;
   assert.equal(config.p2p, true);
   assert.equal(config.mediaRelay, false);
+  assert.equal(config.broadcastRelay, true);
   const a = await client('ABC234');
   a.send({ type: 'create', name: 'a', protocol: 1 });
   const welcome = await a.next('welcome');
@@ -142,6 +146,107 @@ try {
     typeof withRTT.room.members.find((m: any) => m.id === welcome.memberId).rtt,
     'number',
   );
+  a.clear();
+  b.clear();
+  a.send({
+    type: 'media',
+    base: withRTT.room.revision,
+    op: 'relay-start',
+    media: {
+      url: 'https://example.com/screen',
+      title: 'relay',
+      provider: 'local',
+      broadcast: { host: welcome.memberId, kind: 'screen' },
+    },
+  });
+  const live = (await a.next('state')).room;
+  async function mediaClient(identity: any) {
+    const socket = new WebSocket(origin.replace('http', 'ws') + '/broadcast-relay?room=ABC234', {
+      origin,
+    });
+    sockets.push(socket);
+    const messages: any[] = [];
+    socket.on('message', (raw, binary) =>
+      messages.push(binary ? Buffer.from(raw as Buffer) : JSON.parse(String(raw))),
+    );
+    await onceOpen(socket);
+    socket.send(
+      JSON.stringify({
+        type: 'hello',
+        code: 'ABC234',
+        member: identity.memberId,
+        secret: identity.resume,
+        media: live.media.id,
+        epoch: live.epoch,
+        formats: [...RELAY_MIMES],
+      }),
+    );
+    const next = async (predicate: (message: any) => boolean) => {
+      const until = Date.now() + 5000;
+      while (Date.now() < until) {
+        const index = messages.findIndex(predicate);
+        if (index >= 0) return messages.splice(index, 1)[0];
+        await new Promise((r) => setTimeout(r, 20));
+      }
+      throw new Error('Missing relay response');
+    };
+    await next((message) => message.type === 'ready');
+    return {
+      socket,
+      next,
+      clear: () => {
+        messages.length = 0;
+      },
+    };
+  }
+  async function onceOpen(socket: WebSocket) {
+    await new Promise<void>((resolve, reject) => {
+      socket.once('open', resolve);
+      socket.once('error', reject);
+    });
+  }
+  const sender = await mediaClient(welcome),
+    receiver = await mediaClient(bw);
+  await sender.next((message) => message.type === 'need' && message.formats.length === 1);
+  const session = '1234567890abcdef1234567890abcdef';
+  const start = { type: 'start', session, mime: RELAY_MIMES[0] };
+  const packet = relayPacket(session, 0, new Uint8Array([1, 2, 3, 4]));
+  sender.socket.send(JSON.stringify(start));
+  await receiver.next((message) => message.type === 'start');
+  sender.socket.send(packet);
+  assert.deepEqual(await receiver.next((message) => Buffer.isBuffer(message)), Buffer.from(packet));
+  sender.clear();
+  receiver.clear();
+  await runtime.unsafeEvictDurableObject('videosreeeen-test', 'WatchRoom', {
+    name: 'ABC234',
+    webSockets: 'hibernate',
+  });
+  sender.socket.send('{"type":"ping"}');
+  await sender.next((message) => message.type === 'need' && message.formats.length === 1);
+  sender.socket.send(JSON.stringify(start));
+  await receiver.next((message) => message.type === 'start');
+  sender.socket.send(packet);
+  assert.deepEqual(await receiver.next((message) => Buffer.isBuffer(message)), Buffer.from(packet));
+  a.clear();
+  a.send({ type: 'snapshot' });
+  const afterRelay = await a.next('state');
+  assert.equal(
+    afterRelay.room.members.filter((member: any) => member.online).length,
+    2,
+    'Media sockets must not replace room membership sockets',
+  );
+  a.clear();
+  a.send({ type: 'unshare', base: afterRelay.room.revision, op: 'relay-stop' });
+  await a.next('state');
+  await new Promise((r) => setTimeout(r, 100));
+  assert.notEqual(sender.socket.readyState, WebSocket.OPEN);
+  assert.notEqual(receiver.socket.readyState, WebSocket.OPEN);
+  evidence.broadcastRelay = {
+    binaryRoundTrip: true,
+    hibernationRecovery: true,
+    isolatedMembership: true,
+    stopCleanup: true,
+  };
   b.socket.close();
   await new Promise((r) => setTimeout(r, 200));
   const replacement = await client('ABC234');
@@ -159,7 +264,7 @@ try {
   invalid.send({ type: 'join', name: 'outsider', invite: welcome.room.invite, protocol: 1 });
   assert.equal((await invalid.next('error')).code, 'invalid_invite');
   assert.equal((await fetch(origin + '/media/ABC234/anything/video')).status, 501);
-  evidence.noVideoRelay = true;
+  evidence.noSourceVideoProxy = true;
   await mkdir('.local', { recursive: true });
   await writeFile('.local/worker-evidence.json', JSON.stringify(evidence, null, 2));
   console.log(JSON.stringify(evidence, null, 2));

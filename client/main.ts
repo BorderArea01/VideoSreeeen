@@ -9,6 +9,7 @@ import { DeviceCache } from './cache';
 import { RoomPeers } from './peers';
 import { setupUpdates } from './updates';
 import { BroadcastPeers } from './broadcast';
+import { BroadcastRelayClient } from './broadcast-relay';
 import { isNative, nativeCall, onNative, platform, type NativeCache, type Sample } from './native';
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -148,6 +149,8 @@ let stoppingBroadcast = false;
 let nativeCapture = false,
   captureEnding: Promise<unknown> = Promise.resolve();
 let broadcastMessage = '';
+let broadcastRelayEnabled = false;
+let relayPlaybackUrl = '';
 let clearing: Promise<void> = Promise.resolve();
 let clearingBusy = false,
   clearingTicket = 0;
@@ -289,6 +292,7 @@ async function connect(kind: 'create' | 'join', reconnect = false) {
   connectionView(reconnect ? '正在重新连接' : '正在连接');
   mediaRelay = true;
   peers.setIceServers([], false);
+  broadcastRelayEnabled = false;
   let roomRouting = false;
   try {
     const response = await fetch(activeServer + '/config', { signal: AbortSignal.timeout(8000) });
@@ -296,6 +300,7 @@ async function connect(kind: 'create' | 'join', reconnect = false) {
       const config = await response.json();
       mediaRelay = config.mediaRelay !== false;
       roomRouting = config.roomRouting === true;
+      broadcastRelayEnabled = config.broadcastRelay === true;
       peers.setIceServers(
         Array.isArray(config.iceServers) ? config.iceServers : [],
         config.p2p === true,
@@ -416,6 +421,7 @@ async function connect(kind: 'create' | 'join', reconnect = false) {
       }
       peers.close();
       broadcast.close();
+      broadcastFallback.close();
       publisher?.pause();
       pendingControl = false;
       connectionView('连接已断开');
@@ -626,17 +632,24 @@ function renderLiveStatus() {
       : connected === expected
         ? `正在提供视频 · 已连接 ${connected} 位观众`
         : `正在提供视频 · 已连接 ${connected} / ${expected} 位观众`;
-    if (failed) text += ' · 连接失败，正在重试';
+    const relayStatus = broadcastFallback.status();
+    if (relayStatus) text += ` · ${relayStatus}`;
+    else if (failed) text += ' · 连接失败，正在重试';
     if (!room?.media || !broadcast.owns(room.media.url)) text = '共享已中断，请重新选择视频';
     if (publisherStream && !publisherStream.getAudioTracks().length) text += ' · 未共享音频';
     $('broadcast-status').textContent = text;
   } else {
     const name = room?.members.find((member) => member.id === sharing.host)?.name ?? '成员';
     const reception = broadcast.reception();
-    badge.title = !reception.hasTurn
-      ? '当前没有配置视频中继；如果双方网络无法直连，需要部署中继或改用各自播放。'
-      : '';
+    badge.title = broadcastRelayEnabled
+      ? '优先直连；无法建立直连时使用受限的备用视频通道，会增加延迟。'
+      : !reception.hasTurn
+        ? '当前没有配置视频中继；如果双方网络无法直连，需要部署中继或改用各自播放。'
+        : '';
     if (reception.state === 'offline') text = '共享者已离线，等待重新连接';
+    else if (broadcastFallback.active() && playbackPermissionNeeded) text = '点击播放以启用声音';
+    else if (broadcastFallback.active() && room?.playback.paused) text = '房间已暂停播放';
+    else if (broadcastFallback.status()) text = broadcastFallback.status();
     else if (['failed', 'closed', 'disconnected'].includes(reception.state))
       text = '共享已开始 · 视频连接失败，正在重试' + (reception.hasTurn ? '' : ' · 当前未配置中继');
     else if (playbackPermissionNeeded) text = '点击播放以启用声音';
@@ -921,6 +934,7 @@ function renderChat() {
   lastChatLength = room?.chat.length ?? 0;
 }
 async function clearPlayback(keepSite = false, keepPreview = false) {
+  if (!keepPreview) broadcastFallback.close();
   playbackPermissionNeeded = false;
   sourceFailed = false;
   playerGeneration++;
@@ -1069,7 +1083,7 @@ function applyPlayback(explicit = false) {
       // A remote MediaStream has a live timeline. Seeking or rate-correcting it
       // would freeze playback. Versioned controls instead drive the publisher.
       if (playback.paused) video.pause();
-      else if (video.srcObject && video.paused) playElement(video);
+      else if ((video.srcObject || broadcastFallback.active()) && video.paused) playElement(video);
       return;
     }
     if (publisher) {
@@ -1186,6 +1200,7 @@ const broadcast = new BroadcastPeers(
   send,
   (stream) => {
     if (room?.media?.broadcast?.host === memberId && room.media.broadcast.kind === 'site') return;
+    if (broadcastFallback.active()) return;
     if (stream) {
       if (video.srcObject !== stream) video.srcObject = stream;
       video.hidden = false;
@@ -1208,8 +1223,33 @@ const broadcast = new BroadcastPeers(
     render();
   },
 );
+const broadcastFallback = new BroadcastRelayClient(
+  video,
+  (url) => {
+    const previous = relayPlaybackUrl;
+    relayPlaybackUrl = url ?? '';
+    if (url) {
+      video.srcObject = null;
+      video.src = url;
+      video.hidden = false;
+      video.muted = false;
+      playElement(video);
+    } else if (previous && video.getAttribute('src') === previous) {
+      video.removeAttribute('src');
+      video.load();
+      const stream = broadcast.receivedStream();
+      if (stream && broadcast.reception().state === 'connected') {
+        video.srcObject = stream;
+        playElement(video);
+      }
+    }
+  },
+  () => playElement(video),
+  () => renderLiveStatus(),
+);
 const cache = new DeviceCache(cacheProgress, peers);
 function releasePublisher() {
+  broadcastFallback.close();
   pendingBroadcastUrl = '';
   if (nativeCapture) {
     nativeCapture = false;
@@ -1461,7 +1501,18 @@ $('stop-broadcast').onclick = () => {
   operation({ type: 'unshare' });
 };
 setInterval(() => {
-  if (connected) broadcast.configure(room, memberId);
+  if (connected) {
+    broadcast.configure(room, memberId);
+    broadcastFallback.configure(
+      room,
+      memberId,
+      resume,
+      activeServer,
+      broadcastRelayEnabled,
+      publisherStream,
+      broadcast.reception().state === 'connected',
+    );
+  }
 }, 3000);
 let lastProgressSend = 0;
 let cacheNote = '';
@@ -1549,8 +1600,10 @@ $('copy-video-diagnostics').onclick = () => {
         roomConnected: connected,
         mediaKind: room?.media?.broadcast?.kind ?? null,
         ...network,
+        fallback: broadcastFallback.diagnostics(),
         player: {
-          bound: !!video.srcObject,
+          bound: !!video.srcObject || broadcastFallback.active(),
+          transport: broadcastFallback.active() ? 'websocket' : video.srcObject ? 'webrtc' : 'none',
           paused: video.paused,
           readyState: video.readyState,
           width: video.videoWidth,

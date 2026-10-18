@@ -20,6 +20,10 @@ export class BroadcastPeers {
   private local: MediaStream | null = null;
   private localUrl = '';
   private retry = new Map<string, number>();
+  private incoming: MediaStream | null = null;
+  receivedStream() {
+    return this.incoming;
+  }
   constructor(
     private send: (message: ClientMessage) => boolean,
     private receiveStream: (stream: MediaStream | null) => void,
@@ -263,7 +267,10 @@ export class BroadcastPeers {
     pc.ontrack = (e) => {
       if (this.current(id, c) && this.room?.media?.broadcast?.host === id) {
         const stream = e.streams[0];
-        if (stream) this.receiveStream(stream);
+        if (stream) {
+          this.incoming = stream;
+          this.receiveStream(stream);
+        }
       }
     };
     pc.onconnectionstatechange = () => {
@@ -331,6 +338,7 @@ export class BroadcastPeers {
     for (const c of this.connections.values()) c.pc.close();
     this.connections.clear();
     this.retry.clear();
+    this.incoming = null;
     this.receiveStream(null);
     this.scope = '';
   }

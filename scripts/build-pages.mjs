@@ -8,7 +8,15 @@ await writeFile(
   resolve(target, '_routes.json'),
   JSON.stringify({
     version: 1,
-    include: ['/ws', '/healthz', '/config', '/cache-plan/*', '/media/*', '/images/*'],
+    include: [
+      '/ws',
+      '/broadcast-relay',
+      '/healthz',
+      '/config',
+      '/cache-plan/*',
+      '/media/*',
+      '/images/*',
+    ],
     exclude: [],
   }),
 );

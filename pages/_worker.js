@@ -4,7 +4,7 @@ export default {
   async fetch(request, env) {
     const path = new URL(request.url).pathname;
     if (
-      ['/ws', '/healthz', '/config'].includes(path) ||
+      ['/ws', '/broadcast-relay', '/healthz', '/config'].includes(path) ||
       path.startsWith('/cache-plan/') ||
       path.startsWith('/images/') ||
       path.startsWith('/media/')
