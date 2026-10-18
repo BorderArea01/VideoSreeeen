@@ -2,6 +2,7 @@ import type Hls from 'hls.js';
 import './style.css';
 import { icon } from './icons';
 import { PlaybackPicker, playbackPickerMarkup } from './playback-picker';
+import { resolveXifanPage, checkResolvedVideo } from './site-source';
 import type { ClientMessage, MediaInput, ServerMessage, Snapshot } from '../shared/protocol';
 import { PROTOCOL, parseInvite, serverOrigin, invitationServer } from '../shared/invite';
 import { describeUrl } from '../shared/sites';
@@ -49,8 +50,8 @@ const playbackPicker = new PlaybackPicker((choice) => {
 });
 $('link-capability').textContent = isNative
   ? '每人独立加载视频，只同步进度，画质不经转码。支持视频直链和客户端内的原站播放器；原站需要各自登录。'
-  : '每人独立加载视频，只同步进度，画质不经转码。支持视频直链和蜜柑存储线路；其他原站页面可用客户端或共享画面。';
-if (!isNative) $<HTMLInputElement>('source-url').placeholder = '粘贴视频直链或蜜柑播放页面地址';
+  : '每人独立加载视频，只同步进度，画质不经转码。支持视频直链、稀饭 xfy2 线路；蜜柑存储线路为实验识别。';
+if (!isNative) $<HTMLInputElement>('source-url').placeholder = '粘贴视频直链、稀饭或蜜柑播放页';
 $('site-source-options').hidden = !isNative;
 if (isNative) {
   $<HTMLInputElement>('source-url').placeholder = '粘贴视频直链或原站页面地址';
@@ -1832,7 +1833,7 @@ $('source-form').onsubmit = (event) => {
   event.preventDefault();
   try {
     const media = describeUrl($<HTMLInputElement>('source-url').value);
-    if (!isNative && !media.source && media.provider === 'mgn') {
+    if (!isNative && !media.source && ['mgn', 'xifan'].includes(media.provider)) {
       void resolveSiteSource(media);
       return;
     }
@@ -1877,21 +1878,29 @@ async function resolveSiteSource(media: MediaInput) {
   $('source-form').setAttribute('aria-busy', 'true');
   $('link-unavailable').hidden = true;
   try {
-    const response = await fetch(`${activeServer}/resolve-source/${code}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: 'Bearer ' + resume,
-        'X-Member-Id': member,
-      },
-      body: JSON.stringify({ url: media.url }),
-      signal: AbortSignal.any([controller.signal, AbortSignal.timeout(15000)]),
-    });
-    const payload = await response.json();
-    if (!response.ok) throw new Error(payload.error || '原站视频源暂未识别');
-    const resolved = payload.media as MediaInput | undefined;
-    if (!resolved?.source || resolved.provider !== 'mgn')
+    const signal = AbortSignal.any([controller.signal, AbortSignal.timeout(15000)]);
+    let resolved: MediaInput | undefined;
+    if (media.provider === 'xifan') {
+      resolved = await resolveXifanPage(media, signal);
+    } else {
+      const response = await fetch(`${activeServer}/resolve-source/${code}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: 'Bearer ' + resume,
+          'X-Member-Id': member,
+        },
+        body: JSON.stringify({ url: media.url }),
+        signal,
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || '原站视频源暂未识别');
+      resolved = payload.media as MediaInput | undefined;
+    }
+    if (!resolved?.source || resolved.provider !== media.provider)
       throw new Error('原站没有提供可播放视频源');
+    button.textContent = '检查视频…';
+    await checkResolvedVideo(resolved, signal);
     if (
       sourceResolution !== controller ||
       !connected ||

@@ -35,7 +35,7 @@ const runtime = new Miniflare(
       {
         name: 'videosreeeen-test',
         outboundService: async (request) => {
-          assert.match(request.headers.get('User-Agent') ?? '', /^VideoSreeeen\//);
+          assert.match(request.headers.get('User-Agent') ?? '', /VideoSreeeen\//);
           const response = await sourceFixture.fetch(request.url);
           return new MockResponse(await response.text(), { status: response.status });
         },

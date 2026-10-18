@@ -7,6 +7,10 @@ class SiteSourceError extends Error {}
 type TextFetch = (url: string, signal: AbortSignal) => Promise<Response>;
 const PAGE = /^\/bangumi\/(\d+)-(\d+)-(\d+)\/$/;
 const PARSER = 'https://play.mknacg.top:8585/cloudplay/ccxl.php';
+export const SITE_METADATA_HEADERS = {
+  'User-Agent': 'Mozilla/5.0 VideoSreeeen/0.4',
+  Accept: 'text/html,application/javascript;q=0.9,*/*;q=0.1',
+};
 export function mgnPage(raw: string) {
   const url = new URL(raw);
   if (
@@ -216,10 +220,7 @@ export class RoomSources {
       fetch(url, {
         signal,
         redirect: 'manual',
-        headers: {
-          'User-Agent': 'VideoSreeeen/0.4 (+https://github.com/BorderArea01/VideoSreeeen)',
-          Accept: 'text/html,application/javascript;q=0.9,*/*;q=0.1',
-        },
+        headers: SITE_METADATA_HEADERS,
       }),
   ) {}
   async handle(request: Request) {

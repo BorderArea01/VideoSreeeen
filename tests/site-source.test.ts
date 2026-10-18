@@ -33,7 +33,7 @@ test('蜜柑公开播放器元数据识别保留原站签发地址，不执行�
     { title: 'a } " b', x: { v: 1 } },
   );
 });
-test('识别拒绝任意 URL、跨域解析、内网源、坏密文，原媒体代理端口范围未扩大', async () => {
+test('识别拒绝任意 URL、跨域解析、内网源、坏密文，元数据端口不向任意媒体源开放', async () => {
   for (const raw of [
     'http://www.mgnacg.com/bangumi/193-3-17/',
     'https://www.mgnacg.com.evil.test/bangumi/193-3-17/',
@@ -52,6 +52,14 @@ test('识别拒绝任意 URL、跨域解析、内网源、坏密文，原媒体�
   await assert.rejects(mgnPublicSource(await playerFixture('https://127.0.0.1/private.mp4')));
   await assert.rejects(mgnPublicSource('<meta charset="UTF-8" id="now_0000000000">'));
   await assert.rejects(publicTarget('https://r2.jzacg.com:8585/movie.mp4'));
+  for (const url of [
+    'https://127.0.0.1:8088/movie.mp4',
+    'https://play.xfvod.pro.evil.test:8088/movie.mp4',
+    'http://play.xfvod.pro:8088/movie.mp4',
+    'https://u:p@play.xfvod.pro:8088/movie.mp4',
+  ])
+    await assert.rejects(publicTarget(url));
+  await assert.rejects(publicTarget('https://play.xfvod.pro:8088/movie.mp4', ['443']));
 });
 test('页面识别仅供在线成员，鉴权在请求前后生效；响应与并发有边界', async () => {
   const rooms = new Rooms(),

@@ -17,16 +17,16 @@ export function assertPublicAddress(address: string) {
     ip = (ip as ipaddr.IPv6).toIPv4Address();
   if (ip.range() !== 'unicast') throw new Error('禁止访问本机、内网和保留地址');
 }
-export async function publicTarget(
-  raw: string,
-  allowedPorts: readonly string[] = ['80', '443', '8080', '8443'],
-) {
+export async function publicTarget(raw: string, allowedPorts?: readonly string[]) {
   const url = new URL(raw);
+  const ports =
+    allowedPorts ??
+    (url.origin === 'https://play.xfvod.pro:8088' ? ['8088'] : ['80', '443', '8080', '8443']);
   if (
     !['http:', 'https:'].includes(url.protocol) ||
     url.username ||
     url.password ||
-    (url.port && !allowedPorts.includes(url.port))
+    (url.port && !ports.includes(url.port))
   )
     throw new Error('不支持的媒体地址');
   const host = url.hostname.replace(/^\[|\]$/g, '');
