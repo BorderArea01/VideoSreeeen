@@ -114,7 +114,9 @@ test('页面识别仅供在线成员，鉴权在请求前后生效；响应与�
   } as RequestInit);
   const pending = interrupted.handle(hanging);
   abort.abort();
-  assert.equal((await pending).status, 422);
+  const canceled = await pending;
+  assert.equal(canceled.status, 422);
+  assert.match(await canceled.text(), /已取消识别/);
   assert.equal(
     (await interrupted.handle(request())).status,
     200,

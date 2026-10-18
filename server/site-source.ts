@@ -251,8 +251,11 @@ export class RoomSources {
     } catch (cause) {
       return reply(
         {
-          error:
-            cause instanceof SiteSourceError
+          error: signal.aborted
+            ? signal.reason?.name === 'TimeoutError'
+              ? '原站响应超时（12 秒），请重试或使用共享画面'
+              : '已取消识别'
+            : cause instanceof SiteSourceError
               ? cause.message
               : '视频源暂未识别，请重试或使用共享画面',
         },
