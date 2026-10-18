@@ -448,7 +448,14 @@ function adopt(snapshot: Snapshot) {
     cleanupState = 'idle';
     clearingBusy = true;
     const ticket = ++clearingTicket;
-    clearing = clearPlayback(keepSite);
+    const keepPreview =
+      snapshot.mode === 'stream' &&
+      snapshot.media?.broadcast?.host === memberId &&
+      snapshot.media.broadcast.kind !== 'site' &&
+      !!publisherStream &&
+      video.srcObject === publisherStream &&
+      broadcast.owns(snapshot.media.url);
+    clearing = clearPlayback(keepSite, keepPreview);
     void clearing
       .finally(() => {
         if (clearingTicket === ticket) {
@@ -477,7 +484,7 @@ function adopt(snapshot: Snapshot) {
     video.srcObject = publisherStream;
     video.muted = true;
     video.hidden = false;
-    if (!snapshot.playback.paused) void video.play().catch(() => {});
+    if (!snapshot.playback.paused) playElement(video);
   }
   if (pendingBroadcastUrl === snapshot.media?.url && snapshot.media.broadcast?.host === memberId)
     pendingBroadcastUrl = '';
@@ -535,10 +542,55 @@ function showPublisherPreview(stream: MediaStream) {
   video.hidden = false;
   $('browser-hint').hidden = true;
   $('native-stage').hidden = true;
-  void video.play().catch((cause) => {
-    // A room acknowledgement may replace the player while play() is pending.
-    if (video.srcObject === stream && cause?.name !== 'AbortError') error(cause);
-  });
+  playElement(video);
+}
+const playRequests = new WeakMap<
+  HTMLMediaElement,
+  {
+    generation: number;
+    source: string | null;
+    stream: HTMLMediaElement['srcObject'];
+  }
+>();
+function playElement(element: HTMLMediaElement) {
+  const generation = playerGeneration;
+  const source = element.getAttribute('src');
+  const stream = element.srcObject;
+  const pending = playRequests.get(element);
+  if (pending?.generation === generation && pending.source === source && pending.stream === stream)
+    return;
+  const request = { generation, source, stream };
+  playRequests.set(element, request);
+  const current = () =>
+    generation === playerGeneration &&
+    element.srcObject === stream &&
+    element.getAttribute('src') === source;
+  void element
+    .play()
+    .then(() => {
+      if (
+        current() &&
+        playbackPermissionNeeded &&
+        !video.paused &&
+        (!audio.src || !audio.paused) &&
+        (!publisher || !publisher.paused)
+      ) {
+        playbackPermissionNeeded = false;
+        render();
+      }
+    })
+    .catch((cause) => {
+      // Playback promises belong to the input that started them. Source changes
+      // and pause/load cancellations must not mark the replacement as blocked.
+      if (!current() || cause?.name === 'AbortError') return;
+      if (cause?.name === 'NotAllowedError') {
+        playbackPermissionNeeded = true;
+        render();
+      } else error(cause);
+    })
+    .finally(() => {
+      if (playRequests.get(element) === request) playRequests.delete(element);
+    });
 }
 function renderLiveStatus() {
   const sharing = room?.media?.broadcast;
@@ -850,7 +902,7 @@ function renderChat() {
     messages.scrollTop = messages.scrollHeight;
   lastChatLength = room?.chat.length ?? 0;
 }
-async function clearPlayback(keepSite = false) {
+async function clearPlayback(keepSite = false, keepPreview = false) {
   playbackPermissionNeeded = false;
   sourceFailed = false;
   playerGeneration++;
@@ -858,14 +910,16 @@ async function clearPlayback(keepSite = false) {
   loadedKind = '';
   hls?.destroy();
   hls = null;
-  video.pause();
-  video.srcObject = null;
+  if (!keepPreview) {
+    video.pause();
+    video.srcObject = null;
+    video.removeAttribute('src');
+    video.load();
+    video.hidden = true;
+  }
   audio.pause();
-  video.removeAttribute('src');
   audio.removeAttribute('src');
-  video.load();
   audio.load();
-  video.hidden = true;
   $('browser-hint').hidden = true;
   if (!keepSite) {
     $('native-stage').hidden = true;
@@ -927,6 +981,10 @@ async function setPlayer(src: string, audioSrc?: string, isHls = false) {
   if (!hls) video.load();
 }
 async function loadStream(media: NonNullable<Snapshot['media']>) {
+  const epoch = room?.epoch;
+  const current = () =>
+    room?.media?.id === media.id && room.epoch === epoch && room.mode === 'stream';
+  if (!current()) return;
   loadedMedia = media.id;
   loadedKind = 'stream';
   if (media.broadcast) {
@@ -938,11 +996,13 @@ async function loadStream(media: NonNullable<Snapshot['media']>) {
       await resizeSite();
     } else {
       await hideSite(true);
+      if (!current()) return;
       siteOpen = false;
       video.hidden = false;
       $('native-stage').hidden = true;
       video.muted = media.broadcast.host === memberId;
     }
+    if (!current()) return;
     broadcast.configure(room, memberId);
     if (
       media.broadcast.host === memberId &&
@@ -967,6 +1027,7 @@ async function loadStream(media: NonNullable<Snapshot['media']>) {
     }
   } else if (media.source) {
     await hideSite(true);
+    if (!current()) return;
     siteOpen = false;
     await setPlayer(
       mediaPath('video'),
@@ -990,11 +1051,7 @@ function applyPlayback(explicit = false) {
       // A remote MediaStream has a live timeline. Seeking or rate-correcting it
       // would freeze playback. Versioned controls instead drive the publisher.
       if (playback.paused) video.pause();
-      else if (video.srcObject && video.paused)
-        void video.play().catch(() => {
-          playbackPermissionNeeded = true;
-          render();
-        });
+      else if (video.srcObject && video.paused) playElement(video);
       return;
     }
     if (publisher) {
@@ -1010,7 +1067,7 @@ function applyPlayback(explicit = false) {
         publisher.currentTime = Math.min(target, publisher.duration || target);
       publisher.playbackRate = correction.rate;
       if (playback.paused) publisher.pause();
-      else if (publisher.paused) void publisher.play().catch(error);
+      else if (publisher.paused) playElement(publisher);
       return;
     }
   }
@@ -1060,20 +1117,8 @@ function applyPlayback(explicit = false) {
     video.pause();
     audio.pause();
   } else {
-    if (video.paused)
-      void video.play().catch(() => {
-        if (!room?.playback.paused) {
-          playbackPermissionNeeded = true;
-          render();
-        }
-      });
-    if (audio.src && audio.paused)
-      void audio.play().catch(() => {
-        if (!room?.playback.paused) {
-          playbackPermissionNeeded = true;
-          render();
-        }
-      });
+    if (video.paused) playElement(video);
+    if (audio.src && audio.paused) playElement(audio);
   }
 }
 async function hideSite(hide: boolean) {
@@ -1124,14 +1169,19 @@ const broadcast = new BroadcastPeers(
   (stream) => {
     if (room?.media?.broadcast?.host === memberId && room.media.broadcast.kind === 'site') return;
     if (stream) {
-      video.srcObject = stream;
+      if (video.srcObject !== stream) video.srcObject = stream;
       video.hidden = false;
       video.muted = room?.media?.broadcast?.host === memberId;
-      void video.play().catch(() => {
-        playbackPermissionNeeded = true;
-        render();
-      });
+      playElement(video);
     } else if (video.srcObject) {
+      // Transport reconfiguration must not detach the publisher's local preview.
+      if (
+        publisherStream &&
+        video.srcObject === publisherStream &&
+        (pendingBroadcastUrl ||
+          (room?.media?.broadcast?.host === memberId && broadcast.owns(room.media.url)))
+      )
+        return;
       video.srcObject = null;
     }
   },
@@ -1147,8 +1197,8 @@ function releasePublisher() {
     nativeCapture = false;
     captureEnding = nativeCall('endCapture').catch(() => {});
   }
-  broadcast.release();
   publisherStream = null;
+  broadcast.release();
   publisherCleanup?.();
   publisherCleanup = null;
   publisher?.pause();
@@ -1628,14 +1678,9 @@ $('browser-help').onclick = () => {
 };
 $('play-button').onclick = () => {
   if (playbackPermissionNeeded && !room?.playback.paused) {
-    void video
-      .play()
-      .then(() => {
-        playbackPermissionNeeded = false;
-        render();
-      })
-      .catch(error);
-    if (audio.src) void audio.play().catch(error);
+    playElement(video);
+    if (publisher) playElement(publisher);
+    if (audio.src) playElement(audio);
     return;
   }
   if (!room?.playback.paused) control('pause');
@@ -1645,8 +1690,9 @@ $('play-button').onclick = () => {
       (video.src || video.srcObject) &&
       !(room?.mode === 'cache' && !room.cacheReady)
     ) {
-      void video.play().catch(error);
-      if (audio.src) void audio.play().catch(error);
+      playElement(video);
+      if (publisher) playElement(publisher);
+      if (audio.src) playElement(audio);
     }
     control('play');
   }

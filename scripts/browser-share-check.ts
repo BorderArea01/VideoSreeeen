@@ -58,6 +58,27 @@ const evidence: Record<string, unknown> = {
 };
 try {
   const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+  await context.addInitScript(() => {
+    const descriptor = Object.getOwnPropertyDescriptor(HTMLMediaElement.prototype, 'srcObject')!;
+    const load = HTMLMediaElement.prototype.load;
+    const events = { detachments: 0, repeatedBindings: 0, loadsWithStream: 0 };
+    (window as any).__videoInputs = events;
+    Object.defineProperty(HTMLMediaElement.prototype, 'srcObject', {
+      ...descriptor,
+      set(value) {
+        if (this.id === 'video') {
+          const previous = descriptor.get!.call(this);
+          if (previous && value === null) events.detachments++;
+          if (previous && value === previous) events.repeatedBindings++;
+        }
+        descriptor.set!.call(this, value);
+      },
+    });
+    HTMLMediaElement.prototype.load = function () {
+      if (this.id === 'video' && this.srcObject) events.loadsWithStream++;
+      return load.call(this);
+    };
+  });
   const host = await context.newPage(),
     guest = await context.newPage();
   const roomEvents: unknown[] = [];
@@ -260,7 +281,11 @@ try {
       path: '.local/screenshots/provider-preview-before-ack.png',
       fullPage: true,
     });
-    await host.evaluate(() => (window as any).__flushScreenStates());
+    await host.evaluate(() => {
+      (window as any).__previewBeforeAck =
+        document.querySelector<HTMLVideoElement>('#video')!.srcObject;
+      (window as any).__flushScreenStates();
+    });
     await host.locator('#live-status').filter({ hasText: '暂无观众' }).waitFor();
     await host.waitForFunction(() => {
       const video = document.querySelector<HTMLVideoElement>('#video')!;
@@ -271,6 +296,22 @@ try {
       );
     });
     evidence.publisherPreviewWithoutViewers = true;
+    evidence.publisherInputContinuity = await host.evaluate(() => ({
+      ...(window as any).__videoInputs,
+      sameStream:
+        document.querySelector<HTMLVideoElement>('#video')!.srcObject ===
+        (window as any).__previewBeforeAck,
+    }));
+    assert.deepEqual(
+      evidence.publisherInputContinuity,
+      {
+        detachments: 0,
+        repeatedBindings: 0,
+        loadsWithStream: 0,
+        sameStream: true,
+      },
+      'Acknowledging the publisher must preserve the playing input',
+    );
   } catch (error) {
     evidence.failure = {
       capture: await host.evaluate(() => (window as any).__captureState),
@@ -326,6 +367,16 @@ try {
   });
   assert.ok(stats.some((s) => s.kind === 'video' && s.frames > 10 && s.bytes > 0));
   assert.ok(stats.some((s) => s.kind === 'audio' && s.bytes > 0));
+  evidence.receiverInputContinuity = await guest.evaluate(() => (window as any).__videoInputs);
+  assert.deepEqual(
+    evidence.receiverInputContinuity,
+    {
+      detachments: 0,
+      repeatedBindings: 0,
+      loadsWithStream: 0,
+    },
+    'Audio and video track events must not rebind the same stream',
+  );
   assert.equal(await guest.locator('#seek').isEnabled(), false);
   assert.equal(await guest.locator('#rate').isEnabled(), false);
   await host.locator('#live-status').filter({ hasText: '已连接 1 位观众' }).waitFor();
