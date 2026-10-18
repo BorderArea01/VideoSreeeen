@@ -74,6 +74,15 @@ $('stage').insertAdjacentHTML(
   'beforeend',
   '<div id="live-status" class="live-status" role="status" hidden></div>',
 );
+$('watch-help').insertAdjacentHTML(
+  'beforebegin',
+  `
+<details id="video-diagnostics" class="advanced"><summary>高级 · 视频连接诊断</summary>
+<p class="dialog-note">跨网黑屏时可复制双方的连接状态。内容不含房间密钥、视频地址或 IP。</p>
+<button id="copy-video-diagnostics" type="button" class="button soft">复制连接诊断</button>
+<p id="video-diagnostics-status" class="dialog-note" role="status"></p>
+<textarea id="video-diagnostics-output" aria-label="连接诊断" rows="7" readonly spellcheck="false" hidden></textarea></details>`,
+);
 $('web-entry').hidden = !window.desktop;
 $('web-entry').onclick = () => {
   void nativeCall('openBrowser', {
@@ -1521,6 +1530,51 @@ $('settings-button').onclick = () => {
     ? `当前房间连接 ${new URL(activeServer).host}；修改仅在下次生效。`
     : '';
   showDialog('settings-dialog');
+};
+$('copy-video-diagnostics').onclick = () => {
+  const button = $<HTMLButtonElement>('copy-video-diagnostics');
+  button.disabled = true;
+  $('video-diagnostics-status').textContent = '正在读取连接状态…';
+  void (async () => {
+    const network = await broadcast.diagnostics();
+    const output = $<HTMLTextAreaElement>('video-diagnostics-output');
+    output.value = JSON.stringify(
+      {
+        checkedAt: new Date().toISOString(),
+        build: document
+          .querySelector<HTMLScriptElement>('script[type="module"]')
+          ?.getAttribute('src')
+          ?.split('/')
+          .pop(),
+        roomConnected: connected,
+        mediaKind: room?.media?.broadcast?.kind ?? null,
+        ...network,
+        player: {
+          bound: !!video.srcObject,
+          paused: video.paused,
+          readyState: video.readyState,
+          width: video.videoWidth,
+          height: video.videoHeight,
+          frames: video.getVideoPlaybackQuality().totalVideoFrames,
+        },
+      },
+      null,
+      2,
+    );
+    output.hidden = false;
+    try {
+      await navigator.clipboard.writeText(output.value);
+      $('video-diagnostics-status').textContent = '连接诊断已复制';
+    } catch {
+      output.focus();
+      output.select();
+      $('video-diagnostics-status').textContent = '诊断已生成，请复制下方内容';
+    }
+  })()
+    .catch(error)
+    .finally(() => {
+      button.disabled = false;
+    });
 };
 $('settings-form').onsubmit = (event) => {
   event.preventDefault();

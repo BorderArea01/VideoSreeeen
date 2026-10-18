@@ -387,6 +387,31 @@ try {
   );
   evidence.actualTabCapture = true;
   evidence.received = { sample, stats };
+  // Keep clipboard writes inside this isolated test page, not the user's OS clipboard.
+  await guest.evaluate(() => {
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: {
+        async writeText(text: string) {
+          (window as any).__diagnosticClipboard = text;
+        },
+      },
+    });
+  });
+  await guest.locator('#settings-button').click();
+  await guest.locator('#video-diagnostics summary').click();
+  await guest.locator('#copy-video-diagnostics').click();
+  await guest.locator('#video-diagnostics-status').filter({ hasText: '已复制' }).waitFor();
+  const diagnostic = JSON.parse(await guest.locator('#video-diagnostics-output').inputValue());
+  assert.equal(diagnostic.role, 'viewer');
+  assert.equal(diagnostic.connections[0].connection, 'connected');
+  assert.ok(diagnostic.connections[0].media.some((media: any) => media.framesDecoded > 0));
+  assert.equal(
+    await guest.evaluate(() => (window as any).__diagnosticClipboard),
+    await guest.locator('#video-diagnostics-output').inputValue(),
+  );
+  evidence.connectionDiagnostics = { role: diagnostic.role, actualMediaStats: true };
+  await guest.locator('[data-close="settings-dialog"]').first().click();
   // Inject a connection state only for UI verification. Media above remains
   // real; this does not demonstrate a failure or recovery across actual NATs.
   await guest.evaluate(() => {

@@ -7,6 +7,7 @@ interface Connection {
   work: Promise<void>;
   scope: string;
   offering: boolean;
+  iceErrors: Set<number>;
 }
 
 /** One explicitly selected publisher; media never passes through the room server. */
@@ -56,6 +57,77 @@ export class BroadcastPeers {
       ),
     );
     return { state: offline ? 'offline' : (pc?.connectionState ?? 'waiting'), hasTurn };
+  }
+  async diagnostics() {
+    const connections = [];
+    for (const [id, c] of this.connections) {
+      const pc = c.pc;
+      let report: RTCStatsReport | undefined;
+      try {
+        report = await pc.getStats();
+      } catch {
+        /* A closing transport may have no report. */
+      }
+      if (!this.current(id, c)) continue;
+      const stats = report ? [...report.values()] : [];
+      const types = (type: string) => {
+        const counts: Record<string, number> = {};
+        for (const stat of stats.filter((stat) => stat.type === type)) {
+          const kind = String(stat.candidateType ?? 'unknown');
+          counts[kind] = (counts[kind] ?? 0) + 1;
+        }
+        return counts;
+      };
+      const transport = stats.find(
+        (stat) => stat.type === 'transport' && stat.selectedCandidatePairId,
+      );
+      const pair = transport
+        ? report?.get(transport.selectedCandidatePairId)
+        : stats.find(
+            (stat) =>
+              stat.type === 'candidate-pair' && stat.nominated && stat.state === 'succeeded',
+          );
+      const local = pair && report?.get(pair.localCandidateId);
+      const remote = pair && report?.get(pair.remoteCandidateId);
+      connections.push({
+        connection: pc.connectionState,
+        ice: pc.iceConnectionState,
+        gathering: pc.iceGatheringState,
+        signaling: pc.signalingState,
+        localDescription: pc.localDescription?.type ?? null,
+        remoteDescription: pc.remoteDescription?.type ?? null,
+        iceErrorCodes: [...c.iceErrors],
+        localCandidates: types('local-candidate'),
+        remoteCandidates: types('remote-candidate'),
+        selectedPair: pair
+          ? {
+              state: pair.state,
+              localType: local?.candidateType,
+              remoteType: remote?.candidateType,
+              protocol: local?.protocol,
+              roundTripMs:
+                typeof pair.currentRoundTripTime === 'number'
+                  ? Math.round(pair.currentRoundTripTime * 1000)
+                  : undefined,
+            }
+          : null,
+        media: stats
+          .filter((stat) => ['inbound-rtp', 'outbound-rtp'].includes(stat.type))
+          .map((stat) => ({
+            direction: stat.type,
+            kind: stat.kind,
+            bytesReceived: stat.bytesReceived,
+            bytesSent: stat.bytesSent,
+            framesDecoded: stat.framesDecoded,
+            framesEncoded: stat.framesEncoded,
+          })),
+      });
+    }
+    return {
+      role: this.room?.media?.broadcast?.host === this.me ? 'publisher' : 'viewer',
+      hasTurn: this.reception().hasTurn,
+      connections,
+    };
   }
   configure(room: Snapshot | null, me: string) {
     const broadcast = room?.mode === 'stream' && room.media?.broadcast;
@@ -173,8 +245,12 @@ export class BroadcastPeers {
       work: Promise.resolve(),
       scope: this.scope,
       offering: false,
+      iceErrors: new Set(),
     };
     this.connections.set(id, c);
+    pc.onicecandidateerror = (event) => {
+      if (this.current(id, c)) c.iceErrors.add(event.errorCode);
+    };
     pc.onicecandidate = (e) => {
       if (e.candidate && this.current(id, c))
         this.signal(id, {

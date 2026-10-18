@@ -12,9 +12,11 @@ class Peer {
   localDescription: RTCSessionDescriptionInit | null = null;
   onconnectionstatechange: (() => void) | null = null;
   onicecandidate: unknown;
+  onicecandidateerror: ((event: { errorCode: number }) => void) | null = null;
   ontrack: unknown;
   offers: RTCOfferOptions[] = [];
   closed = false;
+  stats = new Map<string, Record<string, unknown>>();
   constructor() {
     Peer.instances.push(this);
   }
@@ -40,6 +42,9 @@ class Peer {
     this.signalingState = description.type === 'offer' ? 'have-remote-offer' : 'stable';
   }
   async addIceCandidate() {}
+  async getStats() {
+    return this.stats;
+  }
   close() {
     this.closed = true;
     this.connectionState = 'closed';
@@ -98,6 +103,55 @@ function setup(t: TestContext, me = 'host') {
   return { peers, room, sent, received, signal };
 }
 const flush = () => new Promise<void>((resolve) => setImmediate(resolve));
+
+test('连接诊断保留协商及媒体计数，不导出地址、SDP或中继凭证', async (t) => {
+  const f = setup(t, 'viewer');
+  f.peers.setIceServers([
+    { urls: 'turns:example.com', username: 'private-user', credential: 'private-key' },
+  ]);
+  f.peers.receive(f.signal('host', 'offer'));
+  await flush();
+  const pc = Peer.instances[0]!;
+  pc.remoteDescription = { type: 'offer', sdp: 'private-sdp' };
+  pc.onicecandidateerror?.({ errorCode: 701 });
+  pc.stats = new Map([
+    [
+      'local',
+      {
+        type: 'local-candidate',
+        candidateType: 'srflx',
+        address: '192.0.2.10',
+        port: 4444,
+        protocol: 'udp',
+      },
+    ],
+    [
+      'remote',
+      { type: 'remote-candidate', candidateType: 'host', address: '198.51.100.10', port: 5555 },
+    ],
+    [
+      'pair',
+      {
+        type: 'candidate-pair',
+        state: 'succeeded',
+        nominated: true,
+        localCandidateId: 'local',
+        remoteCandidateId: 'remote',
+        currentRoundTripTime: 0.123,
+      },
+    ],
+    ['rtp', { type: 'inbound-rtp', kind: 'video', bytesReceived: 1000, framesDecoded: 7 }],
+  ]);
+  const result = await f.peers.diagnostics();
+  assert.equal(result.role, 'viewer');
+  assert.equal(result.hasTurn, true);
+  assert.deepEqual(result.connections[0]!.localCandidates, { srflx: 1 });
+  assert.equal(result.connections[0]!.selectedPair?.roundTripMs, 123);
+  assert.equal(result.connections[0]!.media[0]!.framesDecoded, 7);
+  assert.deepEqual(result.connections[0]!.iceErrorCodes, [701]);
+  assert.doesNotMatch(JSON.stringify(result), /192\.0\.2\.10|198\.51\.100\.10|4444|5555|private-/);
+  f.peers.release();
+});
 
 test('画面连接断开后提供方真正发送 ICE restart，保留连接并执行退避', async (t) => {
   let now = 1000;
