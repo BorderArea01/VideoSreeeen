@@ -287,6 +287,7 @@ try {
       (window as any).__flushScreenStates();
     });
     await host.locator('#live-status').filter({ hasText: '暂无观众' }).waitFor();
+    assert.doesNotMatch((await host.locator('#provide-status').textContent()) ?? '', /未开始|尚未/);
     await host.waitForFunction(() => {
       const video = document.querySelector<HTMLVideoElement>('#video')!;
       return (
@@ -380,8 +381,28 @@ try {
   assert.equal(await guest.locator('#seek').isEnabled(), false);
   assert.equal(await guest.locator('#rate').isEnabled(), false);
   await host.locator('#live-status').filter({ hasText: '已连接 1 位观众' }).waitFor();
+  assert.equal(
+    await guest.locator('#broadcast-status').textContent(),
+    await guest.locator('#live-status').textContent(),
+  );
   evidence.actualTabCapture = true;
   evidence.received = { sample, stats };
+  // Inject a connection state only for UI verification. Media above remains
+  // real; this does not demonstrate a failure or recovery across actual NATs.
+  await guest.evaluate(() => {
+    const pc = (window as any).__pcs[0] as RTCPeerConnection;
+    Object.defineProperty(pc, 'connectionState', { configurable: true, value: 'failed' });
+    pc.dispatchEvent(new Event('connectionstatechange'));
+  });
+  await guest.locator('#live-status').filter({ hasText: '视频连接失败' }).waitFor();
+  assert.doesNotMatch((await guest.locator('#provide-status').textContent()) ?? '', /未开始|尚未/);
+  evidence.failureStatusUiSimulated = true;
+  await guest.evaluate(() => {
+    const pc = (window as any).__pcs[0] as RTCPeerConnection;
+    Reflect.deleteProperty(pc, 'connectionState');
+    pc.dispatchEvent(new Event('connectionstatechange'));
+  });
+  await guest.locator('#live-status').filter({ hasText: '正在接收' }).waitFor();
   await mkdir('.local/screenshots', { recursive: true });
   await guest.screenshot({ path: '.local/screenshots/browser-tab-share.png', fullPage: true });
   await host.bringToFront();

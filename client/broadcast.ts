@@ -5,6 +5,8 @@ interface Connection {
   pc: RTCPeerConnection;
   candidates: RTCIceCandidateInit[];
   work: Promise<void>;
+  scope: string;
+  offering: boolean;
 }
 
 /** One explicitly selected publisher; media never passes through the room server. */
@@ -43,6 +45,18 @@ export class BroadcastPeers {
     const failed = viewers.filter((member) => this.retry.has(member.id)).length;
     return { expected, connected, failed };
   }
+  reception() {
+    const host = this.room?.media?.broadcast?.host;
+    const pc = host ? this.connections.get(host)?.pc : undefined;
+    const offline =
+      !!host && !this.room?.members.some((member) => member.id === host && member.online);
+    const hasTurn = this.ice.some((server) =>
+      (Array.isArray(server.urls) ? server.urls : [server.urls]).some((url) =>
+        /^turns?:/i.test(url),
+      ),
+    );
+    return { state: offline ? 'offline' : (pc?.connectionState ?? 'waiting'), hasTurn };
+  }
   configure(room: Snapshot | null, me: string) {
     const broadcast = room?.mode === 'stream' && room.media?.broadcast;
     const scope = broadcast ? `${room!.media!.id}:${room!.epoch}` : '';
@@ -72,8 +86,18 @@ export class BroadcastPeers {
       this.status('请选择视频文件或重新开始共享');
       return;
     }
-    for (const id of online)
-      if (!this.connections.has(id) && Date.now() >= (this.retry.get(id) ?? 0)) {
+    for (const id of online) {
+      const existing = this.connections.get(id);
+      if (existing) {
+        if (
+          (this.retry.has(id) ||
+            ['failed', 'disconnected'].includes(existing.pc.connectionState)) &&
+          Date.now() >= (this.retry.get(id) ?? 0)
+        ) {
+          this.retry.set(id, Date.now() + 10000);
+          this.offer(id, existing, true);
+        }
+      } else if (Date.now() >= (this.retry.get(id) ?? 0)) {
         const c = this.create(id);
         for (const track of this.local!.getTracks()) {
           const sender = c.pc.addTrack(track, this.local!);
@@ -85,30 +109,50 @@ export class BroadcastPeers {
             }
           }
         }
-        c.work = c.work
-          .then(async () => {
-            const offer = await c.pc.createOffer();
-            await c.pc.setLocalDescription(offer);
-            for (const sender of c.pc.getSenders())
-              if (sender.track?.kind === 'video') {
-                const parameters = sender.getParameters();
-                parameters.degradationPreference = 'maintain-resolution';
-                for (const encoding of parameters.encodings ?? []) {
-                  encoding.maxBitrate = 6_000_000;
-                  encoding.maxFramerate = 30;
-                  const size = sender.track.getSettings();
-                  encoding.scaleResolutionDownBy = Math.max(
-                    1,
-                    (size.width ?? 1920) / 1920,
-                    (size.height ?? 1080) / 1080,
-                  );
-                }
-                await sender.setParameters(parameters).catch(() => {});
-              }
-            this.signal(id, { kind: 'description', type: 'offer', sdp: offer.sdp! });
-          })
-          .catch(() => this.failed(id, c));
+        this.offer(id, c);
       }
+    }
+  }
+  private current(id: string, c: Connection) {
+    return this.connections.get(id) === c && this.scope === c.scope;
+  }
+  private offer(id: string, c: Connection, restart = false) {
+    if (c.offering) return;
+    c.offering = true;
+    c.work = c.work
+      .then(async () => {
+        if (!this.current(id, c)) return;
+        if (restart && c.pc.signalingState === 'have-local-offer' && c.pc.localDescription?.sdp) {
+          this.signal(id, { kind: 'description', type: 'offer', sdp: c.pc.localDescription.sdp });
+          return;
+        }
+        if (c.pc.signalingState !== 'stable') return;
+        const offer = await c.pc.createOffer({ iceRestart: restart });
+        if (!this.current(id, c)) return;
+        await c.pc.setLocalDescription(offer);
+        for (const sender of c.pc.getSenders())
+          if (sender.track?.kind === 'video') {
+            const parameters = sender.getParameters();
+            parameters.degradationPreference = 'maintain-resolution';
+            for (const encoding of parameters.encodings ?? []) {
+              encoding.maxBitrate = 6_000_000;
+              encoding.maxFramerate = 30;
+              const size = sender.track.getSettings();
+              encoding.scaleResolutionDownBy = Math.max(
+                1,
+                (size.width ?? 1920) / 1920,
+                (size.height ?? 1080) / 1080,
+              );
+            }
+            await sender.setParameters(parameters).catch(() => {});
+          }
+        if (this.current(id, c))
+          this.signal(id, { kind: 'description', type: 'offer', sdp: offer.sdp! });
+      })
+      .catch(() => this.failed(id, c))
+      .finally(() => {
+        c.offering = false;
+      });
   }
   private signal(to: string, data: Signal['data']) {
     if (this.room?.media && this.scope)
@@ -123,10 +167,16 @@ export class BroadcastPeers {
   }
   private create(id: string) {
     const pc = new RTCPeerConnection({ iceServers: this.ice });
-    const c: Connection = { pc, candidates: [], work: Promise.resolve() };
+    const c: Connection = {
+      pc,
+      candidates: [],
+      work: Promise.resolve(),
+      scope: this.scope,
+      offering: false,
+    };
     this.connections.set(id, c);
     pc.onicecandidate = (e) => {
-      if (e.candidate)
+      if (e.candidate && this.current(id, c))
         this.signal(id, {
           kind: 'candidate',
           candidate: e.candidate.candidate,
@@ -135,27 +185,30 @@ export class BroadcastPeers {
         });
     };
     pc.ontrack = (e) => {
-      if (this.room?.media?.broadcast?.host === id) {
+      if (this.current(id, c) && this.room?.media?.broadcast?.host === id) {
         const stream = e.streams[0];
         if (stream) this.receiveStream(stream);
       }
     };
     pc.onconnectionstatechange = () => {
+      if (!this.current(id, c)) return;
       if (pc.connectionState === 'failed') this.failed(id, c);
       else if (pc.connectionState === 'connected') {
         this.retry.delete(id);
         this.status('实时画面已连接');
-      } else if (pc.connectionState === 'disconnected') this.status('画面连接中断，正在重连');
+      } else if (pc.connectionState === 'disconnected') {
+        this.retry.set(id, Date.now() + 10000);
+        this.status('画面连接中断，正在重连');
+      }
     };
     return c;
   }
   private failed(id: string, c: Connection) {
-    c.pc.close();
-    if (this.connections.get(id) !== c) return;
-    this.connections.delete(id);
+    if (!this.current(id, c)) return;
     this.retry.set(id, Date.now() + 10000);
-    if (this.room?.media?.broadcast?.host !== this.me) this.receiveStream(null);
-    this.status('无法直连视频提供者；可重试或使用各自播放');
+    // Keep the transceivers and stream: the publisher retries ICE on this same
+    // connection. Closing it here would strand the other side's negotiation.
+    this.status('视频连接失败，等待重新连接');
   }
   receive(message: Signal) {
     const host = this.room?.media?.broadcast?.host;
@@ -172,6 +225,7 @@ export class BroadcastPeers {
     const c = this.connections.get(message.from) ?? this.create(message.from);
     c.work = c.work
       .then(async () => {
+        if (!this.current(message.from, c)) return;
         const d = message.data;
         if (d.kind === 'candidate') {
           const candidate = {
@@ -184,11 +238,14 @@ export class BroadcastPeers {
         } else {
           if ((d.type === 'offer') !== (message.from === host)) return;
           await c.pc.setRemoteDescription({ type: d.type, sdp: d.sdp });
+          if (!this.current(message.from, c)) return;
           for (const candidate of c.candidates.splice(0)) await c.pc.addIceCandidate(candidate);
           if (d.type === 'offer') {
             const answer = await c.pc.createAnswer();
+            if (!this.current(message.from, c)) return;
             await c.pc.setLocalDescription(answer);
-            this.signal(message.from, { kind: 'description', type: 'answer', sdp: answer.sdp! });
+            if (this.current(message.from, c))
+              this.signal(message.from, { kind: 'description', type: 'answer', sdp: answer.sdp! });
           }
         }
       })

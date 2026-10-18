@@ -595,6 +595,7 @@ function playElement(element: HTMLMediaElement) {
 function renderLiveStatus() {
   const sharing = room?.media?.broadcast;
   const badge = $('live-status');
+  badge.title = '';
   const preview = hasPendingPreview();
   badge.hidden = !sharing && !preview;
   if (preview) {
@@ -622,15 +623,23 @@ function renderLiveStatus() {
     $('broadcast-status').textContent = text;
   } else {
     const name = room?.members.find((member) => member.id === sharing.host)?.name ?? '成员';
-    text = playbackPermissionNeeded
-      ? '点击播放以启用声音'
-      : room?.playback.paused
-        ? '房间已暂停播放'
-        : video.srcObject && video.videoWidth > 0
-          ? `正在接收 ${name} 的视频`
-          : broadcastMessage || `正在连接 ${name}`;
+    const reception = broadcast.reception();
+    badge.title = !reception.hasTurn
+      ? '当前没有配置视频中继；如果双方网络无法直连，需要部署中继或改用各自播放。'
+      : '';
+    if (reception.state === 'offline') text = '共享者已离线，等待重新连接';
+    else if (['failed', 'closed', 'disconnected'].includes(reception.state))
+      text = '共享已开始 · 视频连接失败，正在重试' + (reception.hasTurn ? '' : ' · 当前未配置中继');
+    else if (playbackPermissionNeeded) text = '点击播放以启用声音';
+    else if (reception.state !== 'connected') text = `共享已开始 · 正在连接 ${name}`;
+    else if (room?.playback.paused) text = '房间已暂停播放';
+    else if (video.srcObject && video.videoWidth > 0 && video.readyState >= 2)
+      text = `正在接收 ${name} 的视频`;
+    else text = '共享已开始 · 连接已建立，等待视频画面';
   }
   badge.textContent = text;
+  $('broadcast-status').textContent = text;
+  $('provide-status').textContent = text;
 }
 function render() {
   if (provideDialogMediaId && provideDialogMediaId !== room?.media?.id) closeProvider();
@@ -1977,7 +1986,7 @@ setInterval(() => {
           : sourceFailed
             ? '视频未就绪'
             : room.media?.broadcast
-              ? broadcastMessage || '实时共享画面'
+              ? $('live-status').textContent || '共享已开始'
               : !isNative && room.media && !room.media.source
                 ? '视频尚未开始提供'
                 : `WebSocket 同步${rtt === null ? '' : ' · ' + Math.round(rtt) + ' ms'}`;
