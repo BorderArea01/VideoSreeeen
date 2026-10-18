@@ -60,6 +60,22 @@ try {
   const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
   const host = await context.newPage(),
     guest = await context.newPage();
+  const roomEvents: unknown[] = [];
+  host.on('websocket', (socket) =>
+    socket.on('framereceived', (event) => {
+      try {
+        const message = JSON.parse(String(event.payload));
+        if (message.room)
+          roomEvents.push({
+            type: message.type,
+            revision: message.room.revision,
+            broadcast: message.room.media?.broadcast?.kind,
+          });
+        else if (message.type === 'error')
+          roomEvents.push({ type: message.type, message: message.message });
+      } catch {}
+    }),
+  );
   for (const page of [host, guest]) page.on('pageerror', (e) => errors.push(e.message));
   await guest.addInitScript(() => {
     (window as any).__pcs = [];
@@ -135,9 +151,39 @@ try {
         height: video.videoHeight,
       };
     });
+  evidence.sourceTitleStillMatches = (await original.title()) === title;
+  await original.evaluate((title) => {
+    document.title = title;
+  }, title);
+  await host.evaluate(() => {
+    const real = navigator.mediaDevices.getDisplayMedia.bind(navigator.mediaDevices);
+    (window as any).__captureState = 'requesting';
+    navigator.mediaDevices.getDisplayMedia = (options) =>
+      real(options).then(
+        (stream) => {
+          (window as any).__captureState = 'captured';
+          return stream;
+        },
+        (error) => {
+          (window as any).__captureState = error.name;
+          throw error;
+        },
+      );
+  });
   await host.bringToFront();
   await host.locator('#browser-share-tab').click();
-  await guest.locator('#browser-hint').waitFor({ state: 'hidden', timeout: 25000 });
+  try {
+    await guest.locator('#browser-hint').waitFor({ state: 'hidden', timeout: 25000 });
+  } catch (error) {
+    evidence.failure = {
+      capture: await host.evaluate(() => (window as any).__captureState),
+      toast: await host.locator('#toast').textContent(),
+      sourceTitleMatches: (await original.title()) === title,
+      roomEvents,
+    };
+    console.log(JSON.stringify(evidence.failure));
+    throw error;
+  }
   await guest.waitForFunction(
     () => !!document.querySelector<HTMLVideoElement>('#video')?.srcObject,
     {},

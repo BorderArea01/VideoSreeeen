@@ -26,4 +26,11 @@
 
 ## 线上验收
 
-本机检查通过后部署到现有免费 Cloudflare 资源，并以线上 HTML / JS / CSS 摘要和真实房间的标签页收发复验；实际部署结果在完成后记录。
+- 入口：<https://videosreeeen.pages.dev>，运行时代码提交 `953b3f2ad9fb82fe9b2dae86865e410962cf2b55`。后续仅调整测试与验证记录。
+- Pages 部署：`8a9ec1a3-04f1-4b91-b081-1d6c2787f610`；Worker 版本：`e0af8ced-6e38-4261-a4a9-db5eab768f06`。沿用现有免费资源与同一个房间 Durable Object，没有新增付费中继。
+- 公网 HTML 与本机产物一致；活跃 JS `index-BFrKXeq0.js` 的 SHA-256 为 `a1546598fbe33b0627f1137e9744921a1b201393e9713e7bc50c1f7a0d99b693`，CSS `index-Bt1AEEkw.css` 的 SHA-256 为 `7184f4a88052434ecbca10a489e177b3146dc709be33d292556ff9a9d630dda9`；两者均逐字节核对，不以空资源列表判定成功。
+- 实际公网房间、两个网页成员、用户此前提供的 B 站页面：选择入口在提交后约 699 ms 出现；提供方原站视频实际播放，接收方收到 1590×1062、11 个解码帧，音频 1,536 字节 / 42,240 采样，取消重试与停止清理通过。来源视频本次为未登录 640×360，不能标记为已验收高清登录效果。
+- 首次公网自动检查因 B 站异步改写测试标签页标题，自动选择器未选中目标而超时；记录到 `sourceTitleStillMatches=false` 后，将测试标题固定到实际采集前重试，通过真正的采集 API 收发。该改动只在测试脚本中，不通过模拟视频或绕过产品权限代替实测。
+- 结构化证据：`.local/public-web-source-evidence.json`、`.local/browser-share-site-evidence.json`；截图 `.local/screenshots/browser-tab-share.png`、`.local/screenshots/browser-source-mobile.png`。上述截图已目视检查。
+
+本轮部署的是网页修订；已发布的 0.4.0 Windows / Android 安装包基线仍以原发布记录为准。
