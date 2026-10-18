@@ -14,11 +14,11 @@
 ./scripts/controlled.ps1 -File npm.cmd -Arguments @('run','test:p2p') -PrioritizeBuildWhenNoGame
 ```
 
-`test:worker` 在本地 workerd 中验证建房、加入、真实 WebSocket、主动休眠后唤醒、成员恢复和视频转发关闭。`test:p2p` 使用一个浏览器上下文和 Windows 壳，验证实际视频分块互传。两者均不部署云端资源。
+`test:worker` 在本地 workerd 中验证建房、加入、真实 WebSocket、主动休眠后唤醒、成员恢复、原站视频代理关闭与独立备用通道。`test:broadcast-relay` 在浏览器中阻断 WebRTC 候选，验证真实备用视频、音频解码、重新加入和清理。`test:p2p` 使用一个浏览器上下文和 Windows 壳，验证实际视频分块互传。这些测试均不部署云端资源。
 
 只有确认目标账号和部署意图后执行 `npm run worker:deploy`。首次部署会创建名为 `videosreeeen` 的 Worker 与绑定的 `WatchRoom` SQLite Durable Object namespace；`wrangler.jsonc` 使用 `new_sqlite_classes`，适配免费计划。部署前查看同名资源，避免覆盖已有服务。不要修改账号的订阅或启用付费产品。
 
-本机运行所有构建、验证和部署命令时继续使用 `scripts/controlled.ps1`；真实游戏进程存在或资源不足时不启动。
+本机运行所有构建、验证和部署命令时继续使用 `scripts/controlled.ps1`。2026-10-18 用户为本项目明确要求不再因游戏或此前内存门槛中断，使用 `-AllowGameThisRun -MinFreeMiB 0`，仍保留串行、堆上限和所属进程清理；不将此例外用于其他项目。
 
 ## 网页与客户端
 
@@ -32,7 +32,9 @@
 
 ## 视频与 P2P
 
-- Worker 只处理房间状态、聊天、延迟和 WebRTC 信令，不转发视频文件；`/media` 返回明确的 501。
+- Worker 处理房间状态、聊天、延迟和 WebRTC 信令；原站视频文件代理 `/media` 仍返回明确的 501。
+- 实时画面优先直连；约 15 秒仍未连通时，支持的浏览器尝试独立 `/broadcast-relay?room=…`。它由同一房间 Durable Object 鉴权，但不使用房间聊天 WebSocket，也不保存视频内容。需要双方刷新到支持此通道的版本；苹果浏览器按实际可用格式协商，不保证旧版支持。
+- 备用通道最多 4 位观众，视频编码目标 1.2 Mbit/s、音频 96 kbit/s，每包净载荷最多 64 KiB、每端积压最多 2 MiB。慢观众单独断开；重新加入或休眠恢复时重新编码容器头。接收端约保留 30–45 秒实时缓冲，不能称为完整缓存。
 - MP4 / DASH 的共同缓存使用 WebRTC DataChannel；256 KiB 分块落盘，传输帧为 12 KiB，带背压、长度检查、SHA-256 校验、超时及源站回退。
 - 下载者分配不同的优先分块，在缓存过程中即可分享已完成的块；已经缓存完整的成员也可以给后来开始下载的人提供分块。仅当前房间、媒体和缓存代次中的成员可以协商连接，不接入公共 DHT 或 Tracker。
 - 每块的声明哈希来自房间成员，用于检查传输一致性；它不是源站签名或独立可信的版权/来源认证。最终每个文件和整部内容仍重新计算指纹，所有成员一致才可播放。
