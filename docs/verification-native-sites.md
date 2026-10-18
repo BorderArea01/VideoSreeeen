@@ -40,4 +40,16 @@
 - Android `assembleRelease` 与 `lintRelease` 通过，0 错误 / 4 警告。包名不变，versionCode 6 / versionName 0.4.1，minSdk 26 / targetSdk 35。apksigner 通过，证书 SHA-256 `71d21f595ea8306871b55961ff965c4b72cabe80b9ec2915f6bee9f3290978ba`，与 0.4.0 相同；未安装设备，未验证 Android 登录后播放。
 - 安装版 SHA-256 `d83d948d8411219f079f13fd976f7b41a9465a76db98a451dfdd598abba8a076`；便携版 `8eb3a518aee46ff23a0600096af2ccf896bcbe372c2c4388fc9cf6eb94c8725a`；APK `98b08c6092d5950403404c5091abefcdd6622eb966bfa60b04ff44d8f4413974`。
 
-部署与正式版本核对结果在完成后追加；前述开发壳验证不代表已发布安装包或异地用户真机验收。
+## 正式服务与打包客户端复验
+
+2026-10-19 03:13（北京时间）核对正式网页与房间服务：
+
+- 运行时提交 `30f5988370340d7310189aa5f747994995f536dc`，健康版本 0.4.1。
+- Worker `b3ea2141-b33a-4be7-a88b-793f3469e738`；Pages `6e40849c-a3c9-417e-8a71-004531aedfe8`。
+- 活跃 JS `index-CFEmENmr.js`，SHA-256 `046e630fed35bc9d4713003fe2c5d8ffe3e41c57a0c61859af52288398dd8c75`；CSS `index-alx5V5Wp.css`，SHA-256 `51df51c3be268a41c3eebe70a458311e51f53ce150153a1097fc826abb204c18`。在线 HTML、JS、CSS 与构建逐字节相同，Pages 提交与运行时提交一致。
+- 两个**打包后的 0.4.1 Windows 应用**使用新的隔离资料目录、正常系统网络、正式房间服务，通过 B 站和蜜柑共同播放。B 站游客两端 640×360、105 / 98 帧与音轨，准备约 4.8 秒；蜜柑两端 1920×1080、288 / 289 帧与音轨，准备约 14.9 秒。两站均在暂停、5 秒、1.25 倍速稳定保持后，再验证原站 DOM 人工操作路径拖到 8 秒，权威状态与两端播放器均跟随。证据 `.local/native-origin-evidence.json`。
+- 正式网页稀饭回归通过：两个存储隔离浏览器均直接从 `play.xfvod.pro` 解码 1920×1080 与音轨，准备约 4.9 秒；暂停、5 秒、1.25 倍速及权威状态一致。取消、失败和接口成功但媒体不可播均不替换当前影片；没有页面错误，没有画面捕获或原站 HTTP 视频代理。证据 `.local/xifan-playback-evidence.json`。
+
+客户端版本与校验和对应 [v0.4.1 发布入口](https://github.com/BorderArea01/VideoSreeeen/releases/tag/v0.4.1)；上传流程先保留草稿，逐项核对 GitHub 返回的 SHA-256 和字节数后才发布，不覆盖旧版本。运行时代码对应上述部署提交，后续验证记录提交不改变已构建运行时。
+
+没有使用真实登录、画面捕获、完整缓存或收费产品；不能将同机独立应用加正式公网房间服务验收描述为用户异地、登录后高清、Android 或 Safari 真机通过。
