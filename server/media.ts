@@ -17,13 +17,16 @@ export function assertPublicAddress(address: string) {
     ip = (ip as ipaddr.IPv6).toIPv4Address();
   if (ip.range() !== 'unicast') throw new Error('禁止访问本机、内网和保留地址');
 }
-export async function publicTarget(raw: string) {
+export async function publicTarget(
+  raw: string,
+  allowedPorts: readonly string[] = ['80', '443', '8080', '8443'],
+) {
   const url = new URL(raw);
   if (
     !['http:', 'https:'].includes(url.protocol) ||
     url.username ||
     url.password ||
-    (url.port && !['80', '443', '8080', '8443'].includes(url.port))
+    (url.port && !allowedPorts.includes(url.port))
   )
     throw new Error('不支持的媒体地址');
   const host = url.hostname.replace(/^\[|\]$/g, '');
@@ -38,9 +41,10 @@ export async function requestPublic(
   raw: string,
   headers: Record<string, string> = {},
   redirects = 0,
+  options: { allowedPorts?: readonly string[]; maxRedirects?: number; signal?: AbortSignal } = {},
 ): Promise<IncomingMessage> {
-  if (redirects > 5) throw new Error('媒体重定向过多');
-  const { url, address } = await publicTarget(raw);
+  if (redirects > (options.maxRedirects ?? 5)) throw new Error('媒体重定向过多');
+  const { url, address } = await publicTarget(raw, options.allowedPorts);
   const response = await new Promise<IncomingMessage>((resolve, reject) => {
     const request = (url.protocol === 'https:' ? https : http).get(
       url,
@@ -49,6 +53,7 @@ export async function requestPublic(
         family: address.family,
         lookup: (_host, _options, callback) => callback(null, address.address, address.family),
         timeout: 20000,
+        signal: options.signal,
       },
       resolve,
     );
@@ -62,7 +67,12 @@ export async function requestPublic(
     response.headers.location
   ) {
     response.destroy();
-    return requestPublic(new URL(response.headers.location, raw).href, headers, redirects + 1);
+    return requestPublic(
+      new URL(response.headers.location, raw).href,
+      headers,
+      redirects + 1,
+      options,
+    );
   }
   if (!response.statusCode || response.statusCode >= 400) {
     response.destroy();

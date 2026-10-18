@@ -7,6 +7,7 @@ export default {
       ['/ws', '/broadcast-relay', '/healthz', '/config'].includes(path) ||
       path.startsWith('/cache-plan/') ||
       path.startsWith('/images/') ||
+      path.startsWith('/resolve-source/') ||
       path.startsWith('/media/')
     )
       return env.WATCH.fetch(request);

@@ -3,6 +3,9 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { WebSocket } from 'ws';
 import { Miniflare, convertV4MiniflareOptions } from 'miniflare';
 import { RELAY_MIMES, relayPacket } from '../shared/broadcast-relay';
+import { Response as MockResponse } from 'miniflare';
+import { metadataFixture, playerFixture } from '../tests/site-source.fixture';
+const sourceFixture = metadataFixture(await playerFixture());
 
 const runtime = new Miniflare(
   convertV4MiniflareOptions({
@@ -25,11 +28,16 @@ const runtime = new Miniflare(
             '/cache-plan/*',
             '/media/*',
             '/images/*',
+            '/resolve-source/*',
           ],
         },
       },
       {
         name: 'videosreeeen-test',
+        outboundService: async (request) => {
+          const response = await sourceFixture.fetch(request.url);
+          return new MockResponse(await response.text(), { status: response.status });
+        },
         scriptPath: '.local/worker-build/index.js',
         modules: true,
         compatibilityDate: '2026-10-01',
@@ -47,6 +55,7 @@ const runtime = new Miniflare(
             '/cache-plan/*',
             '/media/*',
             '/images/*',
+            '/resolve-source/*',
           ],
         },
         bindings: { ICE_SERVERS: '[]' },
@@ -100,6 +109,27 @@ try {
   const a = await client('ABC234');
   a.send({ type: 'create', name: 'a', protocol: 1 });
   const welcome = await a.next('welcome');
+  const unknownSource = await fetch(origin + '/resolve-source/ABC234', {
+    method: 'POST',
+    body: '{}',
+  });
+  assert.equal(unknownSource.status, 401);
+  const sourceResult = await fetch(origin + '/resolve-source/ABC234', {
+    method: 'POST',
+    headers: { Authorization: 'Bearer ' + welcome.resume, 'X-Member-Id': welcome.memberId },
+    body: JSON.stringify({ url: 'https://www.mgnacg.com/bangumi/193-3-17/' }),
+  });
+  assert.equal(sourceResult.status, 200, await sourceResult.clone().text());
+  assert.equal(
+    ((await sourceResult.json()) as any).media.source.video,
+    'https://r2.jzacg.com/example/episode.mp4?Authorization=public-fixture-token',
+  );
+  assert.equal(sourceFixture.requests.length, 3);
+  evidence.siteSource = {
+    authenticated: true,
+    publicMetadataDecoded: true,
+    mediaBytesForwarded: false,
+  };
   const b = await client('ABC234');
   b.send({ type: 'join', name: 'b', invite: welcome.room.invite, protocol: 1 });
   const bw = await b.next('welcome');

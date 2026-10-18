@@ -5,6 +5,7 @@ import { directPlan } from '../shared/cache-plan';
 import { RoomImages, type ImageMeta } from '../server/images';
 import { BroadcastRelay } from '../server/broadcast-relay';
 import type { RelayHello } from '../shared/broadcast-relay';
+import { RoomSources } from '../server/site-source';
 
 interface Env {
   ROOMS: DurableObjectNamespace<WatchRoom>;
@@ -75,7 +76,11 @@ export default {
       if (!code || !/^[A-HJ-NP-Z2-9]{6}$/.test(code))
         return new Response('请更新客户端后重试', { status: 400 });
       return env.ROOMS.get(env.ROOMS.idFromName(code)).fetch(request);
-    } else if (url.pathname.startsWith('/cache-plan/') || url.pathname.startsWith('/images/')) {
+    } else if (
+      url.pathname.startsWith('/cache-plan/') ||
+      url.pathname.startsWith('/images/') ||
+      url.pathname.startsWith('/resolve-source/')
+    ) {
       const code = url.pathname.split('/')[2];
       if (!code || !/^[A-HJ-NP-Z2-9]{6}$/.test(code))
         return new Response('Not found', { status: 404 });
@@ -99,6 +104,7 @@ export default {
 export class WatchRoom extends DurableObject<Env> {
   private rooms = new Rooms();
   private broadcastRelay = new BroadcastRelay(this.rooms);
+  private sources = new RoomSources(this.rooms);
   private chatIds: string[] = [];
   private images = new RoomImages(
     this.rooms,
@@ -147,6 +153,7 @@ export class WatchRoom extends DurableObject<Env> {
   }
   async fetch(request: Request) {
     const url = new URL(request.url);
+    if (url.pathname.startsWith('/resolve-source/')) return this.sources.handle(request);
     if (url.pathname.startsWith('/images/')) return this.images.handle(request);
     if (url.pathname.startsWith('/cache-plan/')) {
       const [, , code, secret] = url.pathname.split('/');

@@ -16,6 +16,7 @@
       "/cache-plan/*",
       "/media/*",
       "/images/*",
+      "/resolve-source/*",
     ],
   },
   "durable_objects": { "bindings": [{ "name": "ROOMS", "class_name": "WatchRoom" }] },

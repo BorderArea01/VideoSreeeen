@@ -31,7 +31,7 @@ export const playbackPickerMarkup = `
 export class PlaybackPicker {
   private selected: PlaybackChoice = 'screen';
   private observedMedia = '';
-  constructor() {
+  constructor(private changed?: (choice: PlaybackChoice) => void) {
     const choices: PlaybackChoice[] = ['screen', 'link', 'file'];
     for (const choice of choices) {
       const tab = document.getElementById('choose-' + choice)!;
@@ -57,6 +57,7 @@ export class PlaybackPicker {
   }
   select(choice: PlaybackChoice) {
     this.selected = choice;
+    this.changed?.(choice);
     for (const mode of ['screen', 'link', 'file']) {
       const tab = document.getElementById('choose-' + mode)!;
       tab.setAttribute('aria-selected', String(mode === choice));

@@ -10,6 +10,8 @@ import { ImageFiles } from './image-files';
 import { once } from 'node:events';
 import { MediaRelay } from './media';
 import { BroadcastRelay } from './broadcast-relay';
+import { RoomSources } from './site-source';
+import { fetchSiteMetadata } from './site-fetch';
 
 export function createApp(
   options: { now?: () => number; origins?: string[]; broadcastRelay?: boolean } = {},
@@ -19,6 +21,7 @@ export function createApp(
     images = new RoomImages(rooms, imageFiles);
   const relay = new MediaRelay(rooms);
   const broadcastRelay = new BroadcastRelay(rooms);
+  const sources = new RoomSources(rooms, fetchSiteMetadata);
   const root = resolve(fileURLToPath(new URL('../dist/', import.meta.url)));
   const allowed =
     options.origins ??
@@ -50,14 +53,25 @@ export function createApp(
     }
     if (
       !['GET', 'HEAD'].includes(req.method ?? '') &&
-      !(req.method === 'POST' && req.url?.startsWith('/images/'))
+      !(
+        req.method === 'POST' &&
+        (req.url?.startsWith('/images/') || req.url?.startsWith('/resolve-source/'))
+      )
     ) {
       res.writeHead(405).end();
       return;
     }
     try {
       const url = new URL(req.url ?? '/', 'http://localhost');
-      if (url.pathname.startsWith('/images/')) {
+      if (url.pathname.startsWith('/images/') || url.pathname.startsWith('/resolve-source/')) {
+        if (
+          url.pathname.startsWith('/resolve-source/') &&
+          Number(req.headers['content-length']) > 4096
+        ) {
+          req.resume();
+          res.writeHead(413).end('识别请求过大');
+          return;
+        }
         if (req.method === 'POST' && Number(req.headers['content-length']) > IMAGE_LIMIT) {
           req.resume();
           res
@@ -106,7 +120,9 @@ export function createApp(
           headers,
           ...(body ? { body, duplex: 'half' } : {}),
         } as RequestInit);
-        const response = await images.handle(request);
+        const response = url.pathname.startsWith('/images/')
+          ? await images.handle(request)
+          : await sources.handle(request);
         drain();
         res.statusCode = response.status;
         response.headers.forEach((value, key) => res.setHeader(key, value));

@@ -16,6 +16,7 @@ await writeFile(
       '/cache-plan/*',
       '/media/*',
       '/images/*',
+      '/resolve-source/*',
     ],
     exclude: [],
   }),
