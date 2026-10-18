@@ -51,7 +51,8 @@ try {
   const host = await context.newPage(),
     guest = await guestContext.newPage();
   const errors: string[] = [],
-    commands: string[] = [];
+    commands: string[] = [],
+    serverErrors: string[] = [];
   let latest: any,
     metadataStatus = 0;
   for (const page of [host, guest]) {
@@ -71,6 +72,7 @@ try {
             try {
               const m = JSON.parse(event.payload);
               if (m.room) latest = m.room;
+              if (m.type === 'error') serverErrors.push(m.code);
             } catch {}
           }
         });
@@ -127,7 +129,9 @@ try {
   await host.locator('#play-button').click();
   for (const page of [host, guest])
     await page.waitForFunction(() => document.querySelector<HTMLVideoElement>('#video')!.paused);
-  await guest.locator('#seek').fill('5');
+  await guest.locator('#seek').evaluate((element) => {
+    (element as HTMLInputElement).value = '5';
+  });
   await guest.locator('#seek').dispatchEvent('change');
   for (const page of [host, guest])
     await page.waitForFunction(
@@ -138,6 +142,10 @@ try {
     await page.waitForFunction(
       () => document.querySelector<HTMLVideoElement>('#video')!.playbackRate === 1.25,
     );
+  assert.equal(latest.playback.paused, true);
+  assert.equal(latest.playback.position, 5);
+  assert.equal(latest.playback.rate, 1.25);
+  proof.authoritativeControls = { paused: true, position: 5, rate: 1.25 };
   proof.players = [];
   for (const page of [host, guest])
     proof.players.push(
@@ -242,6 +250,7 @@ try {
   proof.unplayableResultNotPublished = true;
   await host.unroute(metadataRoute);
   assert.deepEqual(errors, []);
+  assert.deepEqual(serverErrors, []);
   proof.errors = errors;
   await host.locator('#leave-button').click();
   await guest.locator('#leave-button').click();
