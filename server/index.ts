@@ -152,7 +152,7 @@ export function createApp(
           JSON.stringify({
             ok: true,
             app: 'videosreeeen',
-            version: '0.4.0',
+            version: '0.4.1',
             rooms: rooms.rooms.size,
           }),
         );
@@ -334,7 +334,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   const app = createApp();
   const port = Number(process.env.PORT ?? 8787);
   app.server.listen(port, process.env.HOST ?? '0.0.0.0', () =>
-    console.log(`VideoSreeeen 0.4.0 listening on ${port}`),
+    console.log(`VideoSreeeen 0.4.1 listening on ${port}`),
   );
   for (const signal of ['SIGINT', 'SIGTERM'] as const)
     process.once(signal, () => {
