@@ -37,6 +37,8 @@
 
 本机证据：`.local/stun-probe-evidence.json`、`.local/broadcast-recovery-local-evidence.json`。运行时变更沿用用户本轮游戏期间执行授权，保留 1536 MiB 内存门槛及串行受控入口。新版诊断入口的部署元数据在完成后补充，不能引用此前版本验收代替该入口已通过界面验证。
 
+诊断入口的源码提交为 `8bc96f2af9df7398592e8b6d6feb557253b1ae63`，本地构建 JS 为 `index-Bz-IGdsh.js`。随后尝试部署 Worker 时可用内存只有 1466 MiB，受控入口停止，本次未部署。经 Cloudflare API 再次只读核对，线上仍为前述 `084da42` 的 Pages 与 Worker 版本；不能引导用户到尚未上线的诊断入口，也未在后台自动重试。
+
 ## 资料
 
 - [MDN ICE restart](https://developer.mozilla.org/en-US/docs/Web/API/RTCPeerConnection/restartIce) 与 [WebRTC 官方重连样例](https://webrtc.github.io/samples/src/content/peerconnection/restart-ice/)。
