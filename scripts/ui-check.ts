@@ -44,10 +44,16 @@ try {
   await first.locator('#member-count').filter({ hasText: '2' }).waitFor();
   await first.locator('#chat-input').fill('距离很远，故事很近。🍿');
   await first.locator('#send-button').click();
-  await second.getByText('距离很远，故事很近。🍿', { exact: true }).waitFor();
+  await second
+    .locator('#chat-messages')
+    .getByText('距离很远，故事很近。🍿', { exact: true })
+    .waitFor();
   await second.locator('#chat-input').fill('<img src=x onerror=alert(1)>');
   await second.locator('#send-button').click();
-  await first.getByText('<img src=x onerror=alert(1)>', { exact: true }).waitFor();
+  await first
+    .locator('#chat-messages')
+    .getByText('<img src=x onerror=alert(1)>', { exact: true })
+    .waitFor();
   assert.equal(await first.locator('.bubble img').count(), 0);
   const image = Buffer.concat([
     Buffer.from('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7', 'base64'),

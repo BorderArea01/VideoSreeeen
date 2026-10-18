@@ -94,7 +94,7 @@ try {
   await first.locator('#member-count').filter({ hasText: '2' }).waitFor();
   await second.locator('#chat-input').fill('打开邀请就能加入 🍿');
   await second.locator('#send-button').click();
-  await first.getByText('打开邀请就能加入 🍿', { exact: true }).waitFor();
+  await first.locator('#chat-messages').getByText('打开邀请就能加入 🍿', { exact: true }).waitFor();
   // Changing next-room preferences must not affect an existing session's invitation.
   await configureRoomServer(first, other!);
   await first.locator('#invite-button').click();

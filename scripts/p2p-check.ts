@@ -2,7 +2,7 @@ import { choosePlayback, configureRoomServer, openRoom, closeInvitation } from '
 import assert from 'node:assert/strict';
 import { once } from 'node:events';
 import { createServer } from 'node:http';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile, mkdtemp } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { chromium, _electron as electron, type Page } from 'playwright';
 import { Miniflare, convertV4MiniflareOptions } from 'miniflare';
@@ -159,7 +159,7 @@ try {
   evidence.browserToBrowser = { description, blockedSourceRequests: blocked };
   await second.locator('#chat-input').fill('P2P 缓存完成 🍿');
   await second.locator('#send-button').click();
-  await first.getByText('P2P 缓存完成 🍿', { exact: true }).waitFor();
+  await first.locator('#chat-messages').getByText('P2P 缓存完成 🍿', { exact: true }).waitFor();
   await second.screenshot({ path: resolve('.local/screenshots/p2p-browser.png'), fullPage: true });
   await first.locator('#play-button').click();
   await second.waitForFunction(() => document.querySelector('video')!.currentTime > 0.2);
@@ -222,13 +222,15 @@ try {
   await second.locator('#leave-button').click();
   await first.close();
   await second.close();
+  const profile = await mkdtemp(resolve('.local/p2p-profile-'));
   const desktop = await electron.launch({
-    args: ['desktop/main.cjs', '--mute-audio'],
+    args: ['desktop/main.cjs', '--user-data-dir=' + profile, '--mute-audio'],
     env: { ...process.env, VS_DEV_URL: origin },
     timeout: 30000,
   });
   try {
     const page = await desktop.firstWindow();
+    assert.equal(await desktop.evaluate(({ app }) => app.getPath('userData')), profile);
     page.on('pageerror', (e) => failures.push(e.message));
     await create(page, 'Windows 磁盘种子');
     const receiver = await context.newPage();

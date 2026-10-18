@@ -49,7 +49,10 @@ try {
   await receiver.locator('#connection.online').waitFor();
   await seed.locator('#chat-input').fill('公网房间与 WSS 验证 🍿');
   await seed.locator('#send-button').click();
-  await receiver.getByText('公网房间与 WSS 验证 🍿', { exact: true }).waitFor();
+  await receiver
+    .locator('#chat-messages')
+    .getByText('公网房间与 WSS 验证 🍿', { exact: true })
+    .waitFor();
   evidence.wssAndChat = true;
   await choosePlayback(seed, 'link');
   await seed.locator('#source-url').fill(source);
