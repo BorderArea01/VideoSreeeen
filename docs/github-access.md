@@ -12,14 +12,14 @@ Windows 成品使用公开 GitHub 更新源时，`releases.atom` 也返回 404�
 
 2026-10-18 13:46（北京时间）完成同一客户端、同一 Clash HTTP 入口 `127.0.0.1:7897` 的对照检查。代理仅用于本轮请求，没有修改系统代理或 Clash 路由。
 
-| 请求 | 匿名 | 当前维护账号授权 |
-| --- | --- | --- |
-| 当前登录身份 `/user` | 不适用 | 200，`BorderArea01`，ID `149620762` |
-| 公开用户 `/users/BorderArea01` | 404 | 404 |
-| 按 ID 查询用户 `/user/149620762` | 404 | 404 |
-| 仓库 `/repos/BorderArea01/VideoSreeeen` | 404 | 200，公开且 `disabled=false` |
-| 按 ID 查询仓库 `/repositories/1423533430` | 404 | 200，同一仓库 |
-| 最新 Release | 404 | 200，`v0.4.0`，`draft=false` |
+| 请求                                      | 匿名   | 当前维护账号授权                    |
+| ----------------------------------------- | ------ | ----------------------------------- |
+| 当前登录身份 `/user`                      | 不适用 | 200，`BorderArea01`，ID `149620762` |
+| 公开用户 `/users/BorderArea01`            | 404    | 404                                 |
+| 按 ID 查询用户 `/user/149620762`          | 404    | 404                                 |
+| 仓库 `/repos/BorderArea01/VideoSreeeen`   | 404    | 200，公开且 `disabled=false`        |
+| 按 ID 查询仓库 `/repositories/1423533430` | 404    | 200，同一仓库                       |
+| 最新 Release                              | 404    | 200，`v0.4.0`，`draft=false`        |
 
 补充对照：匿名查询 `/user/1` 返回 200；VideoTogether 仓库的 API 和网页均返回 200；匿名搜索 `BorderArea01 in:login` 返回 200，但结果数为 0。当前项目的原始 README、仓库网页、Release 网页均返回 404。仓库 Actions 设置读取为 `enabled=true`，历史运行数为 0；本轮未再次触发云端构建。
 

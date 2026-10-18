@@ -972,6 +972,16 @@ input[type='range'] {
   font-size: 12px;
   padding: 10px 14px;
 }
+.browser-secondary {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  margin-top: 14px;
+}
+.browser-secondary .text-button {
+  font-size: 11px;
+}
 @media (max-width: 540px) {
   .stage:has(.browser-hint:not([hidden])) {
     min-height: 340px;

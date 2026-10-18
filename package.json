@@ -34,6 +34,7 @@
     "pages:deploy": "npm run pages:prepare && wrangler --cwd pages pages deploy ../.local/pages-dist --project-name videosreeeen --branch main --commit-dirty=true",
     "test:public": "tsx scripts/public-check.ts",
     "test:broadcast": "tsx scripts/broadcast-check.ts",
+    "test:browser-share": "tsx scripts/browser-share-check.ts",
     "release:prepare": "node scripts/prepare-release.mjs",
     "release:publish": "node scripts/publish-release.mjs",
     "test:site-broadcast": "tsx scripts/site-broadcast-check.ts"
