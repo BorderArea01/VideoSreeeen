@@ -1,4 +1,4 @@
-import { configureRoomServer, openRoom, closeInvitation } from './room-ui';
+import { choosePlayback, configureRoomServer, openRoom, closeInvitation } from './room-ui';
 import { _electron as electron } from 'playwright';
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
@@ -54,6 +54,7 @@ try {
   await page.locator('#create-button').click();
   await closeInvitation(page);
   await page.locator('#connection.online').waitFor();
+  await choosePlayback(page, 'link');
   await page
     .locator('#source-url')
     .fill('https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4');

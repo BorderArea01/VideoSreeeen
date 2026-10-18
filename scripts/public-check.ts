@@ -1,4 +1,4 @@
-import { configureRoomServer, openRoom, closeInvitation } from './room-ui';
+import { choosePlayback, configureRoomServer, openRoom, closeInvitation } from './room-ui';
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
@@ -51,6 +51,7 @@ try {
   await seed.locator('#send-button').click();
   await receiver.getByText('公网房间与 WSS 验证 🍿', { exact: true }).waitFor();
   evidence.wssAndChat = true;
+  await choosePlayback(seed, 'link');
   await seed.locator('#source-url').fill(source);
   await seed.locator('#source-form button').click();
   await seed.waitForFunction(

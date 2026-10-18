@@ -1,10 +1,10 @@
+import { choosePlayback, openRoom, closeInvitation, configureRoomServer } from './room-ui';
 import assert from 'node:assert/strict';
 import { once } from 'node:events';
 import { createServer } from 'node:http';
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { chromium, _electron as electron } from 'playwright';
 import { createApp } from '../server/index';
-import { openRoom, closeInvitation, configureRoomServer } from './room-ui';
 
 const app = createApp();
 app.server.listen(0, '127.0.0.1');
@@ -74,6 +74,7 @@ try {
   await guest.locator('#name-input').fill('无需登录的成员');
   await guest.locator('#join-button').click();
   await host.locator('#member-count').filter({ hasText: '2' }).waitFor();
+  await choosePlayback(host, 'link');
   await host.locator('#source-url').fill(sourceUrl);
   await host.locator('#source-form button').click();
   await host.waitForFunction(
@@ -87,6 +88,7 @@ try {
     {},
     { timeout: 60000 },
   );
+  await choosePlayback(host, 'screen');
   await host.locator('#broadcast-site').waitFor();
   await host.evaluate(() => {
     const original = navigator.mediaDevices.getDisplayMedia.bind(navigator.mediaDevices);

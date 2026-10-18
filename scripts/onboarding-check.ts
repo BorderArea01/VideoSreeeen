@@ -1,10 +1,10 @@
+import { choosePlayback, configureRoomServer, openRoom, closeInvitation } from './room-ui';
 import assert from 'node:assert/strict';
 import { once } from 'node:events';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { chromium } from 'playwright';
 import { createApp } from '../server/index';
-import { configureRoomServer, openRoom, closeInvitation } from './room-ui';
 
 const apps = [createApp(), createApp()];
 for (const app of apps) {
@@ -49,8 +49,10 @@ try {
     mask: [first.locator('#invite-link')],
   });
   await closeInvitation(first);
+  await choosePlayback(first, 'link');
   await first.locator('#source-url').fill('https://www.bilibili.com/video/BV13Aa66LEAW/');
   await first.locator('#source-form button').click();
+  await first.locator('#link-use-screen').click();
   await first.locator('#provide-dialog').waitFor();
   await first.locator('#browser-title').filter({ hasText: '将视频提供给房间' }).waitFor();
   assert.equal(await first.locator('#browser-open-site').isVisible(), true);
@@ -124,6 +126,7 @@ try {
     path: resolve('.local/screenshots/source-needed-mobile.png'),
     fullPage: true,
   });
+  await choosePlayback(first, 'link');
   await first.locator('#source-url').fill(`${origin}/unplayable.mp4`);
   await first.locator('#source-form button').click();
   await second.locator('#browser-title').filter({ hasText: '无法直接播放' }).waitFor();

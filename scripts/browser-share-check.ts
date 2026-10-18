@@ -1,10 +1,10 @@
+import { choosePlayback, closeInvitation } from './room-ui';
 import assert from 'node:assert/strict';
 import { once } from 'node:events';
 import { createServer } from 'node:http';
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { chromium } from 'playwright';
 import { createApp } from '../server/index';
-import { closeInvitation } from './room-ui';
 
 // Capture only this test's isolated tab, never the user's desktop or other apps.
 const title = `VideoSreeeen-test-${crypto.randomUUID()}`;
@@ -143,8 +143,10 @@ try {
   await guest.locator('#join-button').click();
   await host.locator('#member-count').filter({ hasText: '2' }).waitFor();
   const began = Date.now();
+  await choosePlayback(host, 'link');
   await host.locator('#source-url').fill(sourceUrl);
   await host.locator('#source-form button').click();
+  await host.locator('#link-use-screen').click();
   await host.locator('#provide-dialog').waitFor();
   await guest.locator('#browser-title').filter({ hasText: '开始共享' }).waitFor();
   assert.equal(await guest.locator('#browser-open-site').isVisible(), false);
@@ -459,8 +461,10 @@ try {
       configurable: true,
     }),
   );
+  await choosePlayback(host, 'link');
   await host.locator('#source-url').fill(sourceUrl);
   await host.locator('#source-form button').click();
+  await host.locator('#link-use-screen').click();
   await guest.locator('#browser-title').filter({ hasText: '开始共享' }).waitFor();
   await guest.locator('#browser-takeover').click();
   await guest.locator('#provide-dialog').waitFor();

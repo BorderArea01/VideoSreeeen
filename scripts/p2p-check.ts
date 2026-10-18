@@ -1,4 +1,4 @@
-import { configureRoomServer, openRoom, closeInvitation } from './room-ui';
+import { choosePlayback, configureRoomServer, openRoom, closeInvitation } from './room-ui';
 import assert from 'node:assert/strict';
 import { once } from 'node:events';
 import { createServer } from 'node:http';
@@ -123,6 +123,7 @@ const ready = (page: Page) =>
     { timeout: 45000 },
   );
 async function share(page: Page) {
+  await choosePlayback(page, 'link');
   await page.locator('#source-url').fill(sourceUrl);
   await page.locator('#source-form button').click();
   await page.waitForFunction(() => document.querySelector('video')!.readyState >= 2);

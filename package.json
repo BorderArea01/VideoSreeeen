@@ -38,7 +38,9 @@
     "test:broadcast-relay": "tsx scripts/broadcast-relay-check.ts",
     "release:prepare": "node scripts/prepare-release.mjs",
     "release:publish": "node scripts/publish-release.mjs",
-    "test:site-broadcast": "tsx scripts/site-broadcast-check.ts"
+    "test:site-broadcast": "tsx scripts/site-broadcast-check.ts",
+    "test:playback-modes": "tsx scripts/playback-modes-check.ts",
+    "test:native-sync": "tsx scripts/native-sync-check.ts"
   },
   "dependencies": {
     "electron-updater": "^6.8.9",

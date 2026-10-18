@@ -1,6 +1,7 @@
 import type Hls from 'hls.js';
 import './style.css';
 import { icon } from './icons';
+import { PlaybackPicker, playbackPickerMarkup } from './playback-picker';
 import type { ClientMessage, MediaInput, ServerMessage, Snapshot } from '../shared/protocol';
 import { PROTOCOL, parseInvite, serverOrigin, invitationServer } from '../shared/invite';
 import { describeUrl } from '../shared/sites';
@@ -33,8 +34,8 @@ $('app').innerHTML = `
 <main class="workspace"><section class="screen-column"><div class="room-heading"><div><div class="eyebrow">YOUR SHARED SCREEN</div><h1 id="room-title">多人观影<span class="orange-dot">.</span></h1><p id="room-subtitle">创建房间或通过邀请加入。</p></div><div class="heading-actions">${button('invite-button', '复制房间邀请', 'link')}${button('chat-toggle', '隐藏或显示聊天室', 'chat')}</div></div>
 <section id="stage" class="stage"><div id="welcome" class="welcome"><div class="scene-lines"></div><div class="scene-orb"></div><div class="frame-index">V / S <span>PRIVATE CINEMA</span></div><div class="welcome-text"><span class="tag">链接 · 画面 · 本地视频</span><h2>选择视频，<br>开始同步观看。</h2><p>支持视频链接、实时画面和本地文件。</p><div class="hero-actions"><button id="hero-create" class="button accent">${icon('plus', 18)} 创建房间 ${icon('arrow', 17)}</button><button id="hero-join" class="text-button">通过邀请加入 →</button></div></div><div class="scene-footer"><span>PLAY · SYNC · SHARE</span><span>01 — ∞</span></div></div><video id="video" playsinline preload="metadata" hidden></video><audio id="audio" preload="metadata"></audio><div id="native-stage" class="native-stage" hidden><div class="native-hint">正在客户端内打开原站…</div></div><div id="browser-hint" class="browser-hint" hidden>${icon('globe', 36)}<h3 id="browser-title">选择播放方式</h3><p id="browser-description"></p><div class="browser-actions"><button id="browser-provide" class="button accent">提供视频给房间</button><button id="browser-takeover" class="button outline" hidden>改由我提供视频</button><button id="browser-local-video" class="button soft" title="选择本机视频，实时传给房间成员">打开视频文件</button></div><div class="browser-secondary"><button id="browser-invite" class="text-button" title="客户端成员也可识别视频源，或共享原站画面">邀请成员提供视频</button><button id="browser-help" class="text-button">使用方法</button></div></div><div id="cache-overlay" class="cache-overlay" hidden><span class="cache-icon">${icon('download', 28)}</span><h3 id="cache-title">等待完整缓存</h3><p id="cache-description">每人完整缓存，等最慢的朋友准备好。</p><div class="cache-track"><i id="cache-progress"></i></div><button id="cache-button" class="button accent">开始本机缓存</button></div></section>
 <div class="transport"><button id="play-button" class="play-button" title="播放或暂停" aria-label="播放或暂停">${icon('play', 19)}</button><button id="live-sound" class="icon-button" title="静音" aria-label="静音" hidden>${icon('volume', 19)}</button><span id="position" class="time">00:00</span><input id="seek" aria-label="播放进度" type="range" min="0" max="100" step="0.1" value="0"><span id="duration" class="time muted">00:00</span><select id="rate" aria-label="播放速度"><option value="0.5">0.5×</option><option value="1" selected>1×</option><option value="1.25">1.25×</option><option value="1.5">1.5×</option><option value="2">2×</option></select>${button('fullscreen', '全屏', 'expand')}</div>
-<section class="source-card"><div class="section-heading"><span>${icon('film', 18)} 视频来源</span><span id="provider" class="subtle">选择播放方式</span></div><form id="source-form" class="source-form"><span class="input-icon">${icon('link', 18)}</span><input id="source-url" type="url" aria-label="视频页面或视频文件地址" placeholder="粘贴 B 站、喜番、蜜柑或视频直链…" required><button class="button soft" type="submit" title="视频直链可直接播放；原站页面会进入提供视频流程">选择视频 ${icon('arrow', 16)}</button></form><div class="source-actions"><button id="local-video-button" class="button soft" type="button" title="选择文件后实时传给成员，不需要整部上传或共同缓存">打开视频文件</button><input id="local-video-input" type="file" accept="video/*,.mkv,.mp4,.webm,.mov" hidden><button id="broadcast-site" class="button soft" type="button" hidden title="只共享原站视图及声音；其他成员无需登录。开始前请在原站选好画质。">共享原站画面</button><button id="broadcast-screen" class="button soft" type="button" title="选择浏览器标签页并勾选共享声音">共享标签页 / 屏幕</button><button id="stop-broadcast" class="text-button" type="button" hidden>停止共享</button><span id="broadcast-status" class="subtle" role="status"></span></div><div class="source-bottom"><div class="site-chips"><button data-site="bilibili">哔哩哔哩</button><button data-site="xifan">喜番</button><button data-site="mgn">蜜柑</button><span>+ 视频直链</span></div><button id="extract-button" class="text-button" hidden>${icon('link', 14)} 识别并共享原站视频源</button></div></section>
-<details id="cache-options" class="cache-options"><summary title="默认关闭。只有大家都卡时才考虑完整缓存；实时画面不使用此模式。">共同缓存</summary><section class="mode-card"><div class="mode-copy"><span class="mode-symbol">${icon('download', 22)}</span><div><h3>共同缓存模式 <span class="pill">手动启用</span></h3><p id="mode-description">仅在大家都卡时使用；默认边播边看。</p></div></div><button id="mode-toggle" class="switch" role="switch" aria-checked="false" aria-label="共同缓存模式"><i></i></button></section></details><div class="screen-foot"><span>${icon('shield', 14)} 多人可控 · 自动同步</span><span id="sync-status">等待加入房间</span></div>
+${playbackPickerMarkup}
+<details id="cache-options" class="cache-options"><summary title="默认关闭。只有大家都卡时才考虑完整缓存；实时画面不使用此模式。">共同缓存</summary><section class="mode-card"><div class="mode-copy"><span class="mode-symbol">${icon('download', 22)}</span><div><h3>共同缓存模式 <span class="pill">手动启用</span></h3><p id="mode-description">仅在大家都卡时使用；默认边播边看。</p></div></div><button id="mode-toggle" class="switch" role="switch" aria-checked="false" aria-label="共同缓存模式"><i></i></button></section></details><div class="screen-foot"><span id="control-summary">${icon('shield', 14)} 多人可控 · 自动同步</span><span id="sync-status">等待加入房间</span></div>
 </section>
 <aside id="sidebar" class="sidebar"><section class="members-card"><div class="section-heading"><span>${icon('users', 18)} 放映室成员 <b id="member-count">0</b></span><span class="live-label">${icon('signal', 14)} RTT</span></div><div id="members" class="members"><p class="empty-members">暂无成员</p></div><button id="sidebar-invite" class="invite-line">${icon('plus', 16)} 邀请成员</button></section><section id="chat-panel" class="chat-panel"><div id="chat-drag" class="chat-heading" title="拖拽可悬浮聊天室"><div>${icon('chat', 18)} 聊天室 <span class="tiny-dot"></span></div><div>${button('chat-dock', '停靠聊天室', 'expand')}</div></div><div id="chat-messages" class="chat-messages"><div id="chat-empty" class="chat-empty"><span>${icon('chat', 30)}</span><p>暂无消息</p><small>加入房间后，消息会出现在这里。</small></div></div><div id="emoji-picker" class="emoji-picker" hidden></div><div class="chat-compose"><textarea id="chat-input" title="Enter 发送，Shift + Enter 换行" aria-label="聊天消息" placeholder="发送消息…" rows="2" maxlength="2000"></textarea><div class="compose-actions"><div>${button('emoji-button', '选择表情', 'smile')}${button('image-button', '发送图片或 GIF 表情包', 'image')}<input id="image-input" type="file" accept="image/png,image/jpeg,image/gif,image/webp" hidden></div><button id="send-button" class="send-button" title="发送消息" aria-label="发送消息">${icon('send', 17)}</button></div></div></section><div class="sidebar-foot">VIDEOSREEEEN <span>✳</span></div></aside></main>
 <footer class="app-foot"><span>VideoSreeeen <b>0.4.0</b></span><span>GPL-3.0 · 开源</span><button id="leave-button" class="text-button" hidden>${icon('exit', 14)} 离开放映室</button></footer>
@@ -43,6 +44,18 @@ $('app').innerHTML = `
 <dialog id="settings-dialog" aria-labelledby="settings-title"><form id="settings-form"><div class="dialog-heading"><div><div class="eyebrow">SETTINGS</div><h2 id="settings-title">设置与帮助</h2></div><button type="button" data-close="settings-dialog" class="icon-button" aria-label="关闭">${icon('close')}</button></div><details class="advanced"><summary>版本与更新</summary><p class="dialog-note">Windows / Android 0.4.0</p><div class="dialog-buttons"><button id="update-action" type="button" class="button soft">检查更新</button><a class="button soft" href="https://github.com/BorderArea01/VideoSreeeen/releases/latest/download/VideoSreeeen-Setup.exe" target="_blank" rel="noopener noreferrer">Windows 安装版</a><a class="button soft" href="https://github.com/BorderArea01/VideoSreeeen/releases/latest/download/VideoSreeeen-Android.apk" target="_blank" rel="noopener noreferrer">Android APK</a></div><p id="update-status" class="dialog-note" role="status"></p></details><details id="connection-details" class="advanced"><summary>高级 · 房间服务器</summary><p class="dialog-note">仅自建或局域网用户需要修改。保存后用于下一次建房或邀请码加入，不会切换当前房间。</p><label>服务器地址<input id="server-input" type="url" placeholder="https://你的服务器" required></label><div class="dialog-buttons"><button type="submit" class="button accent">保存设置</button><button id="reset-server" type="button" class="button outline">恢复默认</button></div><p id="settings-error" class="form-error" role="alert"></p><p id="settings-status" class="dialog-note" role="status"></p></details><details id="watch-help" class="advanced"><summary>第一次使用 · 怎么一起看？</summary><ol class="help-steps"><li>创建房间，把邀请链接发给朋友；朋友打开后填写昵称即可加入。</li><li>视频直链可直接同步播放；原站链接会显示可用的播放方式。</li><li>电脑浏览器在“提供视频给房间”窗口完成两步：打开原站播放，再选择该标签页并勾选音频。完成后房间才会显示画面；原站负责播放进度。Windows 客户端也可共享原站画面，或识别视频源以使用同步播放、暂停和拖动。</li><li>默认边播边看。仅在大家都卡时，可手动开启共同缓存，完整下载后播放。</li></ol></details><details class="advanced"><summary>浏览器与客户端有什么区别？</summary><p class="dialog-note">浏览器可建房、聊天、看直链、共享本地文件和接收画面；支持屏幕共享的电脑浏览器还可提供视频标签页。网页不能自动读取第三方网站的播放器。浏览器完整缓存目前限总计 128 MiB；长视频缓存请用客户端。Windows / Android 可在应用内打开原站，苹果设备使用浏览器。</p></details><div class="help-links"><button id="project-link" type="button" class="text-button">开源项目与构建说明 ↗</button><button id="feedback-link" type="button" class="text-button">反馈问题 ↗</button></div><p class="dialog-note">GPL-3.0 · 无需注册。昵称会保存在本机；房间服务会处理昵称、聊天和同步信息。公共服务可能受免费额度或网络影响，也可以自行部署。</p><button data-close="settings-dialog" type="button" class="button soft dialog-wide">返回观影</button></form></dialog><div id="toast" class="toast" role="status" hidden></div>`;
 
 $('platform').textContent = platform;
+const playbackPicker = new PlaybackPicker();
+$('link-capability').textContent = isNative
+  ? '每人独立加载视频，只同步进度，画质不经转码。支持视频直链和客户端内的原站播放器；原站需要各自登录。'
+  : '每人独立加载视频，只同步进度，画质不经转码。支持 MP4 / WebM / HLS 直链；B 站等原站页面需客户端，或改用共享画面。';
+$('site-source-options').hidden = !isNative;
+if (isNative) {
+  $<HTMLInputElement>('source-url').placeholder = '粘贴视频直链或原站页面地址';
+  $('screen-open-note').textContent = window.desktop
+    ? '在客户端原站中播放后，点击“共享客户端原站画面”。'
+    : 'Android 可以同步原站播放器、接收画面或提供本地视频；当前不支持原站画面采集。';
+  if (window.desktop) $<HTMLDetailsElement>('screen-open-details').open = true;
+}
 $('stop-broadcast').insertAdjacentHTML(
   'beforebegin',
   '<select id="broadcast-quality" aria-label="共享画质" title="提供者设置，影响全房间；网络不稳可选流畅" hidden><option value="smooth">流畅</option><option value="hd" selected>高清</option><option value="high">高画质</option></select>',
@@ -140,6 +153,7 @@ let sourceFailed = false;
 let playbackPermissionNeeded = false;
 let liveMuted = false;
 let autoSharedMedia = '';
+let requestedScreenPage = '';
 let publisher: HTMLVideoElement | null = null;
 let publisherStream: MediaStream | null = null;
 let providingMediaId = '',
@@ -535,6 +549,7 @@ function adopt(snapshot: Snapshot) {
 }
 function openProvider() {
   if (!room?.media || room.media.broadcast || isNative) return;
+  playbackPicker.select('screen');
   providingMediaId = room.media.id;
   provideDialogMediaId = room.media.id;
   provideError = '';
@@ -692,12 +707,45 @@ function render() {
   $('live-sound').hidden = !liveScreen || preview || room?.media?.broadcast?.host === memberId;
   renderLiveSound();
   const canShareTab = !isNative && !!navigator.mediaDevices?.getDisplayMedia;
+  const media = room?.media;
+  const actualChoice =
+    media?.broadcast?.kind === 'file'
+      ? 'file'
+      : media?.broadcast
+        ? 'screen'
+        : requestedScreenPage === media?.url
+          ? 'screen'
+          : 'link';
+  playbackPicker.observe(
+    media ? `${media.url}:${media.broadcast?.kind ?? 'source'}` : '',
+    actualChoice,
+  );
+  if (requestedScreenPage === media?.url) requestedScreenPage = '';
+  $('current-playback').textContent = !media
+    ? '尚未选择视频'
+    : media.broadcast?.kind === 'file'
+      ? '当前：本地视频'
+      : media.broadcast
+        ? '当前：共享画面'
+        : sourceNeeded
+          ? '原站链接 · 尚未提供画面'
+          : sourceFailed
+            ? '共同播放 · 视频未就绪'
+            : room?.mode === 'cache'
+              ? '当前：共同播放 · 共同缓存'
+              : '当前：共同播放';
+  $('active-source').hidden = !media;
+  $('control-summary').innerHTML =
+    `${icon('shield', 14)} ${media?.broadcast?.kind === 'screen' ? '共享画面 · 原站控制进度' : '多人可控 · 自动同步'}`;
+  $('screen-unavailable').hidden = canShareTab || !!window.desktop;
+  $('screen-open-details').hidden = !canShareTab && !isNative;
   const providing = room?.media?.sharedBy === memberId || providingMediaId === room?.media?.id;
   const sourceMember = room?.members.find((m) => m.id === room?.media?.sharedBy);
   const cacheAvailable =
     !!room?.media?.source &&
     !room.media.broadcast &&
     (isNative || room.media.source.kind !== 'hls');
+  $('cache-options').hidden = !cacheAvailable && room?.mode !== 'cache';
   $('browser-hint').hidden = !blocked || room?.mode === 'cache';
   $('browser-title').textContent = sourceNeeded
     ? providing
@@ -707,12 +755,12 @@ function render() {
   $('browser-description').textContent = sourceNeeded
     ? providing
       ? '完成共享后，房间成员才能看到视频。'
-      : '提供者开始后，画面会出现在这里。观看者不需要打开原站。'
-    : !cacheAvailable
-      ? '视频流未能直接播放。浏览器暂不支持完整 HLS 缓存，请用 Windows / Android 客户端观看，或换用 MP4 / DASH 视频源。'
-      : '视频源无法直接访问，可由提供方共享原站画面，或重新识别视频源。';
+      : '此原站页面需客户端内的播放器。也可由成员共享画面，浏览器观众无需打开原站。'
+    : '地址可能已失效，或视频源限制外部播放。可以换一个视频直链，或改用共享画面。';
 
   $<HTMLButtonElement>('play-button').disabled = !room?.media || blocked || preview;
+  for (const id of ['play-button', 'position', 'seek', 'duration', 'rate'])
+    $(id).hidden = liveScreen || !media || blocked;
   $<HTMLButtonElement>('mode-toggle').disabled = !cacheAvailable;
   $('broadcast-site').hidden = !window.desktop || !siteOpen || !!room?.media?.broadcast;
   $('broadcast-screen').hidden = !canShareTab;
@@ -1600,8 +1648,12 @@ $('room-button').onclick = () => {
   else openDialog($<HTMLInputElement>('invite-input').value ? 'join' : 'create');
 };
 $('hero-create').onclick = () => {
-  if (room) $<HTMLInputElement>('source-url').focus();
-  else openDialog();
+  if (room) {
+    $('playback-picker').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    document
+      .querySelector<HTMLElement>('.playback-tabs [aria-selected="true"]')
+      ?.focus({ preventScroll: true });
+  } else openDialog();
 };
 $('hero-join').onclick = () => {
   if (room) void invite();
@@ -1775,7 +1827,39 @@ $('source-form').onsubmit = (event) => {
   event.preventDefault();
   try {
     const media = describeUrl($<HTMLInputElement>('source-url').value);
+    if (!isNative && !media.source) {
+      $('link-error').textContent =
+        '这是原站页面，网页版无法直接同步它的播放器。可改用共享画面；视频直链仍可共同播放。';
+      $('link-unavailable').hidden = false;
+      return;
+    }
+    $('link-unavailable').hidden = true;
     operation({ type: 'media', media });
+  } catch (e) {
+    error(e);
+  }
+};
+$('source-url').oninput = () => {
+  $('link-unavailable').hidden = true;
+};
+$('link-use-screen').onclick = () => {
+  try {
+    const media = describeUrl($<HTMLInputElement>('source-url').value);
+    requestedScreenPage = media.url;
+    playbackPicker.select('screen');
+    operation({ type: 'media', media });
+  } catch (e) {
+    error(e);
+  }
+};
+$('screen-page-form').onsubmit = (event) => {
+  event.preventDefault();
+  try {
+    const media = describeUrl($<HTMLInputElement>('screen-page-url').value);
+    if (isNative) {
+      requestedScreenPage = media.url;
+      operation({ type: 'media', media });
+    } else openExternal(media.url);
   } catch (e) {
     error(e);
   }
@@ -2160,7 +2244,9 @@ setInterval(() => {
   void nativeCall('sampleSite')
     .then((sample: Sample) => {
       if (!expectedMediaId || room?.media?.id !== expectedMediaId) return;
+      const availabilityChanged = siteSample?.available !== sample.available;
       siteSample = sample;
+      if (availabilityChanged) render();
       if (
         !room.media.source &&
         !room.media.broadcast &&

@@ -19,3 +19,14 @@ export async function closeInvitation(page: Page) {
   await page.locator('#invite-dialog').waitFor();
   await page.locator('[data-close="invite-dialog"]').last().click();
 }
+
+export async function choosePlayback(page: Page, mode: 'screen' | 'link' | 'file') {
+  await page.locator('#choose-' + mode).click();
+}
+
+export async function selectSource(page: Page, url: string, provideScreen = false) {
+  await choosePlayback(page, 'link');
+  await page.locator('#source-url').fill(url);
+  await page.locator('#source-form button').click();
+  if (provideScreen) await page.locator('#link-use-screen').click();
+}

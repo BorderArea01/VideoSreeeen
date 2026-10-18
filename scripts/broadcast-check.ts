@@ -1,10 +1,10 @@
+import { choosePlayback, openRoom, closeInvitation } from './room-ui';
 import assert from 'node:assert/strict';
 import { once } from 'node:events';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { chromium } from 'playwright';
 import { createApp } from '../server/index';
-import { openRoom, closeInvitation } from './room-ui';
 
 const app = createApp();
 app.server.listen(0, '127.0.0.1');
@@ -69,8 +69,10 @@ try {
     await host.locator('#cache-options').evaluate((e) => (e as HTMLDetailsElement).open),
     false,
   );
+  await choosePlayback(host, 'link');
   await host.locator('#source-url').fill('https://www.bilibili.com/video/BV13Aa66LEAW/');
   await host.locator('#source-form button').click();
+  await host.locator('#link-use-screen').click();
   await host.locator('#provide-dialog').waitFor();
   const choosing = host.waitForEvent('filechooser');
   await host.locator('#provide-local-video').click();

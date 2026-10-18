@@ -1,4 +1,4 @@
-import { configureRoomServer, openRoom, closeInvitation } from './room-ui';
+import { choosePlayback, configureRoomServer, openRoom, closeInvitation } from './room-ui';
 import { chromium, _electron as electron } from 'playwright';
 import assert from 'node:assert/strict';
 import { once } from 'node:events';
@@ -77,6 +77,7 @@ try {
   await first.locator('#chat-dock').click();
   await first.screenshot({ path: resolve(output, 'desktop-room.png'), fullPage: true });
   // Real public CC0 video: verifies that the production relay and real decoders work.
+  await choosePlayback(first, 'link');
   await first
     .locator('#source-url')
     .fill('https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4');
@@ -184,6 +185,7 @@ try {
     await page.locator('#create-button').click();
     await closeInvitation(page);
     await page.locator('#connection.online').waitFor();
+    await choosePlayback(page, 'link');
     await page
       .locator('#source-url')
       .fill('https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4');

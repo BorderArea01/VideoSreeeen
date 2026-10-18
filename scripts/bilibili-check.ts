@@ -1,10 +1,10 @@
+import { choosePlayback, configureRoomServer, openRoom, closeInvitation } from './room-ui';
 import assert from 'node:assert/strict';
 import { once } from 'node:events';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { chromium, _electron as electron } from 'playwright';
 import { createApp } from '../server/index';
-import { configureRoomServer, openRoom, closeInvitation } from './room-ui';
 
 // Public user-reported video; never store its media URLs, responses or bytes in the repository.
 const source = 'https://www.bilibili.com/video/BV13Aa66LEAW/';
@@ -61,6 +61,7 @@ try {
   await receiver.locator('#join-button').click();
   await receiver.locator('#connection.online').waitFor();
   await seed.locator('#member-count').filter({ hasText: '2' }).waitFor();
+  await choosePlayback(seed, 'link');
   await seed.locator('#source-url').fill(source);
   await seed.locator('#source-form button').click();
   // No click on the extraction button: the real native player must attach its source automatically.
