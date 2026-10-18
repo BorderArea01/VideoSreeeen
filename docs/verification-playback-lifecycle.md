@@ -21,7 +21,14 @@
 
 ## 部署
 
-待本轮部署与公网复测完成后记录版本。此前已部署版本的通过记录不作为本轮通过证据。
+- 正式入口 <https://videosreeeen.pages.dev>，运行时代码 `79be15295badbfad07cbcc064878e6bcc826163b`，已推送 GitHub。
+- Pages 部署 `a270b964-7aeb-44b3-89aa-38da17c184c5`；Worker 版本 `bfc12b5e-e7e6-4703-9951-55e2c9875ad1`。
+- 线上 HTML、JS 与 CSS 与本机构建逐字节一致；部署元数据提交匹配。JS `/assets/index-C9RXVQmc.js` 的 SHA-256 为 `239a9bec8efd65eeadb1598332c9a5207c272c2e55c4d55cc7cca12dc20a6a40`；CSS 沿用 `index-CvOf_f_s.css`。
+- 公网 `test:browser-share` 完整通过：服务器确认前房主已解码 33 帧，采样 2254 点非黑；确认后原流保持，解绑、重复绑定和带流 load 均为 0。观众实际解码 11 帧并接收音频 RTP，同样无重复绑定或解绑；取消重试、停止清理、替代入口、手机布局与页面错误检查通过。
+- 首次公网脚本在后续换片步骤超时：轨道停止不代表服务器已确认 unshare。脚本补充等待双方回到欢迎页，再提交新的版本化媒体操作，随后完整重测通过。运行时代码未因该测试时序调整再次变化。
+- 初次部署核对因直连超时失败；改用本机 Clash 代理后完成全部线上资源核对，没有将超时结果记为成功。
+
+公网证据：`.local/playback-lifecycle-public-evidence.json`、`.local/public-web-source-evidence.json`。公网播放器截图已目视确认正常样片画面。以上为同机不同页面连接真实 Cloudflare 服务的验证，未验收不同网络、用户截图中的原站视频或 Android 真机；本轮未重打安装包或安装设备。
 
 ## 依据
 

@@ -400,6 +400,10 @@ try {
     true,
   );
   evidence.stopCleanup = true;
+  // Track shutdown is immediate; wait for the server to accept unshare before
+  // submitting another versioned media operation over the public connection.
+  await host.locator('#welcome').waitFor();
+  await guest.locator('#welcome').waitFor();
   // A browser without screen capture must offer supported alternatives immediately.
   await guest.evaluate(() =>
     Object.defineProperty(navigator.mediaDevices, 'getDisplayMedia', {
