@@ -2,21 +2,23 @@ import { choosePlayback, configureRoomServer, openRoom, closeInvitation } from '
 import { _electron as electron } from 'playwright';
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
-import { mkdir, writeFile, access } from 'node:fs/promises';
+import { mkdir, writeFile, access, mkdtemp } from 'node:fs/promises';
 import { spawn } from 'node:child_process';
 
 const dir = resolve('.local/screenshots');
 await mkdir(dir, { recursive: true });
 const evidence: Record<string, unknown> = {};
+const profile = await mkdtemp(resolve('.local/package-check-'));
 const app = await electron.launch({
   executablePath: resolve('artifacts/windows/win-unpacked/VideoSreeeen.exe'),
-  args: ['--mute-audio'],
+  args: ['--user-data-dir=' + profile, '--mute-audio'],
   timeout: 30000,
 });
 let local = '';
 let previousSettings: Record<string, string> | undefined;
 try {
   const page = await app.firstWindow();
+  assert.equal(await app.evaluate(({ app }) => app.getPath('userData')), profile);
   previousSettings = await page.evaluate(() => Object.fromEntries(Object.entries(localStorage)));
   await page.evaluate(() => localStorage.clear());
   await page.reload();
@@ -113,11 +115,11 @@ evidence.embeddedServerStopped = true;
 console.log('Packaged Windows application and embedded server passed');
 // Also launch the delivered portable wrapper. It extracts its own runtime and
 // exits after capturing a real window, without requiring Node/npm on the user PC.
-const portable = resolve('artifacts/windows/VideoSreeeen 0.4.0.exe');
+const portable = resolve('artifacts/windows/VideoSreeeen 0.4.1.exe');
 await access(portable);
 const screenshot = resolve(dir, 'windows-portable.png');
 await new Promise<void>((resolveDone, reject) => {
-  const child = spawn(portable, ['--mute-audio'], {
+  const child = spawn(portable, ['--user-data-dir=' + profile + '-portable', '--mute-audio'], {
     env: { ...process.env, VS_SMOKE_OUTPUT: screenshot },
     windowsHide: true,
     stdio: 'ignore',

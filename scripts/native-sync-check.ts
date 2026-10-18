@@ -1,10 +1,12 @@
 import assert from 'node:assert/strict';
 import { once } from 'node:events';
 import { createServer } from 'node:http';
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, writeFile, mkdtemp } from 'node:fs/promises';
+import { resolve, join } from 'node:path';
 import { chromium, _electron as electron } from 'playwright';
 import { createApp } from '../server/index';
 import { configureRoomServer, closeInvitation, openRoom, selectSource } from './room-ui';
+import { waitForNativeSample } from './native-sample';
 
 // Real Windows original-site bridge, with a local page hosting a public CC0
 // video. This validates the bridge, not third-party login/site compatibility.
@@ -30,8 +32,15 @@ const browser = await chromium.launch({
 let desktop: Awaited<ReturnType<typeof electron.launch>> | undefined;
 const evidence: Record<string, any> = { originalSite: 'local-cc0-page', actualWindowsBridge: true };
 try {
+  await mkdir('.local', { recursive: true });
+  const profile = await mkdtemp(resolve('.local/native-sync-'));
+  const entry = join(profile, 'entry.cjs');
+  await writeFile(
+    entry,
+    `const {app}=require('electron');app.setPath('userData',${JSON.stringify(profile)});require(${JSON.stringify(resolve('desktop/main.cjs'))});`,
+  );
   desktop = await electron.launch({
-    args: ['desktop/main.cjs', '--mute-audio'],
+    args: [entry, '--mute-audio'],
     env: { ...process.env, VS_DEV_URL: origin },
   });
   const host = await desktop.firstWindow(),
@@ -51,35 +60,26 @@ try {
   await guest.locator('#join-button').click();
   await host.locator('#member-count').filter({ hasText: '2' }).waitFor();
   await selectSource(host, source);
-  await host.waitForFunction(
-    async () => (await window.desktop!.call('sampleSite')).available,
-    {},
-    { timeout: 45000 },
-  );
+  await waitForNativeSample(host, (s) => s.available, 45000);
   await guest.waitForFunction(
     () => document.querySelector<HTMLVideoElement>('#video')!.readyState >= 2,
     {},
     { timeout: 45000 },
   );
   await guest.locator('#play-button').click();
-  await host.waitForFunction(async () => {
-    const s = await window.desktop!.call('sampleSite');
-    return !s.paused && s.position > 0.3;
-  });
+  await waitForNativeSample(host, (s) => s.available && !s.paused && (s.position ?? 0) > 0.3);
   await guest.waitForFunction(
     () =>
       document.querySelector<HTMLVideoElement>('#video')!.getVideoPlaybackQuality()
         .totalVideoFrames > 3,
   );
   await guest.locator('#play-button').click();
-  await host.waitForFunction(async () => (await window.desktop!.call('sampleSite')).paused);
+  await waitForNativeSample(host, (s) => s.paused === true);
   await guest.locator('#seek').fill('1');
   await guest.locator('#seek').dispatchEvent('change');
-  await host.waitForFunction(
-    async () => Math.abs((await window.desktop!.call('sampleSite')).position - 1) < 0.2,
-  );
+  await waitForNativeSample(host, (s) => Math.abs((s.position ?? -1) - 1) < 0.2);
   await guest.locator('#rate').selectOption('1.5');
-  await host.waitForFunction(async () => (await window.desktop!.call('sampleSite')).rate === 1.5);
+  await waitForNativeSample(host, (s) => s.rate === 1.5);
   evidence.stability = await host.evaluate(async () => {
     const samples = [];
     for (let i = 0; i < 4; i++) {

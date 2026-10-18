@@ -44,12 +44,13 @@ await writeFile(
   `provider: generic\nurl: ${origin}\nupdaterCacheDirName: windows\n`,
 );
 const app = await electron.launch({
-  args: ['desktop/main.cjs', '--mute-audio'],
+  args: ['desktop/main.cjs', '--user-data-dir=' + root, '--mute-audio'],
   env: { ...process.env, VS_DEV_URL: origin },
   timeout: 30000,
 });
 try {
   await app.firstWindow();
+  assert.equal(await app.evaluate(({ app }) => app.getPath('userData')), root);
   await app.evaluate('globalThis.__name = (value) => value; undefined');
   const run = async (name: string) =>
     app.evaluate(
@@ -85,7 +86,7 @@ try {
         updater.disableWebInstaller = true;
         updater.logger = { info() {}, warn() {}, error() {}, debug() {} };
         const update = await updater.checkForUpdates();
-        if (!update || update.updateInfo.version !== '0.4.0')
+        if (!update || update.updateInfo.version !== '0.4.1')
           throw new Error('Update metadata not loaded');
         const files = await updater.downloadUpdate();
         let bytes = 0;

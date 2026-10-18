@@ -13,6 +13,7 @@ const { pathToFileURL } = require('node:url');
 const os = require('node:os');
 const { DiskCache } = require('./cache.cjs');
 const { BlockCache } = require('./blocks.cjs');
+const { popupTarget } = require('./navigation.cjs');
 let blocks;
 let captureUntil = 0;
 let update;
@@ -109,10 +110,10 @@ async function openSite(url) {
   site.setBackgroundColor('#101014');
   win.contentView.addChildView(site);
   site.setBounds(bounds);
-  site.webContents.setWindowOpenHandler(({ url: next }) => {
-    try {
-      void site.webContents.loadURL(validUrl(next));
-    } catch {}
+  const view = site;
+  view.webContents.setWindowOpenHandler(({ url: next }) => {
+    const target = popupTarget(view.webContents.getURL(), next);
+    if (target) void view.webContents.loadURL(target).catch(() => {});
     return { action: 'deny' };
   });
   site.webContents.on('will-navigate', (e, next) => {
@@ -128,7 +129,6 @@ async function openSite(url) {
   site.webContents.on('dom-ready', () => {
     void sampleSite();
   });
-  const view = site;
   let timer;
   let domReady;
   try {
@@ -218,6 +218,14 @@ app.whenReady().then(async () => {
   });
   win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   win.webContents.on('will-navigate', (e) => e.preventDefault());
+  const openSiteAccount = require('./site-account.cjs')(win, () => {
+    const url = site?.webContents.getURL() ?? '';
+    if (/^https:\/\/(?:[^/]+\.)?bilibili\.com\//i.test(url)) {
+      sample = { available: false };
+      observed = [];
+      site.webContents.reload();
+    }
+  });
   update = require('./updates.cjs')(event);
   win.webContents.session.setDisplayMediaRequestHandler((request, callback) => {
     const allowed = request.frame === win.webContents.mainFrame && Date.now() < captureUntil;
@@ -235,6 +243,9 @@ app.whenReady().then(async () => {
     if (e.sender !== win.webContents || e.senderFrame !== win.webContents.mainFrame)
       throw new Error('不允许的调用');
     switch (method) {
+      case 'siteAccount':
+        openSiteAccount();
+        return {};
       case 'update':
         return update(data.action);
       case 'captureSite':

@@ -1,15 +1,9 @@
-提供三种可选播放方式：链接同步、实时画面共享、本地视频文件共享。共同缓存保留为手动选项，默认关闭。
+新增客户端“设置与帮助 → 原站账号 · B 站登录”：在官方页面登录，会话仅保留本机，关闭窗口后刷新当前 B 站播放器。共同播放使用每位用户自己的原站权限，仍可选择共享画面给观众。
 
-- Windows 客户端打开原站后，可共享原站画面和声音；其他成员无需登录提供方的账号。登录状态保留在提供方，画质受原站权限、编码、设备和上行带宽影响。
-- 打开本地视频文件即可向房间实时提供画面和声音，无需完整上传或缓存；文件提供者需保持在线。格式支持取决于设备解码器，推荐 H.264/AAC MP4。
-- 聊天图片最大 20 MiB，GIF 保留原图与动画。图片使用独立 HTTP 附件传输，不进入同步消息；单房间最多 64 MiB，随聊天过期或房间清理删除。
-- 精简界面文案，常用说明移到悬停或折叠帮助。
-- Windows 安装版接入 GitHub Releases 更新；Android 应用内下载并校验更新，安装由系统确认，保持相同包名和发布签名。
+- 修复原站第一次拖动可能丢失，适配 B 站新版播放器的视频源信息。
+- Windows 双客户端实测通过 B 站游客 360p、蜜柑 1080p 的播放、暂停、进度、倍速及原站拖动同步；保留稀饭网页识别。
+- B 站提取地址仍可能被 CDN 拒绝，不能保证浏览器观众通过直链播放；蜜柑纯网页识别仍为实验支持。Android 登录后高清、Android 真机及 Safari/iOS 尚未验收。
 
-下载 `VideoSreeeen-Setup.exe` 获取 Windows 安装版（支持后续应用内更新）；`VideoSreeeen-Portable-0.4.0.exe` 为便携版。Android 使用 `VideoSreeeen-Android.apk`。SHA-256 见 `SHA256SUMS.txt`。
+Windows 安装版 VideoSreeeen-Setup.exe 支持应用内更新；便携版 VideoSreeeen-Portable-0.4.1.exe。Android 使用 VideoSreeeen-Android.apk，同一发布签名，更新由系统确认。没有安装或卸载任何设备应用。苹果设备使用 [网页版](https://videosreeeen.pages.dev)。校验见 SHA256SUMS.txt。
 
-首次正式 APK 使用独立固定签名，不能覆盖旧的 debug 签名 APK；请勿为切换签名擅自卸载有数据的应用。苹果设备使用 [网页版](https://videosreeeen.pages.dev)。
-
-P2P 默认仅配置 STUN，不启用付费 TURN；受网络限制无法直连时，可使用链接同步。Android 真机、Safari/iOS 接收及跨运营商长期播放尚未验收，不能把桌面浏览器测试视为这些设备已经通过。Windows 安装包尚未取得 Authenticode 证书。
-
-源码与许可证：GPL-3.0-only，[对应仓库](https://github.com/BorderArea01/VideoSreeeen)。
+实时共享画面默认走现有 WebSocket 转发，保持零付费授权，没有启用 TURN 或服务器托管登录会话。Windows 安装包没有 Authenticode 证书。源码许可证 GPL-3.0-only。

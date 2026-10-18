@@ -113,3 +113,47 @@ test('B站视频源使用原站提供的 HTTPS 常规端口备源和兼容音轨
   assert.equal(source.video, 'https://cdn.example/video.m4s');
   assert.equal(source.audio, 'https://cdn.example/audio.m4s');
 });
+
+test('新版 B 站在清除旧全局数据后读取正在播放的轨道，不拆坏签名中的逗号', () => {
+  const urls = [
+    'https://cdn.example/video.m4s?issued=a,b,c',
+    'https://cdn.example/audio.m4s?issued=d,e,f',
+  ];
+  const win: any = { player: { getMediaInfo: () => ({ playUrl: urls.join(',') }) } };
+  const video = {
+    currentSrc: 'blob:actual-player',
+    duration: 164,
+    currentTime: 0,
+    paused: true,
+    playbackRate: 1,
+    clientWidth: 640,
+    clientHeight: 360,
+    addEventListener() {},
+  };
+  runInNewContext(readFileSync(new URL('../shared/page-bridge.js', import.meta.url), 'utf8'), {
+    window: win,
+    document: {
+      querySelectorAll: (q: string) => (q === 'video' ? [video] : []),
+      addEventListener() {},
+      title: 'fixture',
+    },
+    location: { href: 'https://www.bilibili.com/video/BV13Aa66LEAW/' },
+    performance: { now: () => 5000 },
+    WeakSet,
+    Number,
+    Math,
+    URL,
+    atob,
+  });
+  let source = win.__VS.sample().source;
+  assert.equal(source.kind, 'dash');
+  assert.equal(source.video, urls[0]);
+  assert.equal(source.audio, urls[1]);
+  win.player.getMediaInfo = () => ({ playUrl: 'https://user:secret@cdn.example/a.m4s,' + urls[1] });
+  assert.equal(win.__VS.sample().source, null);
+  win.player.getMediaInfo = () => {
+    throw new Error('not initialized');
+  };
+  assert.equal(win.__VS.sample().available, true);
+  assert.equal(win.__VS.sample().source, null);
+});

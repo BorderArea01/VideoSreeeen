@@ -88,6 +88,23 @@
     }
     if (data?.durl?.length === 1)
       return { kind: 'file', video: trackUrl(data.durl[0]), referer: location.href };
+    // Current Bilibili players clear __playinfo__ after loading. Their public
+    // read-only API exposes the tracks that are actually playing instead.
+    // Signed URL queries can contain commas: only split before another URL.
+    try {
+      if (/^https:\/\/(?:www\.)?bilibili\.com\//i.test(location.href)) {
+        const raw = window.player?.getMediaInfo?.().playUrl;
+        const tracks = typeof raw === 'string' ? raw.split(/,(?=https?:\/\/)/) : [];
+        if (
+          tracks.length === 2 &&
+          tracks.every((value) => {
+            const url = new URL(value);
+            return url.protocol === 'https:' && !url.username && !url.password;
+          })
+        )
+          return { kind: 'dash', video: tracks[0], audio: tracks[1], referer: location.href };
+      }
+    } catch {}
     try {
       const player = window.player_aaaa;
       let raw = player?.url;

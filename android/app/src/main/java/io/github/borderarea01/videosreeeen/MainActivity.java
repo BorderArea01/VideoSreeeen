@@ -1,6 +1,7 @@
 package io.github.borderarea01.videosreeeen;
 
 import android.app.Activity;
+import android.app.Dialog;
 import android.graphics.Color;
 import android.net.Uri;
 import android.os.Bundle;
@@ -19,6 +20,7 @@ import org.json.JSONObject;
 public class MainActivity extends Activity {
 
     private WebView ui, site;
+    private Dialog accountDialog;
     private FrameLayout root;
     private String bridge;
     private MediaCache cache;
@@ -222,6 +224,62 @@ public class MainActivity extends Activity {
         }
     }
 
+    private boolean isBilibiliLoginUrl(String value) {
+        Uri url = Uri.parse(value);
+        String host = url.getHost();
+        return (
+            "https".equals(url.getScheme()) &&
+            url.getPort() == -1 &&
+            url.getUserInfo() == null &&
+            host != null &&
+            (host.equals("bilibili.com") || host.endsWith(".bilibili.com"))
+        );
+    }
+
+    private void openSiteAccount() {
+        if (accountDialog != null) return;
+        Dialog dialog = new Dialog(this);
+        accountDialog = dialog;
+        dialog.setTitle("B 站登录");
+        android.widget.LinearLayout layout = new android.widget.LinearLayout(this);
+        layout.setOrientation(android.widget.LinearLayout.VERTICAL);
+        android.widget.Button done = new android.widget.Button(this);
+        done.setText("完成登录 / 返回观影");
+        done.setOnClickListener(view -> dialog.dismiss());
+        layout.addView(done);
+        WebView account = new WebView(this);
+        configure(account, true);
+        account.getSettings().setUseWideViewPort(true);
+        account.getSettings().setLoadWithOverviewMode(true);
+        account.getSettings().setBuiltInZoomControls(true);
+        account.getSettings().setDisplayZoomControls(false);
+        // This WebView has no app bridge; CookieManager owns the local login session.
+        account.setWebViewClient(
+            new WebViewClient() {
+                @Override
+                public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
+                    return (
+                        request.isForMainFrame() && !isBilibiliLoginUrl(request.getUrl().toString())
+                    );
+                }
+            }
+        );
+        layout.addView(account, new android.widget.LinearLayout.LayoutParams(-1, 0, 1));
+        dialog.setContentView(layout);
+        dialog.setOnDismissListener(ignored -> {
+            accountDialog = null;
+            account.stopLoading();
+            account.destroy();
+            if (!ioCalls.isShutdown()) ioCalls.execute(() -> CookieManager.getInstance().flush());
+            if (site != null && isBilibiliLoginUrl(site.getUrl() == null ? "" : site.getUrl())) {
+                site.reload();
+            }
+        });
+        dialog.show();
+        dialog.getWindow().setLayout(-1, -1);
+        account.loadUrl("https://passport.bilibili.com/login");
+    }
+
     private void openSite(String url) throws Exception {
         validateUrl(url);
         closeSite();
@@ -359,6 +417,10 @@ public class MainActivity extends Activity {
                     runOnUiThread(() -> {
                         try {
                             switch (method) {
+                                case "siteAccount":
+                                    openSiteAccount();
+                                    resolve(id, new JSONObject(), null);
+                                    break;
                                 case "openBrowser": {
                                     Uri target = Uri.parse(payload.getString("url"));
                                     if (
@@ -513,6 +575,7 @@ public class MainActivity extends Activity {
 
     @Override
     protected void onDestroy() {
+        if (accountDialog != null) accountDialog.dismiss();
         if (updates != null) updates.close();
         if (blocks != null) blocks.cancel("*");
         if (cache != null) cache.close();

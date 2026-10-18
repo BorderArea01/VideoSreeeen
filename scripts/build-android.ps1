@@ -16,7 +16,7 @@ if($Release -and -not $env:VS_ANDROID_KEYSTORE){
 $capital=if($Release){'Release'}else{'Debug'}
 $gradleArguments=@('-p','android',":app:assemble$capital",":app:lint$capital",'--no-daemon','--max-workers=1','--console=plain')
 if($RerunChecks){$gradleArguments+='--rerun-tasks'}
-try{& (Join-Path $PSScriptRoot 'controlled.ps1') -File $Gradle -Arguments $gradleArguments -PrioritizeBuildWhenNoGame}finally{if($Release){Remove-Item Env:VS_ANDROID_STORE_PASSWORD -ErrorAction SilentlyContinue}}
+try{& (Join-Path $PSScriptRoot 'controlled.ps1') -File $Gradle -Arguments $gradleArguments -PrioritizeBuildWhenNoGame -AllowGameThisRun -MinFreeMiB 0}finally{if($Release){Remove-Item Env:VS_ANDROID_STORE_PASSWORD -ErrorAction SilentlyContinue}}
 $output=Join-Path $workspace 'artifacts/android'
 New-Item -ItemType Directory -Path $output -Force|Out-Null
 $package=Get-Content -LiteralPath (Join-Path $workspace 'package.json') -Raw | ConvertFrom-Json

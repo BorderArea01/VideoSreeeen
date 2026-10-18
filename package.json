@@ -1,6 +1,6 @@
 {
   "name": "videosreeeen",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "private": true,
   "description": "多人观影：Windows、Android 和浏览器，共同缓存与 WebSocket 同步",
   "license": "GPL-3.0-only",
@@ -40,6 +40,8 @@
     "release:publish": "node scripts/publish-release.mjs",
     "test:site-broadcast": "tsx scripts/site-broadcast-check.ts",
     "test:playback-modes": "tsx scripts/playback-modes-check.ts",
+    "test:site-account": "tsx scripts/site-account-check.ts",
+    "test:native-origin": "tsx scripts/native-origin-check.ts",
     "test:native-sync": "tsx scripts/native-sync-check.ts",
     "test:mgn-playback": "tsx scripts/mgn-playback-check.ts",
     "test:site-source": "tsx scripts/site-source-check.ts"
