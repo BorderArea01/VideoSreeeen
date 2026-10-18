@@ -41,7 +41,7 @@ Windows 安装版支持应用内下载和重启更新，便携版仍提供。And
 
 邀请包含入房凭证，请发给预期成员。六位房间号不能独立加入，跨服务器请使用完整邀请链接。Windows、Android、公开网页的验证边界见 [verification.md](docs/verification.md)。
 
-![VideoSreeeen 桌面界面](docs/screenshots/desktop.png)
+![VideoSreeeen 播放方式选择](docs/screenshots/playback-modes.png)
 
 ## 本地启动
 
