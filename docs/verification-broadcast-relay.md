@@ -40,9 +40,20 @@
 
 本地证据为 `.local/broadcast-relay-local-evidence.json`、`.local/worker-evidence.json` 和 `.local/browser-share-evidence.json`。前期内存中断和 192 MiB 堆不足不再是本轮未完成的检查，未将其删除或误记为成功。
 
-## 部署剩余步骤
+## 正式入口部署
 
-更新现有 Worker、Pages 并核对线上提交、活动资源哈希。以禁止直连的公网浏览器验证独立转发真实画面/音频；这仍不等于用户远程网络已恢复，最后需双方刷新线上版本验证。
+已部署到 `https://videosreeeen.pages.dev`。2026-10-18 15:43:53 UTC（北京时间 23:43:53），经 Cloudflare API、正式入口 HTTP 及实际活动资源字节核对：
+
+- 部署提交：`2fbed29b2f041cdcf1e09158f1098e1ade5bb497`。
+- Worker 版本：`adcca22e-56ed-4027-b071-77938059ae95`。
+- Pages 部署：`bc5f3cb9-52ce-45e7-b143-f497eaa077f3`。
+- 线上 HTML、JS、CSS 与本地产物逐字节一致，健康检查正常。
+- JS `index-Cg7hWKLc.js` SHA-256：`06a4c5c03ee4e81d69412c99c0214114c6737ac06544f8604ebf67ccee56294c`。
+- CSS `index-CvOf_f_s.css` SHA-256：`bd2342ee20569c1be50e02f6adc6d931326cba45a76b8d94d4a5ce9fb35bb1e6`。
+
+未启用收费 TURN 或修改账户订阅，使用原有 Worker、Pages、同一个 Durable Object 绑定。线上核对证据保存在 `.local/public-web-source-evidence.json`。用户远程双方仍需刷新到新版并重新开始共享；旧版发布端不具备此通道。
+
+正式入口阻断直连的完整浏览器验收通过：WebRTC 状态为 new、RTP 接收字节为 0，同时备用通道实际接收 271788 字节，640×360 视频解码 13 帧后继续增长，音频实际解码 12223 字节。诊断、重新加入、停止后清理全部通过，无页面错误。证据为 `.local/broadcast-relay-public-evidence.json`；这证明媒体经过线上备用通道，不把它冒充用户两端已经完成现场验收。
 
 ## 官方依据
 
