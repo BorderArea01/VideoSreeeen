@@ -92,6 +92,17 @@ test('页面识别仅供在线成员，鉴权在请求前后生效；响应与�
   const failure = await failing.handle(request());
   assert.equal(failure.status, 422);
   assert.doesNotMatch(await failure.text(), /127\.0\.0\.1|ECONNREFUSED/);
+  const unavailable = new RoomSources(rooms, async (url) =>
+    url.endsWith('playerconfig.js')
+      ? new Response('private upstream details', { status: 520 })
+      : fixture.fetch(url),
+  );
+  const upstreamFailure = await unavailable.handle(request());
+  assert.equal(upstreamFailure.status, 422);
+  const upstreamMessage = await upstreamFailure.text();
+  assert.match(upstreamMessage, /播放器配置.*520/);
+  assert.doesNotMatch(upstreamMessage, /private upstream|https:/);
+  assert.equal(room.media, null);
   const abort = new AbortController();
   const interrupted = new RoomSources(rooms, fixture.fetch.bind(fixture));
   const hanging = new Request(`https://test/resolve-source/${room.code}`, {

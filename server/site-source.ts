@@ -159,7 +159,15 @@ export async function resolveMgnPage(
     const response = await fetchText(url, signal);
     if (!response.ok) {
       await response.body?.cancel();
-      throw new SiteSourceError('原站暂时无法读取，请稍后重试或使用共享画面');
+      const stage =
+        url === page.href
+          ? '播放页'
+          : new URL(url).pathname.endsWith('playerconfig.js')
+            ? '播放器配置'
+            : '解析器';
+      throw new SiteSourceError(
+        `房间服务读取原站${stage}失败（HTTP ${response.status}），请稍后重试`,
+      );
     }
     return smallText(response.body, 512 * 1024, signal);
   };
@@ -204,7 +212,15 @@ export class RoomSources {
   private attempts = new Map<string, number>();
   constructor(
     private rooms: Rooms,
-    private fetchText: TextFetch = (url, signal) => fetch(url, { signal, redirect: 'manual' }),
+    private fetchText: TextFetch = (url, signal) =>
+      fetch(url, {
+        signal,
+        redirect: 'manual',
+        headers: {
+          'User-Agent': 'VideoSreeeen/0.4 (+https://github.com/BorderArea01/VideoSreeeen)',
+          Accept: 'text/html,application/javascript;q=0.9,*/*;q=0.1',
+        },
+      }),
   ) {}
   async handle(request: Request) {
     const path = new URL(request.url).pathname;
