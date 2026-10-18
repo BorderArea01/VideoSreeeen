@@ -53,4 +53,11 @@
 - 本地生成 720p 动态画面和音轨经过实际视频 WebSocket 解码，已验证控件隐藏、本机静音往返、自动播放拒绝后的声音按钮授权、真实全屏和零条房间时间线操作。桌面全页及 390 像素宽控件截图已目视检查。
 - 最终本地首屏 5768 ms；提供者实际关闭房间 WebSocket 后重新加入，观众新流恢复解码，不需要隐藏的播放按钮。新成员、清晰度切换、重新加入、停止清理通过，无页面错误。证据为 `.local/live-controls-local-evidence.json`。真实 workerd 的视频、休眠恢复、图片和聊天回归通过。
 
+正式入口于 2026-10-19 00:26:39（北京时间）核对部署：
+
+- 运行时提交 `9445725b368a733ba1e4f35c909591c96a7af13b`，Worker `e74b1ec8-0385-49f7-bafe-fba8a7059d10`，Pages `13a1eba1-1962-41cc-899b-f45128f1b3f5`。
+- HTML、活动 JS 和 CSS 与本地产物逐字节一致。JS `index-HmEs6GL_.js` SHA-256 `6ef14121807e8654d711ab197aee0033aabcab3c3495e9081ac74388dcd9828f`；CSS `index-0MFU06RT.css` SHA-256 `f963417f266ae817561e63efc051eb83d35a6708b81e65c1982954b9a0254608`。
+- 正式入口实际视频 WebSocket 验收通过：1280×720 视频与音轨解码，首屏 7733 ms。声音按钮解除自动播放限制、静音往返、全屏、提供端重连、新观众、画质切换、重新加入和停止清理均通过；未发送房间时间线控制，页面错误为零。
+- 已目视正式入口桌面截图及 390 像素宽控件截图：观众只显示声音与全屏。证据为 `.local/live-controls-public-evidence.json` 和 `.local/public-web-source-evidence.json`。公网验证仍是同机隔离浏览器经真实 Cloudflare 转发，不冒充用户远程网络或苹果真机验收。双方刷新页面即可获取新版。
+
 依据：[HTMLMediaElement.duration（未知时长与实时媒体）](https://developer.mozilla.org/en-US/docs/Web/API/HTMLMediaElement/duration)、[HTMLMediaElement.muted（本机静音）](https://developer.mozilla.org/en-US/docs/Web/API/HTMLMediaElement/muted)。
