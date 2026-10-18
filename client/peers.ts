@@ -91,7 +91,7 @@ export class RoomPeers {
             .createOffer()
             .then(async (offer) => {
               await peer.pc.setLocalDescription(offer);
-              this.signal(id, { kind: 'description', type: 'offer', sdp: offer.sdp! });
+              this.signal(id, peer, { kind: 'description', type: 'offer', sdp: offer.sdp! });
             })
             .catch(() => this.dispose(peer));
         }
@@ -111,7 +111,7 @@ export class RoomPeers {
     this.peers.set(id, peer);
     pc.onicecandidate = (e) => {
       if (e.candidate)
-        this.signal(id, {
+        this.signal(id, peer, {
           kind: 'candidate',
           candidate: e.candidate.candidate,
           sdpMid: e.candidate.sdpMid,
@@ -127,8 +127,8 @@ export class RoomPeers {
     };
     return peer;
   }
-  private signal(to: string, data: Extract<ClientMessage, { type: 'signal' }>['data']) {
-    if (this.room?.media && this.scope)
+  private signal(to: string, peer: Peer, data: Extract<ClientMessage, { type: 'signal' }>['data']) {
+    if (this.room?.media && this.scope && this.peers.get(to) === peer)
       this.send({ type: 'signal', to, mediaId: this.room.media.id, epoch: this.room.epoch, data });
   }
   receive(message: Extract<ServerMessage, { type: 'signal' }>) {
@@ -145,6 +145,7 @@ export class RoomPeers {
     const peer = this.peers.get(message.from) ?? this.create(message.from);
     peer.signals = peer.signals
       .then(async () => {
+        if (this.peers.get(message.from) !== peer) return;
         const d = message.data;
         if (d.kind === 'candidate') {
           const c = { candidate: d.candidate, sdpMid: d.sdpMid, sdpMLineIndex: d.sdpMLineIndex };
@@ -157,7 +158,11 @@ export class RoomPeers {
           if (d.type === 'offer') {
             const answer = await peer.pc.createAnswer();
             await peer.pc.setLocalDescription(answer);
-            this.signal(message.from, { kind: 'description', type: 'answer', sdp: answer.sdp! });
+            this.signal(message.from, peer, {
+              kind: 'description',
+              type: 'answer',
+              sdp: answer.sdp!,
+            });
           }
         }
       })

@@ -118,7 +118,15 @@ test('P2P 信令仅发送给同房间目标，换片后拒绝旧信令', () => {
   assert.equal(b.messages[0].from, first.id);
   assert.equal(JSON.stringify(rooms.dump(room)).includes('sdp'), false);
   rooms.act(room, first, { type: 'mode', op: 'stream', base: room.revision, mode: 'stream' });
-  assert.throws(() => rooms.act(room, first, signal), /缓存连接已失效/);
+  a.messages = [];
+  b.messages = [];
+  rooms.act(room, first, signal);
+  assert.equal(a.messages.length, 0);
+  assert.equal(b.messages.length, 0);
+  assert.throws(
+    () => rooms.act(room, first, { ...signal, epoch: room.epoch + 1 }),
+    /缓存连接已失效/,
+  );
   assert.equal(
     clientMessageSchema.safeParse({ ...signal, data: { ...signal.data, sdp: 'a'.repeat(32001) } })
       .success,

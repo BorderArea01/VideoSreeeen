@@ -33,6 +33,8 @@ try {
     guest = await b.newPage();
   const ids: Record<string, string> = {},
     errors: string[] = [];
+  const states: Record<string, any> = {};
+  const serverErrors: Array<{ code: string; message: string }> = [];
   for (const [name, page, delay] of [
     ['host', host, 20],
     ['guest', guest, 160],
@@ -43,6 +45,8 @@ try {
       server.onMessage((raw) => {
         const msg = JSON.parse(String(raw));
         if (msg.type === 'welcome') ids[name] = msg.memberId;
+        if (msg.room) states[name] = msg.room;
+        if (msg.type === 'error') serverErrors.push({ code: msg.code, message: msg.message });
         socket.send(raw);
       });
       socket.onMessage((raw) => {
@@ -61,6 +65,16 @@ try {
   const send = async (page: Page, text: string) => {
     await page.locator('#chat-input').fill(text);
     await page.locator('#send-button').click();
+  };
+  const confirmed = async (check: () => boolean) => {
+    const until = Date.now() + 15000;
+    while (!check()) {
+      assert.ok(
+        Date.now() < until,
+        'Server acknowledgement timeout: ' + JSON.stringify(serverErrors),
+      );
+      await host.waitForTimeout(100);
+    }
   };
   await host.goto(origin);
   await host.locator('#hero-create').click();
@@ -86,6 +100,9 @@ try {
       { timeout: 30000 },
     );
   await guest.locator('#play-button').click();
+  await confirmed(
+    () => states.host?.playback.paused === false && states.guest?.playback.paused === false,
+  );
   for (const page of [host, guest])
     await page.waitForFunction(
       () =>
@@ -93,13 +110,18 @@ try {
           .totalVideoFrames > 3,
     );
   await guest.locator('#play-button').click();
+  await confirmed(
+    () => states.host?.playback.paused === true && states.guest?.playback.paused === true,
+  );
   assert.equal(await guest.locator('.danmaku-item').count(), 0);
   await host.locator('#cache-options > summary').click();
   assert.equal(await host.locator('#link-choice #cache-options').count(), 1);
   assert.equal(await host.locator('#mode-toggle').isEnabled(), true);
   await host.locator('#mode-toggle').click();
+  await confirmed(() => states.host?.mode === 'cache' && states.guest?.mode === 'cache');
   await guest.locator('#cache-overlay').waitFor();
   await host.locator('#mode-toggle').click();
+  await confirmed(() => states.host?.mode === 'stream' && states.guest?.mode === 'stream');
   await guest.locator('#cache-overlay').waitFor({ state: 'hidden' });
   await guest.waitForFunction(
     () => document.querySelector<HTMLVideoElement>('#video')!.readyState >= 2,
@@ -210,6 +232,8 @@ try {
   proof.expiredSamplesHidden = true;
   assert.deepEqual(errors, []);
   proof.errors = errors;
+  proof.serverErrors = serverErrors;
+  assert.deepEqual(serverErrors, []);
   await host.locator('#leave-button').click();
   await guest.locator('#leave-button').click();
   console.log(JSON.stringify(proof));

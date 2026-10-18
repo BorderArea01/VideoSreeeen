@@ -328,6 +328,9 @@ export class Rooms {
       throw new RoomError('not_in_room', '请重新加入房间');
     room.touched = this.now();
     if (message.type === 'signal') {
+      // A cancelled generation may still have packets in flight. Drop them
+      // without sending playback state or acknowledging unrelated controls.
+      if (message.epoch < room.epoch) return;
       if (
         ((message.purpose ?? 'cache') === 'cache'
           ? room.mode !== 'cache'
