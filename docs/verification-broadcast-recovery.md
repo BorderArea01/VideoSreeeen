@@ -39,6 +39,22 @@
 
 诊断入口的源码提交为 `8bc96f2af9df7398592e8b6d6feb557253b1ae63`，本地构建 JS 为 `index-Bz-IGdsh.js`。随后尝试部署 Worker 时可用内存只有 1466 MiB，受控入口停止，本次未部署。经 Cloudflare API 再次只读核对，线上仍为前述 `084da42` 的 Pages 与 Worker 版本；不能引导用户到尚未上线的诊断入口，也未在后台自动重试。
 
+## 诊断版本部署
+
+用户再次要求部署后，重新检查确认真实游戏进程已退出，可用内存约 6438 MiB。通过受控入口串行部署既有构建，保留内存门槛与游戏进程监测。
+
+- 部署提交 `bd9e17481bfc8ae26ae912c0cb99b8f0e58ef6c6`（运行时代码为上述 `8bc96f2`，其后仅文档变更）。
+- Pages：`61f3b918-9ebc-43ed-9677-a279386f1b5c`；Worker：`b9fd5216-88a5-48e5-9b24-8e6cc2ffbef0`。
+- 2026-10-18 15:20 UTC，实际访问正式入口 `https://videosreeeen.pages.dev`，健康检查通过；HTML、活动 JS 与 CSS 均与本地产物逐字节一致。
+- JS `index-Bz-IGdsh.js`，SHA-256：`4fcae2e0d96797f28154d156b27445afd315804caacb4498449ef00369d0b6eb`。
+- CSS `index-CvOf_f_s.css`，SHA-256：`bd2342ee20569c1be50e02f6adc6d931326cba45a76b8d94d4a5ce9fb35bb1e6`。
+- 本轮正式入口 `test:browser-share` 完整通过：房主在房间确认前本机预览 87 帧、2268 个非黑采样点；观众接收 1590×1062 画面、实际解码 11 帧并接收音轨。双方无重复绑定、解绑或带流重新 load；停止清理、取消重试、移动布局及无采集 API 的替代入口通过，无页面错误。
+- 真实观众连接上打开诊断入口并复制成功，导出连接状态为 connected、实际解码帧数大于零，展示文本与隔离剪贴板内容一致。已目视观众截图中正常视频画面；失败状态 UI 注入检查仍仅证明提示状态，不证明真实跨网恢复。
+
+部署与回归证据分别保存在 `.local/public-web-source-evidence.json` 和 `.local/browser-share-evidence.json`。这次浏览器回归仍使用本机两个页面连接公网服务，不能替代用户远程两端的网络验证。
+
+诊断入口现已上线；跨网黑屏根因仍待用户双方实际连接报告，不将部署成功表述为远程视频已恢复。未启用 TURN 或新增计费服务。
+
 ## 资料
 
 - [MDN ICE restart](https://developer.mozilla.org/en-US/docs/Web/API/RTCPeerConnection/restartIce) 与 [WebRTC 官方重连样例](https://webrtc.github.io/samples/src/content/peerconnection/restart-ice/)。
