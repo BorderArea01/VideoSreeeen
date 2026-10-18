@@ -67,7 +67,10 @@ try {
   await host.locator('#provide-local-video').click();
   await (await choosing).setFiles(resolve('.local/flower.mp4'));
   await guest.waitForFunction(
-    () => !!document.querySelector<HTMLVideoElement>('#video')?.srcObject,
+    () => {
+      const video = document.querySelector<HTMLVideoElement>('#video');
+      return !!(video?.srcObject || video?.getAttribute('src'));
+    },
     {},
     { timeout: 25000 },
   );
@@ -100,26 +103,35 @@ try {
   await host.locator('#position').filter({ hasText: '00:02' }).waitFor();
   const sample = await guest.locator('#video').evaluate((e) => {
     const v = e as HTMLVideoElement;
-    const stream = v.srcObject as MediaStream;
+    const stream = v.srcObject as MediaStream | null;
     return {
       width: v.videoWidth,
       height: v.videoHeight,
       frames: v.getVideoPlaybackQuality().totalVideoFrames,
-      tracks: stream.getTracks().map((t) => t.kind),
+      transport: stream ? 'webrtc' : 'websocket',
+      tracks: stream?.getTracks().map((t) => t.kind),
+      audioBytes: (v as any).webkitAudioDecodedByteCount,
     };
   });
   assert.ok(sample.frames > 10);
+  if (sample.transport === 'websocket') assert.ok(sample.audioBytes > 0);
   // A newly joined receiver must connect to the existing publisher.
   await guest.reload();
   await guest.locator('#name-input').fill('重新加入');
   await guest.locator('#join-button').click();
   await guest.waitForFunction(
-    () => !!document.querySelector<HTMLVideoElement>('#video')?.srcObject,
+    () => {
+      const video = document.querySelector<HTMLVideoElement>('#video');
+      return !!(video?.srcObject || video?.getAttribute('src'));
+    },
     {},
     { timeout: 25000 },
   );
   await host.locator('#stop-broadcast').click();
-  await guest.waitForFunction(() => !document.querySelector<HTMLVideoElement>('#video')?.srcObject);
+  await guest.waitForFunction(() => {
+    const video = document.querySelector<HTMLVideoElement>('#video');
+    return !video?.srcObject && !video?.getAttribute('src');
+  });
   assert.equal([...app.rooms.rooms.values()][0]!.media, null);
   await mkdir('.local/screenshots', { recursive: true });
   await host.screenshot({

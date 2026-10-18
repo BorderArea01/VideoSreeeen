@@ -43,6 +43,10 @@ $('app').innerHTML = `
 <dialog id="settings-dialog" aria-labelledby="settings-title"><form id="settings-form"><div class="dialog-heading"><div><div class="eyebrow">SETTINGS</div><h2 id="settings-title">设置与帮助</h2></div><button type="button" data-close="settings-dialog" class="icon-button" aria-label="关闭">${icon('close')}</button></div><details class="advanced"><summary>版本与更新</summary><p class="dialog-note">Windows / Android 0.4.0</p><div class="dialog-buttons"><button id="update-action" type="button" class="button soft">检查更新</button><a class="button soft" href="https://github.com/BorderArea01/VideoSreeeen/releases/latest/download/VideoSreeeen-Setup.exe" target="_blank" rel="noopener noreferrer">Windows 安装版</a><a class="button soft" href="https://github.com/BorderArea01/VideoSreeeen/releases/latest/download/VideoSreeeen-Android.apk" target="_blank" rel="noopener noreferrer">Android APK</a></div><p id="update-status" class="dialog-note" role="status"></p></details><details id="connection-details" class="advanced"><summary>高级 · 房间服务器</summary><p class="dialog-note">仅自建或局域网用户需要修改。保存后用于下一次建房或邀请码加入，不会切换当前房间。</p><label>服务器地址<input id="server-input" type="url" placeholder="https://你的服务器" required></label><div class="dialog-buttons"><button type="submit" class="button accent">保存设置</button><button id="reset-server" type="button" class="button outline">恢复默认</button></div><p id="settings-error" class="form-error" role="alert"></p><p id="settings-status" class="dialog-note" role="status"></p></details><details id="watch-help" class="advanced"><summary>第一次使用 · 怎么一起看？</summary><ol class="help-steps"><li>创建房间，把邀请链接发给朋友；朋友打开后填写昵称即可加入。</li><li>视频直链可直接同步播放；原站链接会显示可用的播放方式。</li><li>电脑浏览器在“提供视频给房间”窗口完成两步：打开原站播放，再选择该标签页并勾选音频。完成后房间才会显示画面；原站负责播放进度。Windows 客户端也可共享原站画面，或识别视频源以使用同步播放、暂停和拖动。</li><li>默认边播边看。仅在大家都卡时，可手动开启共同缓存，完整下载后播放。</li></ol></details><details class="advanced"><summary>浏览器与客户端有什么区别？</summary><p class="dialog-note">浏览器可建房、聊天、看直链、共享本地文件和接收画面；支持屏幕共享的电脑浏览器还可提供视频标签页。网页不能自动读取第三方网站的播放器。浏览器完整缓存目前限总计 128 MiB；长视频缓存请用客户端。Windows / Android 可在应用内打开原站，苹果设备使用浏览器。</p></details><div class="help-links"><button id="project-link" type="button" class="text-button">开源项目与构建说明 ↗</button><button id="feedback-link" type="button" class="text-button">反馈问题 ↗</button></div><p class="dialog-note">GPL-3.0 · 无需注册。昵称会保存在本机；房间服务会处理昵称、聊天和同步信息。公共服务可能受免费额度或网络影响，也可以自行部署。</p><button data-close="settings-dialog" type="button" class="button soft dialog-wide">返回观影</button></form></dialog><div id="toast" class="toast" role="status" hidden></div>`;
 
 $('platform').textContent = platform;
+$('stop-broadcast').insertAdjacentHTML(
+  'beforebegin',
+  '<select id="broadcast-quality" aria-label="共享画质" title="提供者设置，影响全房间；网络不稳可选流畅" hidden><option value="smooth">流畅</option><option value="hd" selected>高清</option><option value="high">高画质</option></select>',
+);
 $('app').insertAdjacentHTML(
   'beforeend',
   '<dialog id="image-dialog" class="image-viewer"><button class="icon-button" data-close="image-dialog" aria-label="关闭图片">×</button><img id="image-full" alt="聊天原图"></dialog>',
@@ -487,7 +491,7 @@ function adopt(snapshot: Snapshot) {
   // Accept offers immediately. Native file cleanup may finish after signaling
   // has already arrived; starting a new download still awaits `clearing`.
   peers.configure(room, memberId);
-  broadcast.configure(room, memberId);
+  configureBroadcast();
   if (
     !changed &&
     snapshot.media?.broadcast?.host === memberId &&
@@ -633,7 +637,7 @@ function renderLiveStatus() {
         ? `正在提供视频 · 已连接 ${connected} 位观众`
         : `正在提供视频 · 已连接 ${connected} / ${expected} 位观众`;
     const relayStatus = broadcastFallback.status();
-    if (relayStatus) text += ` · ${relayStatus}`;
+    if (broadcastRelayEnabled) text = relayStatus;
     else if (failed) text += ' · 连接失败，正在重试';
     if (!room?.media || !broadcast.owns(room.media.url)) text = '共享已中断，请重新选择视频';
     if (publisherStream && !publisherStream.getAudioTracks().length) text += ' · 未共享音频';
@@ -642,7 +646,7 @@ function renderLiveStatus() {
     const name = room?.members.find((member) => member.id === sharing.host)?.name ?? '成员';
     const reception = broadcast.reception();
     badge.title = broadcastRelayEnabled
-      ? '优先直连；无法建立直连时使用受限的备用视频通道，会增加延迟。'
+      ? '通过服务器转发视频，使用短暂缓冲抵御网络波动。'
       : !reception.hasTurn
         ? '当前没有配置视频中继；如果双方网络无法直连，需要部署中继或改用各自播放。'
         : '';
@@ -717,6 +721,8 @@ function render() {
   $<HTMLButtonElement>('provide-local-video').disabled =
     !connected || broadcastBusy || !!pendingBroadcastUrl;
   $('stop-broadcast').hidden = room?.media?.broadcast?.host !== memberId;
+  $('broadcast-quality').hidden =
+    !broadcastRelayEnabled || room?.media?.broadcast?.host !== memberId;
   $('broadcast-status').textContent = playbackPermissionNeeded
     ? '点击播放以启用声音'
     : room?.media?.broadcast
@@ -1035,7 +1041,7 @@ async function loadStream(media: NonNullable<Snapshot['media']>) {
       video.muted = media.broadcast.host === memberId;
     }
     if (!current()) return;
-    broadcast.configure(room, memberId);
+    configureBroadcast();
     if (
       media.broadcast.host === memberId &&
       media.broadcast.kind !== 'site' &&
@@ -1083,7 +1089,8 @@ function applyPlayback(explicit = false) {
       // A remote MediaStream has a live timeline. Seeking or rate-correcting it
       // would freeze playback. Versioned controls instead drive the publisher.
       if (playback.paused) video.pause();
-      else if ((video.srcObject || broadcastFallback.active()) && video.paused) playElement(video);
+      else if (broadcastFallback.active()) broadcastFallback.resume();
+      else if (video.srcObject && video.paused) playElement(video);
       return;
     }
     if (publisher) {
@@ -1233,7 +1240,6 @@ const broadcastFallback = new BroadcastRelayClient(
       video.src = url;
       video.hidden = false;
       video.muted = false;
-      playElement(video);
     } else if (previous && video.getAttribute('src') === previous) {
       video.removeAttribute('src');
       video.load();
@@ -1248,6 +1254,15 @@ const broadcastFallback = new BroadcastRelayClient(
   () => renderLiveStatus(),
 );
 const cache = new DeviceCache(cacheProgress, peers);
+const qualitySelect = $<HTMLSelectElement>('broadcast-quality');
+qualitySelect.value = ['smooth', 'hd', 'high'].includes(saved('broadcast-quality'))
+  ? saved('broadcast-quality')
+  : 'hd';
+broadcastFallback.setQuality(qualitySelect.value);
+qualitySelect.onchange = () => {
+  save('broadcast-quality', qualitySelect.value);
+  broadcastFallback.setQuality(qualitySelect.value);
+};
 function releasePublisher() {
   broadcastFallback.close();
   pendingBroadcastUrl = '';
@@ -1500,9 +1515,9 @@ $('stop-broadcast').onclick = () => {
   releasePublisher();
   operation({ type: 'unshare' });
 };
-setInterval(() => {
+function configureBroadcast() {
   if (connected) {
-    broadcast.configure(room, memberId);
+    broadcast.configure(room, memberId, !broadcastRelayEnabled);
     broadcastFallback.configure(
       room,
       memberId,
@@ -1513,7 +1528,8 @@ setInterval(() => {
       broadcast.reception().state === 'connected',
     );
   }
-}, 3000);
+}
+setInterval(configureBroadcast, 3000);
 let lastProgressSend = 0;
 let cacheNote = '';
 function cacheProgress(event: NativeCache) {

@@ -1,6 +1,9 @@
 // A separate, bounded live-media channel. Room/chat sockets never carry video.
 export const RELAY_PACKET = 64 * 1024;
 export const RELAY_WINDOW = 2 * 1024 * 1024;
+export const RELAY_VIDEO_BITRATE = 4_500_000;
+export const RELAY_AUDIO_BITRATE = 128_000;
+export const RELAY_CHUNK_MS = 200;
 export const RELAY_VIEWERS = 4;
 export const RELAY_MIMES = [
   'video/webm;codecs=vp8,opus',

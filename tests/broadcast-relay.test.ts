@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { BroadcastRelay, type RelaySocket } from '../server/broadcast-relay';
 import { Rooms, type RoomSocket } from '../server/rooms';
 import { RELAY_MIMES, RELAY_PACKET, RELAY_WINDOW, relayPacket } from '../shared/broadcast-relay';
+import { init, cluster } from './webm.fixture';
 
 class Socket implements RelaySocket {
   readyState = 1;
@@ -147,4 +148,38 @@ test('休眠恢复仅恢复授权，要求重新编码而不重放旧媒体', ()
   const before = f.receive.socket.messages.length;
   fresh.message(f.publish.socket, relayPacket(session, 0, new Uint8Array([1])));
   assert.equal(f.receive.socket.messages.length, before);
+});
+
+test('新观众从关键帧接入，进出不重启已有观众的编码流；回放确认使用独立序号', () => {
+  const f = fixture();
+  f.start();
+  const bytes = Buffer.concat([init, cluster()]);
+  f.hub.message(f.publish.socket, relayPacket(session, 0, bytes));
+  const need = () => f.publish.socket.messages.filter((message) => message.type === 'need').length;
+  const before = need();
+  const { seat } = f.rooms.join(
+    `${f.room.code}:${f.room.token}`,
+    'late',
+    new Socket() as RoomSocket,
+  );
+  const late = f.connect(seat);
+  assert.equal(need(), before);
+  assert.equal(late.socket.messages.filter((message) => message.type === 'start').length, 1);
+  f.hub.message(late.socket, JSON.stringify({ type: 'ack', session, sequence: 1 }));
+  assert.equal(late.socket.readyState, 1);
+  f.hub.close(late.socket);
+  assert.equal(need(), before, 'Leaving must not reset the encoder for remaining viewers');
+});
+
+test('最后一位观众离开后清理历史，下次接入重新启动编码而不接收过期片段', () => {
+  const f = fixture();
+  f.start();
+  f.hub.message(f.publish.socket, relayPacket(session, 0, Buffer.concat([init, cluster()])));
+  f.hub.close(f.receive.socket);
+  assert.deepEqual(f.publish.socket.messages.at(-1), { type: 'need', formats: [] });
+  f.receive.socket.close();
+  const rejoined = f.connect(f.viewer);
+  assert.equal(f.publish.socket.messages.at(-1).type, 'need');
+  assert.equal(f.publish.socket.messages.at(-1).formats.length, 1);
+  assert.equal(rejoined.socket.messages.filter((message) => message.type === 'start').length, 0);
 });

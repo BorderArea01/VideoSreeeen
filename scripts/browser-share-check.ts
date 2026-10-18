@@ -33,7 +33,7 @@ source.listen(0, '127.0.0.1');
 await once(source, 'listening');
 const sourceUrl =
   process.env.VS_SITE_URL || `http://127.0.0.1:${(source.address() as any).port}/watch`;
-const app = process.env.VS_PUBLIC_URL ? undefined : createApp();
+const app = process.env.VS_PUBLIC_URL ? undefined : createApp({ broadcastRelay: false });
 if (app) {
   app.server.listen(0, '127.0.0.1');
   await once(app.server, 'listening');

@@ -21,6 +21,7 @@ export class BroadcastPeers {
   private localUrl = '';
   private retry = new Map<string, number>();
   private incoming: MediaStream | null = null;
+  private enabled = true;
   receivedStream() {
     return this.incoming;
   }
@@ -133,7 +134,8 @@ export class BroadcastPeers {
       connections,
     };
   }
-  configure(room: Snapshot | null, me: string) {
+  configure(room: Snapshot | null, me: string, enabled = true) {
+    this.enabled = enabled;
     const broadcast = room?.mode === 'stream' && room.media?.broadcast;
     const scope = broadcast ? `${room!.media!.id}:${room!.epoch}` : '';
     if (scope !== this.scope || me !== this.me) {
@@ -142,6 +144,12 @@ export class BroadcastPeers {
       this.me = me;
     }
     this.room = room;
+    if (!enabled) {
+      for (const connection of this.connections.values()) connection.pc.close();
+      this.connections.clear();
+      this.retry.clear();
+      return;
+    }
     if (!broadcast || !scope) return;
     const host = broadcast.host;
     const online = room!.members
@@ -294,6 +302,7 @@ export class BroadcastPeers {
     this.status('视频连接失败，等待重新连接');
   }
   receive(message: Signal) {
+    if (!this.enabled) return;
     const host = this.room?.media?.broadcast?.host;
     if (
       message.purpose !== 'broadcast' ||

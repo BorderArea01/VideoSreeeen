@@ -3,11 +3,14 @@ import {
   readRelayPacket,
   RELAY_WINDOW,
   RELAY_VIEWERS,
+  RELAY_PACKET,
+  relayPacket,
   type RelayHello,
   type RelayStart,
 } from '../shared/broadcast-relay';
 import type { Rooms } from './rooms';
 import { z } from 'zod';
+import { WebMWindow } from './webm-window';
 
 const relayHello = z.object({
   type: z.literal('hello'),
@@ -41,11 +44,14 @@ interface Client {
   tick: number;
   controls: number;
   controlTick: number;
+  sequence: number;
+  waiting: boolean;
 }
 interface Stream {
   publisher: RelaySocket;
   start: RelayStart;
   sequence: number;
+  window?: WebMWindow;
 }
 
 /** Ephemeral live bytes only: no files, media persistence, or room-state writes. */
@@ -70,6 +76,8 @@ export class BroadcastRelay {
       tick: now,
       controls: 40,
       controlTick: now,
+      sequence: 0,
+      waiting: false,
     });
   }
   restored() {
@@ -111,6 +119,40 @@ export class BroadcastRelay {
     for (const [socket, c] of this.clients)
       if (c.auth?.code === auth.code && this.access(c.auth)?.publisher) this.need(socket, c.auth);
   }
+  private audience(auth: RelayHello) {
+    for (const [socket, c] of this.clients)
+      if (c.auth?.code === auth.code && this.access(c.auth)?.publisher)
+        this.send(socket, { type: 'audience', count: this.viewers(auth).length });
+  }
+  private media(socket: RelaySocket, c: Client, stream: Stream, bytes: Uint8Array) {
+    for (let offset = 0; offset < bytes.length; offset += RELAY_PACKET) {
+      const packet = relayPacket(
+        stream.start.session,
+        c.sequence,
+        bytes.subarray(offset, offset + RELAY_PACKET),
+      );
+      if (c.bytes + packet.length > RELAY_WINDOW || (socket.bufferedAmount ?? 0) > RELAY_WINDOW) {
+        this.drop(socket, 'slow media receiver');
+        return false;
+      }
+      c.pending.set(c.sequence++, packet.length);
+      c.bytes += packet.length;
+      if (socket.readyState === 1) socket.send(packet);
+    }
+    return true;
+  }
+  private bootstrap(socket: RelaySocket, c: Client, stream: Stream) {
+    const snapshot = stream.window?.bootstrap();
+    if (!snapshot) return false;
+    c.waiting = false;
+    c.sequence = 0;
+    c.pending.clear();
+    c.bytes = 0;
+    c.ack = -1;
+    this.send(socket, stream.start);
+    for (const bytes of snapshot) if (!this.media(socket, c, stream, bytes)) break;
+    return true;
+  }
   message(socket: RelaySocket, raw: string | Uint8Array): RelayHello | undefined {
     const c = this.clients.get(socket);
     if (!c) return;
@@ -138,22 +180,35 @@ export class BroadcastRelay {
             throw new Error('relay viewer limit');
           c.auth = auth;
           this.send(socket, { type: 'ready', publisher: access.publisher });
-          this.refresh(auth);
+          const stream = this.streams.get(auth.code);
+          if (!access.publisher && stream?.window && auth.formats.includes(stream.start.mime)) {
+            c.waiting = true;
+            this.bootstrap(socket, c, stream);
+            this.audience(auth);
+          } else this.refresh(auth);
           return auth;
         }
         const access = this.access(c.auth);
         if (!access) throw new Error('room authorization expired');
         if (data.type === 'ping') this.send(socket, { type: 'pong' });
+        else if (data.type === 'configure' && access.publisher) this.need(socket, c.auth);
         else if (data.type === 'start' && access.publisher) {
           const start = relayStart.parse(data);
           const viewers = this.viewers(c.auth);
           if (!viewers.length || viewers.some(([, v]) => !v.auth!.formats.includes(start.mime)))
             throw new Error('unsupported media format');
-          this.streams.set(c.auth.code, { publisher: socket, start, sequence: 0 });
+          this.streams.set(c.auth.code, {
+            publisher: socket,
+            start,
+            sequence: 0,
+            window: start.mime.startsWith('video/webm') ? new WebMWindow() : undefined,
+          });
           for (const [viewer, v] of viewers) {
             v.pending.clear();
             v.bytes = 0;
             v.ack = -1;
+            v.sequence = 0;
+            v.waiting = false;
             this.send(viewer, start);
           }
         } else if (data.type === 'ack' && !access.publisher) {
@@ -163,7 +218,7 @@ export class BroadcastRelay {
             stream.start.session !== data.session ||
             !Number.isInteger(data.sequence) ||
             data.sequence < c.ack ||
-            data.sequence >= stream.sequence
+            data.sequence >= c.sequence
           )
             return;
           for (const [sequence, bytes] of c.pending)
@@ -185,22 +240,22 @@ export class BroadcastRelay {
         }
         if (stream.publisher !== socket || packet.session !== stream.start.session) return; // Old asynchronous encoder output.
         if (packet.sequence !== stream.sequence) throw new Error('media sequence gap');
-        c.tokens = Math.min(1024 * 1024, c.tokens + (this.now() - c.tick) * 256);
+        c.tokens = Math.min(2 * 1024 * 1024, c.tokens + (this.now() - c.tick) * 1024);
         c.tick = this.now();
         c.tokens -= raw.byteLength;
         if (c.tokens < 0) throw new Error('media bitrate limit');
         stream.sequence++;
+        stream.window?.push(packet.bytes);
+        if (stream.window?.unavailable()) {
+          stream.window = undefined;
+          if (this.viewers(c.auth).some(([, viewer]) => viewer.waiting)) this.refresh(c.auth);
+        }
         for (const [viewer, v] of this.viewers(c.auth)) {
-          if (
-            v.bytes + raw.byteLength > RELAY_WINDOW ||
-            (viewer.bufferedAmount ?? 0) > RELAY_WINDOW
-          ) {
-            this.drop(viewer, 'slow media receiver');
+          if (v.waiting) {
+            this.bootstrap(viewer, v, stream);
             continue;
           }
-          v.pending.set(packet.sequence, raw.byteLength);
-          v.bytes += raw.byteLength;
-          if (viewer.readyState === 1) viewer.send(raw);
+          this.media(viewer, v, stream, packet.bytes);
         }
       }
     } catch {
@@ -216,7 +271,11 @@ export class BroadcastRelay {
     if (stream?.publisher === socket) {
       this.streams.delete(c.auth.code);
       for (const [viewer] of this.viewers(c.auth)) this.send(viewer, { type: 'end' });
-    } else this.refresh(c.auth);
+    } else if (this.viewers(c.auth).length) this.audience(c.auth);
+    else {
+      this.streams.delete(c.auth.code);
+      this.refresh(c.auth);
+    }
   }
   private drop(socket: RelaySocket, reason: string) {
     this.close(socket);

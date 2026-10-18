@@ -11,7 +11,9 @@ import { once } from 'node:events';
 import { MediaRelay } from './media';
 import { BroadcastRelay } from './broadcast-relay';
 
-export function createApp(options: { now?: () => number; origins?: string[] } = {}) {
+export function createApp(
+  options: { now?: () => number; origins?: string[]; broadcastRelay?: boolean } = {},
+) {
   const rooms = new Rooms(options.now);
   const imageFiles = new ImageFiles(),
     images = new RoomImages(rooms, imageFiles);
@@ -119,7 +121,7 @@ export function createApp(options: { now?: () => number; origins?: string[] } = 
         res.end(
           JSON.stringify({
             mediaRelay: true,
-            broadcastRelay: true,
+            broadcastRelay: options.broadcastRelay !== false,
             p2p: true,
             iceServers: JSON.parse(
               process.env.ICE_SERVERS ?? '[{"urls":"stun:stun.cloudflare.com:3478"}]',

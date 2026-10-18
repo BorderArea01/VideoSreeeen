@@ -3,6 +3,9 @@ import {
   RELAY_MIMES,
   RELAY_PACKET,
   RELAY_WINDOW,
+  RELAY_VIDEO_BITRATE,
+  RELAY_AUDIO_BITRATE,
+  RELAY_CHUNK_MS,
   relayPacket,
   readRelayPacket,
   type RelayStart,
@@ -13,7 +16,7 @@ const mediaSourceClass = () =>
   ((globalThis as any).ManagedMediaSource as typeof MediaSource | undefined) ??
   globalThis.MediaSource;
 
-/** Optional live fallback, independent of WebRTC and of the room/chat socket. */
+/** Primary live transport, independent of WebRTC and the room/chat socket. */
 export class BroadcastRelayClient {
   private scope = '';
   private socket?: WebSocket;
@@ -30,7 +33,11 @@ export class BroadcastRelayClient {
   private pendingEncoding = 0;
   private sequence = 0;
   private retryAt = 0;
-  private startedAt = 0;
+  private buffering = true;
+  private bufferTarget = 2.5;
+  private lastAckAt = 0;
+  private pendingAck?: { session: string; sequence: number };
+  private stalls = 0;
   private room: Snapshot | null = null;
   private publisher = false;
   private local: MediaStream | null = null;
@@ -39,14 +46,33 @@ export class BroadcastRelayClient {
   private bytes = 0;
   private audiences = 0;
   private mime = '';
+  private videoBitrate = RELAY_VIDEO_BITRATE;
   constructor(
     private video: HTMLVideoElement,
     private attach: (url: string | null) => void,
     private play: () => void,
     private changed: () => void,
-  ) {}
+  ) {
+    video.addEventListener('waiting', () => {
+      if (!this.active() || this.publisher || this.room?.playback.paused || this.buffering) return;
+      this.stalls++;
+      this.buffering = true;
+      this.bufferTarget = Math.min(5, this.bufferTarget + 0.5);
+      video.pause();
+      this.state = 'buffering';
+      this.changed();
+    });
+    video.addEventListener('canplay', () => this.playBuffered());
+  }
   active() {
     return !!this.objectUrl;
+  }
+  setQuality(quality: string) {
+    const bitrate =
+      quality === 'smooth' ? 1_800_000 : quality === 'high' ? 6_000_000 : RELAY_VIDEO_BITRATE;
+    if (bitrate === this.videoBitrate) return;
+    this.videoBitrate = bitrate;
+    if (this.publisher) this.send({ type: 'configure' });
   }
   diagnostics() {
     return {
@@ -55,15 +81,27 @@ export class BroadcastRelayClient {
       viewers: this.audiences,
       queuedBytes: this.queuedBytes,
       mime: this.mime || null,
+      videoBitsPerSecond: this.publisher ? this.recorder?.videoBitsPerSecond : undefined,
+      bufferTarget: this.bufferTarget,
+      stalls: this.stalls,
+      bufferedSeconds: this.buffer?.buffered.length
+        ? Math.max(
+            0,
+            this.buffer.buffered.end(this.buffer.buffered.length - 1) - this.video.currentTime,
+          )
+        : 0,
     };
   }
   status() {
-    if (this.publisher) return this.audiences ? `备用通道 · ${this.audiences} 位观众` : '';
-    if (this.state === 'receiving') return '正在通过备用通道接收视频';
-    if (this.state === 'buffering') return '备用通道已连接，正在缓冲';
-    if (this.state === 'connecting') return '直连未成功，正在连接备用通道';
-    if (this.state === 'unsupported') return '当前浏览器不支持备用视频格式';
-    if (this.state === 'failed') return '备用通道暂不可用，稍后重试';
+    if (this.publisher)
+      return this.audiences
+        ? `正在提供视频 · ${this.audiences} 位观众接入`
+        : '正在提供视频 · 等待观众';
+    if (this.state === 'receiving') return '正在接收视频';
+    if (this.state === 'buffering') return '正在缓冲视频';
+    if (this.state === 'connecting') return '正在连接视频通道';
+    if (this.state === 'unsupported') return '当前浏览器不支持此视频格式';
+    if (this.state === 'failed') return '视频通道暂不可用，正在重连';
     return '';
   }
   configure(
@@ -73,15 +111,16 @@ export class BroadcastRelayClient {
     server: string,
     enabled: boolean,
     local: MediaStream | null,
-    directConnected: boolean,
+    _directConnected = false,
   ) {
     const media = enabled && room?.mode === 'stream' && room.media?.broadcast ? room.media : null;
     const scope = media ? `${room!.code}:${media.id}:${room!.epoch}:${me}` : '';
     if (scope !== this.scope) {
       this.close();
       this.scope = scope;
-      this.startedAt = Date.now();
       this.bytes = 0;
+      this.stalls = 0;
+      this.bufferTarget = 2.5;
     }
     this.room = room;
     this.publisher = media?.broadcast?.host === me;
@@ -91,13 +130,8 @@ export class BroadcastRelayClient {
       this.stopTransport();
       return;
     }
-    if (!this.publisher && directConnected) {
-      this.stopTransport();
-      this.state = 'idle';
-      return;
-    }
     // Keep a publisher control channel ready, but encode only on receiver demand.
-    if (this.publisher ? !local?.active : Date.now() - this.startedAt < 15000) return;
+    if (this.publisher && !local?.active) return;
     if (this.socket || Date.now() < this.retryAt) return;
     const Source = mediaSourceClass();
     const formats = RELAY_MIMES.filter((mime) =>
@@ -140,7 +174,10 @@ export class BroadcastRelayClient {
         if (typeof event.data === 'string') {
           const message = JSON.parse(event.data);
           if (message.type === 'need' && this.publisher) this.encode(socket, message.formats);
-          else if (message.type === 'start' && !this.publisher) this.decode(message);
+          else if (message.type === 'audience' && this.publisher) {
+            this.audiences = message.count;
+            this.changed();
+          } else if (message.type === 'start' && !this.publisher) this.decode(message);
           else if (message.type === 'end' && !this.publisher) {
             this.clearDecoder();
             this.state = 'buffering';
@@ -166,10 +203,12 @@ export class BroadcastRelayClient {
     this.pendingEncoding = 0;
   }
   private encode(socket: WebSocket, audiences: string[][]) {
-    this.stopEncoder();
     this.audiences = audiences.length;
     this.changed();
-    if (!audiences.length || !this.local?.active) return;
+    if (!audiences.length || !this.local?.active) {
+      this.stopEncoder();
+      return;
+    }
     const mime = RELAY_MIMES.find(
       (mime) =>
         MediaRecorder.isTypeSupported(mime) && audiences.every((formats) => formats.includes(mime)),
@@ -180,14 +219,16 @@ export class BroadcastRelayClient {
       socket.close(4003, 'unsupported media format');
       return;
     }
+    this.stopEncoder();
     const session = crypto.randomUUID().replaceAll('-', '');
     const generation = this.encodingGeneration;
     this.sequence = 0;
     const recorder = new MediaRecorder(this.local, {
       mimeType: mime,
-      videoBitsPerSecond: 1_200_000,
-      audioBitsPerSecond: 96_000,
-    });
+      videoBitsPerSecond: this.videoBitrate,
+      audioBitsPerSecond: RELAY_AUDIO_BITRATE,
+      videoKeyFrameIntervalDuration: 1000,
+    } as MediaRecorderOptions);
     this.recorder = recorder;
     this.mime = mime;
     socket.send(JSON.stringify({ type: 'start', session, mime }));
@@ -220,7 +261,7 @@ export class BroadcastRelayClient {
     recorder.onerror = () => {
       if (this.recorder === recorder) this.fail();
     };
-    recorder.start(500);
+    recorder.start(RELAY_CHUNK_MS);
   }
   private decode(start: RelayStart) {
     if (!RELAY_MIMES.includes(start.mime) || !/^[0-9a-f]{32}$/.test(start.session))
@@ -234,6 +275,7 @@ export class BroadcastRelayClient {
     this.expected = 0;
     this.mime = start.mime;
     this.state = 'buffering';
+    this.buffering = true;
     this.changed();
     source.addEventListener(
       'sourceopen',
@@ -251,19 +293,14 @@ export class BroadcastRelayClient {
               const packet = this.currentPacket;
               this.currentPacket = undefined;
               this.bytes += packet.bytes.length;
-              this.send({ type: 'ack', session: packet.session, sequence: packet.sequence });
-            }
-            if (this.video.readyState >= 2) {
-              this.state = 'receiving';
-              this.changed();
-              if (!this.room?.playback.paused && this.video.paused) this.play();
-              const ranges = buffer.buffered;
-              if (ranges.length && !this.room?.playback.paused) {
-                const end = ranges.end(ranges.length - 1);
-                if (end - this.video.currentTime > 4)
-                  this.video.currentTime = Math.max(ranges.start(ranges.length - 1), end - 1);
+              this.pendingAck = { session: packet.session, sequence: packet.sequence };
+              if (performance.now() - this.lastAckAt >= 200) {
+                this.send({ type: 'ack', ...this.pendingAck });
+                this.lastAckAt = performance.now();
+                this.pendingAck = undefined;
               }
             }
+            this.playBuffered();
             this.pump();
           });
           this.pump();
@@ -276,6 +313,31 @@ export class BroadcastRelayClient {
     this.objectUrl = URL.createObjectURL(source);
     this.video.disableRemotePlayback = true;
     this.attach(this.objectUrl);
+  }
+  private playBuffered() {
+    const ranges = this.buffer?.buffered;
+    if (!this.active() || !ranges?.length || this.room?.playback.paused) return;
+    const start = ranges.start(ranges.length - 1),
+      end = ranges.end(ranges.length - 1);
+    if (this.video.currentTime < start - 0.05) this.video.currentTime = Math.min(end, start + 0.05);
+    if (this.buffering && end - this.video.currentTime < this.bufferTarget) {
+      if (!this.video.paused) this.video.pause();
+      return;
+    }
+    this.buffering = false;
+    if (end - this.video.currentTime > 12)
+      this.video.currentTime = Math.max(start, end - this.bufferTarget);
+    if (this.video.readyState >= 2) {
+      const ahead = end - this.video.currentTime;
+      this.video.playbackRate =
+        ahead > this.bufferTarget + 1 ? 1.03 : ahead < this.bufferTarget - 0.8 ? 0.98 : 1;
+      this.state = 'receiving';
+      if (this.video.paused) this.play();
+      this.changed();
+    }
+  }
+  resume() {
+    this.playBuffered();
   }
   private append(raw: Uint8Array) {
     const packet = readRelayPacket(raw);
@@ -317,6 +379,7 @@ export class BroadcastRelayClient {
     this.currentPacket = undefined;
     this.queuedBytes = 0;
     this.session = '';
+    this.pendingAck = undefined;
     if (this.objectUrl) {
       this.attach(null);
       URL.revokeObjectURL(this.objectUrl);
@@ -348,6 +411,5 @@ export class BroadcastRelayClient {
     this.scope = '';
     this.state = 'idle';
     this.retryAt = 0;
-    this.startedAt = 0;
   }
 }

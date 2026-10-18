@@ -1650,6 +1650,13 @@ button {
   align-items: center;
   margin-top: 14px;
 }
+.source-actions select {
+  background: var(--panel);
+  color: inherit;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 7px 10px;
+}
 .source-actions .button {
   font-size: 12px;
   padding: 8px 12px;
