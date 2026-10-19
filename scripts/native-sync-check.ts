@@ -181,7 +181,7 @@ try {
   // metadata promise must not leave the trusted UI's next-episode action busy.
   await desktop.evaluate(async ({ webContents }, url) => {
     const contents = webContents.getAllWebContents().find((w) => w.getURL() === url)!;
-    await contents.executeJavaScript('window.__VS.nextEpisode=()=>new Promise(()=>{})');
+    await contents.executeJavaScript('window.__VS.nextEpisode=()=>new Promise(()=>{});true');
   }, source);
   const readBegan = performance.now();
   await assert.rejects(
