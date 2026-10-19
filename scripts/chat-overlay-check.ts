@@ -88,6 +88,74 @@ try {
   await guest.locator('#name-input').fill('弹幕观众');
   await guest.locator('#join-button').click();
   await host.locator('#member-count').filter({ hasText: '2' }).waitFor();
+  const chatHeight = await guest.locator('#chat-panel').evaluate((el) => el.clientHeight);
+  for (let i = 0; i < 24; i++) await send(host, `滚动记录 ${i}：固定高度的聊天室。`);
+  await guest.locator('#chat-messages .bubble').filter({ hasText: '滚动记录 23：' }).waitFor();
+  assert.equal(await guest.locator('#chat-panel').evaluate((el) => el.clientHeight), chatHeight);
+  await guest.locator('#chat-messages').evaluate((el) => {
+    el.scrollTop = 0;
+  });
+  await send(host, '查看历史时收到的新消息');
+  await guest
+    .locator('#chat-messages .bubble')
+    .filter({ hasText: '查看历史时收到的新消息' })
+    .waitFor();
+  assert.equal(await guest.locator('#chat-messages').evaluate((el) => el.scrollTop), 0);
+  assert.ok(
+    await guest.locator('#chat-messages').evaluate((el) => el.scrollHeight > el.clientHeight),
+  );
+  proof.fixedChatAndHistoryScroll = true;
+  await host.locator('#chat-input').fill('图片粘贴保留文字草稿');
+  const pastedBytes = await host.locator('#chat-input').evaluate(async (input) => {
+    const canvas = document.createElement('canvas');
+    canvas.width = canvas.height = 768;
+    const ctx = canvas.getContext('2d')!,
+      pixels = ctx.createImageData(768, 768);
+    let seed = 12345;
+    for (let i = 0; i < pixels.data.length; i += 4) {
+      seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+      pixels.data[i] = seed & 255;
+      pixels.data[i + 1] = (seed >>> 8) & 255;
+      pixels.data[i + 2] = (seed >>> 16) & 255;
+      pixels.data[i + 3] = 255;
+    }
+    ctx.putImageData(pixels, 0, 0);
+    const blob = await new Promise<Blob>((resolve) =>
+      canvas.toBlob((blob) => resolve(blob!), 'image/png'),
+    );
+    const data = new DataTransfer();
+    data.items.add(new File([blob], 'clipboard.png', { type: 'image/png' }));
+    input.dispatchEvent(
+      new ClipboardEvent('paste', { bubbles: true, cancelable: true, clipboardData: data }),
+    );
+    return blob.size;
+  });
+  assert.ok(pastedBytes > 1024 * 1024);
+  for (const page of [host, guest]) {
+    await page.locator('#chat-messages').evaluate((el) => {
+      el.scrollTop = el.scrollHeight;
+    });
+    await page.waitForFunction(() => {
+      const img = document.querySelector<HTMLImageElement>('#chat-messages .bubble img');
+      return img?.naturalWidth === 768;
+    });
+  }
+  assert.equal(await host.locator('#chat-input').inputValue(), '图片粘贴保留文字草稿');
+  await host.locator('#chat-input').fill('');
+  proof.clipboardImage = { bytes: pastedBytes, decodedOnBothClients: true, draftPreserved: true };
+  await mkdir('.local/screenshots', { recursive: true });
+  await guest.locator('#sidebar').screenshot({ path: '.local/screenshots/chat-fixed-desktop.png' });
+  await guest.setViewportSize({ width: 390, height: 844 });
+  assert.ok(
+    await guest
+      .locator('#chat-panel')
+      .evaluate((el) => el.clientHeight >= 300 && el.clientHeight <= 420),
+  );
+  assert.ok(await guest.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+  await guest
+    .locator('#chat-panel')
+    .screenshot({ path: '.local/screenshots/chat-fixed-mobile.png' });
+  await guest.setViewportSize({ width: 1440, height: 1080 });
   assert.equal(await host.locator('#cache-options').isVisible(), false);
   await selectSource(
     host,

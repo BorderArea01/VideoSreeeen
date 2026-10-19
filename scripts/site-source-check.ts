@@ -126,6 +126,74 @@ try {
       {},
       { timeout: 20000 },
     );
+  // A seek while playing must continue decoding without a pause/play workaround.
+  await guest.locator('#seek').evaluate((element) => {
+    (element as HTMLInputElement).value = '30';
+  });
+  await guest.locator('#seek').dispatchEvent('change');
+  for (const page of [host, guest]) {
+    await page.waitForFunction(() => {
+      const v = document.querySelector<HTMLVideoElement>('#video')!;
+      return v.currentTime >= 30 && v.currentTime < 36 && !v.seeking && !v.paused;
+    });
+    const before = await page
+      .locator('#video')
+      .evaluate((el) => (el as HTMLVideoElement).getVideoPlaybackQuality().totalVideoFrames);
+    await page.waitForFunction(
+      (before) => {
+        const v = document.querySelector<HTMLVideoElement>('#video')!;
+        return v.getVideoPlaybackQuality().totalVideoFrames > before + 15 && !v.paused;
+      },
+      before,
+      { timeout: 20000 },
+    );
+  }
+  proof.playingSeekContinuesDecoding = true;
+  if (process.env.VS_TEST_RECOVERY) {
+    const network = await guestContext.newCDPSession(guest);
+    await network.send('Network.enable');
+    await network.send('Network.emulateNetworkConditions', {
+      offline: true,
+      latency: 0,
+      downloadThroughput: -1,
+      uploadThroughput: -1,
+    });
+    try {
+      await host.locator('#seek').evaluate((el) => {
+        (el as HTMLInputElement).value = '300';
+        el.dispatchEvent(new Event('change'));
+      });
+      await guest.waitForTimeout(3500);
+    } finally {
+      await network.send('Network.emulateNetworkConditions', {
+        offline: false,
+        latency: 0,
+        downloadThroughput: -1,
+        uploadThroughput: -1,
+      });
+    }
+    await guest.waitForFunction(
+      () => {
+        const v = document.querySelector<HTMLVideoElement>('#video')!;
+        return !v.paused && !v.seeking && v.currentTime > 300 && v.currentTime < 325;
+      },
+      {},
+      { timeout: 25000 },
+    );
+    const frames = await guest
+      .locator('#video')
+      .evaluate((el) => (el as HTMLVideoElement).getVideoPlaybackQuality().totalVideoFrames);
+    await guest.waitForFunction(
+      (frames) =>
+        document.querySelector<HTMLVideoElement>('#video')!.getVideoPlaybackQuality()
+          .totalVideoFrames >
+        frames + 15,
+      frames,
+      { timeout: 15000 },
+    );
+    await network.detach();
+    proof.interruptedViewerNetworkResumesWithoutRoomPause = true;
+  }
   await host.locator('#play-button').click();
   for (const page of [host, guest])
     await page.waitForFunction(() => document.querySelector<HTMLVideoElement>('#video')!.paused);
@@ -249,6 +317,45 @@ try {
   );
   proof.unplayableResultNotPublished = true;
   await host.unroute(metadataRoute);
+  if (process.env.VS_TEST_NEXT) {
+    await host.locator('#play-button').click();
+    const playingDeadline = Date.now() + 15000;
+    while (latest.playback.paused) {
+      assert.ok(Date.now() < playingDeadline);
+      await host.waitForTimeout(100);
+    }
+    const previous = latest.media.id;
+    await host.locator('#next-episode').click();
+    await host.waitForFunction(
+      (previous) =>
+        !document.querySelector<HTMLButtonElement>('#next-episode')!.disabled &&
+        document.querySelector<HTMLInputElement>('#source-url')!.value !== previous,
+      site,
+      { timeout: 30000 },
+    );
+    const until = Date.now() + 45000;
+    while (latest.media.id === previous) {
+      assert.ok(Date.now() < until, 'Real next episode did not replace the current media');
+      await host.waitForTimeout(100);
+    }
+    assert.notEqual(latest.media.url, site);
+    for (const page of [host, guest])
+      await page.waitForFunction(
+        () => {
+          const v = document.querySelector<HTMLVideoElement>('#video')!;
+          return (
+            v.readyState >= 2 &&
+            v.videoWidth > 0 &&
+            !v.paused &&
+            v.currentTime > 0.5 &&
+            v.currentTime < 10
+          );
+        },
+        {},
+        { timeout: 30000 },
+      );
+    proof.nextEpisode = { url: latest.media.url, decodedOnBothClients: true };
+  }
   assert.deepEqual(errors, []);
   assert.deepEqual(serverErrors, []);
   proof.errors = errors;

@@ -6,6 +6,8 @@
     lastGesture = -10000,
     seq = 0,
     action = null,
+    actionPosition,
+    actionRate,
     catchingUp = false;
   const bound = new WeakSet();
   const videoList = (root = document) => {
@@ -170,6 +172,31 @@
       if (target === video) video.controls = true;
       return true;
     },
+    nextEpisode() {
+      const page = new URL(location.href);
+      if (page.hostname === 'next.xifanacg.com') {
+        for (const script of document.scripts) {
+          const text = script.textContent.replace(/\\"/g, '"');
+          const match = /"nextHref"\s*:\s*("(?:[^"\\]|\\.)*")/.exec(text);
+          if (match) {
+            try {
+              return JSON.parse(match[1]);
+            } catch {}
+          }
+        }
+      } else if (['www.mgnacg.com', 'mgnacg.com'].includes(page.hostname)) {
+        return window.player_aaaa?.link_next || null;
+      } else if (page.hostname === 'www.bilibili.com') {
+        const pages = window.__INITIAL_STATE__?.videoData?.pages;
+        if (Array.isArray(pages)) {
+          const index = pages.findIndex(
+            (part) => part.page === Number(page.searchParams.get('p') || 1),
+          );
+          if (index >= 0 && pages[index + 1]) return page.pathname + '?p=' + pages[index + 1].page;
+        }
+      }
+      return null;
+    },
     sample() {
       const video = current();
       if (!video) return { available: false, title: document.title };
@@ -188,6 +215,8 @@
             ) {
               seq++;
               action = intent;
+              actionPosition = video.currentTime;
+              actionRate = video.playbackRate;
             }
           });
         video.addEventListener('ended', () => {
@@ -202,8 +231,12 @@
         duration: video.duration,
         paused: video.paused,
         rate: video.playbackRate,
+        readyState: video.readyState,
+        frames: video.getVideoPlaybackQuality?.().totalVideoFrames ?? 0,
         source: source(video),
         action,
+        actionPosition,
+        actionRate,
         seq,
         frame: location.href,
       };
@@ -217,7 +250,11 @@
       muteUntil = performance.now() + 800;
       mutedGesture = lastGesture;
       const delta = state.position - video.currentTime;
-      if (state.seek || Math.abs(delta) > (state.paused ? 0.12 : 1.2 * Math.max(1, state.rate)))
+      if (
+        state.seek ||
+        (video.readyState >= 3 &&
+          Math.abs(delta) > (state.paused ? 0.12 : 1.2 * Math.max(1, state.rate)))
+      )
         video.currentTime = Math.max(0, Math.min(state.position, video.duration || state.position));
       catchingUp = !state.paused && Math.abs(delta) > (catchingUp ? 0.06 : 0.3);
       const rate = catchingUp ? state.rate * (1 + Math.sign(delta) * 0.06) : state.rate;

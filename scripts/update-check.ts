@@ -86,7 +86,7 @@ try {
         updater.disableWebInstaller = true;
         updater.logger = { info() {}, warn() {}, error() {}, debug() {} };
         const update = await updater.checkForUpdates();
-        if (!update || update.updateInfo.version !== '0.4.2')
+        if (!update || update.updateInfo.version !== '0.4.3')
           throw new Error('Update metadata not loaded');
         const files = await updater.downloadUpdate();
         let bytes = 0;

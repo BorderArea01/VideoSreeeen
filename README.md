@@ -35,7 +35,9 @@
 
 **共同缓存默认关闭。** 仅在大家都卡时展开“共同缓存”手动启用；适用于可完整下载的 MP4 / DASH 等源，各人完整落盘并校验一致后播放，看完清理。实时画面不使用共同缓存。浏览器完整缓存上限仍为 128 MiB，长视频缓存使用客户端。
 
-聊天室支持文字、Emoji 和单张最多 **20 MiB** 的 GIF / PNG / JPEG / WebP 原图，点击查看原图，GIF 不强制转成静态图片。图片独立传输，聊天快照只存引用；单房间图片总量 64 MiB，历史滚动或房间过期后清理。侧栏可以隐藏、拖拽，成员旁显示到房间服务的真实 RTT。
+聊天室固定高度，消息在内部上下滚动；上翻历史时新消息不会强行拉回底部。支持文字、Emoji 和单张最多 **20 MiB** 的 GIF / PNG / JPEG / WebP 原图，输入框支持直接粘贴截图或剪贴板图片，发送图片保留现有文字草稿。点击可查看原图，GIF 不强制转成静态图片。图片独立传输，聊天快照只存引用；单房间图片总量 64 MiB，历史滚动或房间过期后清理。侧栏可以隐藏、拖拽，成员旁显示到房间服务的真实 RTT。
+
+共同播放的视频来源栏提供“下一集”：读取原站明确给出的下一集地址，由房间服务统一切换，全员仍使用同一控制冲突规则。喜番支持同一番剧和线路；蜜柑客户端读取原站播放配置；B 站支持同一 BV 视频的下一分 P，不把推荐视频或广告当作下一集。正在播放时切集，提供者加载出首帧后再让全员开始；暂停时切集保持暂停。到末集、识别失败或已被其他成员换片时保留现有视频。纯浏览器蜜柑仍受原站对服务器访问的限制。
 
 **客户端：[Windows 安装版](https://github.com/BorderArea01/VideoSreeeen/releases/latest/download/VideoSreeeen-Setup.exe) · [Android APK](https://github.com/BorderArea01/VideoSreeeen/releases/latest/download/VideoSreeeen-Android.apk) · [全部版本与校验和](https://github.com/BorderArea01/VideoSreeeen/releases)。**
 

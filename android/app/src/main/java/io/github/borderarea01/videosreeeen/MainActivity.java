@@ -635,6 +635,23 @@ public class MainActivity extends Activity {
                                     } else resolve(id, result, null);
                                     break;
                                 }
+                                case "nextEpisode":
+                                    if (site == null) resolve(id, JSONObject.NULL, null);
+                                    else site.evaluateJavascript(
+                                        bridge + ";window.__VS.nextEpisode()",
+                                        value -> {
+                                            try {
+                                                resolve(
+                                                    id,
+                                                    new org.json.JSONTokener(value).nextValue(),
+                                                    null
+                                                );
+                                            } catch (Exception e) {
+                                                resolve(id, JSONObject.NULL, null);
+                                            }
+                                        }
+                                    );
+                                    break;
                                 case "applySite":
                                     if (site != null) {
                                         if (

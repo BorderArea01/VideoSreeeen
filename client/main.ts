@@ -5,11 +5,13 @@ import { PlaybackPicker, playbackPickerMarkup } from './playback-picker';
 import { resolveXifanPage, checkResolvedVideo } from './site-source';
 import { SiteActions } from './site-actions';
 import { Latencies } from './latency';
+import { PlaybackHealth } from './playback-health';
 import { DanmakuFeed } from './danmaku';
 import '../shared/danmaku.js';
 import type { ClientMessage, MediaInput, ServerMessage, Snapshot } from '../shared/protocol';
 import { PROTOCOL, parseInvite, serverOrigin, invitationServer } from '../shared/invite';
 import { describeUrl } from '../shared/sites';
+import { nextEpisode } from '../shared/episodes';
 import { positionAt, reconcile } from '../shared/sync';
 import { DeviceCache } from './cache';
 import { RoomPeers } from './peers';
@@ -43,10 +45,10 @@ ${playbackPickerMarkup}
 <details id="cache-options" class="cache-options"><summary title="默认关闭。只有大家都卡时才考虑完整缓存；实时画面不使用此模式。">共同缓存</summary><section class="mode-card"><div class="mode-copy"><span class="mode-symbol">${icon('download', 22)}</span><div><h3>共同缓存模式 <span class="pill">手动启用</span></h3><p id="mode-description">仅在大家都卡时使用；默认边播边看。</p></div></div><button id="mode-toggle" class="switch" role="switch" aria-checked="false" aria-label="共同缓存模式"><i></i></button></section></details><div class="screen-foot"><span id="control-summary">${icon('shield', 14)} 多人可控 · 自动同步</span><span id="sync-status">等待加入房间</span></div>
 </section>
 <aside id="sidebar" class="sidebar"><section class="members-card"><div class="section-heading"><span>${icon('users', 18)} 放映室成员 <b id="member-count">0</b></span><span class="live-label">${icon('signal', 14)} RTT</span></div><div id="members" class="members"><p class="empty-members">暂无成员</p></div><button id="sidebar-invite" class="invite-line">${icon('plus', 16)} 邀请成员</button></section><section id="chat-panel" class="chat-panel"><div id="chat-drag" class="chat-heading" title="拖拽可悬浮聊天室"><div>${icon('chat', 18)} 聊天室 <span class="tiny-dot"></span></div><div>${button('chat-dock', '停靠聊天室', 'expand')}</div></div><div id="chat-messages" class="chat-messages"><div id="chat-empty" class="chat-empty"><span>${icon('chat', 30)}</span><p>暂无消息</p><small>加入房间后，消息会出现在这里。</small></div></div><div id="emoji-picker" class="emoji-picker" hidden></div><div class="chat-compose"><textarea id="chat-input" title="Enter 发送，Shift + Enter 换行" aria-label="聊天消息" placeholder="发送消息…" rows="2" maxlength="2000"></textarea><div class="compose-actions"><div>${button('emoji-button', '选择表情', 'smile')}${button('image-button', '发送图片或 GIF 表情包', 'image')}<input id="image-input" type="file" accept="image/png,image/jpeg,image/gif,image/webp" hidden></div><button id="send-button" class="send-button" title="发送消息" aria-label="发送消息">${icon('send', 17)}</button></div></div></section><div class="sidebar-foot">VIDEOSREEEEN <span>✳</span></div></aside></main>
-<footer class="app-foot"><span>VideoSreeeen <b>0.4.2</b></span><span>GPL-3.0 · 开源</span><button id="leave-button" class="text-button" hidden>${icon('exit', 14)} 离开放映室</button></footer>
+<footer class="app-foot"><span>VideoSreeeen <b>0.4.3</b></span><span>GPL-3.0 · 开源</span><button id="leave-button" class="text-button" hidden>${icon('exit', 14)} 离开放映室</button></footer>
 <dialog id="room-dialog" aria-labelledby="room-dialog-title"><form id="room-form"><div class="dialog-heading"><div><div class="eyebrow">ROOM</div><h2 id="room-dialog-title">创建或加入房间</h2></div><button id="dialog-close" type="button" class="icon-button" aria-label="关闭">${icon('close')}</button></div><div class="room-tabs" role="group" aria-label="创建或加入"><button id="create-tab" type="button" aria-pressed="true">创建房间</button><button id="join-tab" type="button" aria-pressed="false">我有邀请</button></div><label>你的昵称<input id="name-input" maxlength="30" autocomplete="nickname" placeholder="输入昵称" required></label><div id="invite-field" hidden><label>朋友的邀请链接或完整邀请码<input id="invite-input" autocomplete="off" spellcheck="false" placeholder="粘贴朋友发来的邀请"></label><p id="invite-server-hint" class="dialog-note">推荐使用完整链接，可自动找到朋友的房间。</p></div><p id="create-note" hidden></p><div class="dialog-buttons"><button id="create-button" type="submit" class="button accent">创建房间并生成邀请</button><button id="join-button" type="submit" class="button accent" hidden>加入朋友的房间</button></div><p id="dialog-error" class="form-error" role="alert"></p></form></dialog>
 <dialog id="invite-dialog" aria-labelledby="invite-title"><div class="dialog-heading"><div><div class="eyebrow">INVITE</div><h2 id="invite-title">邀请成员</h2></div><button data-close="invite-dialog" class="icon-button" aria-label="关闭">${icon('close')}</button></div><p class="dialog-copy">朋友打开链接，填个昵称就能加入。苹果设备直接用浏览器。</p><label>邀请链接<input id="invite-link" readonly aria-label="邀请链接"></label><div class="dialog-buttons"><button id="copy-link" class="button accent">${icon('copy', 16)} 复制邀请链接</button><button id="share-invite" class="button outline" hidden>系统分享</button></div><details class="advanced"><summary>使用邀请码加入</summary><label>完整邀请码<input id="invite-code" readonly></label><button id="copy-code" class="text-button">复制邀请码</button><p class="dialog-note">邀请码只适用于相同服务器；跨服务器请发送完整邀请链接。不要只发送六位房间号。</p></details><p id="invite-feedback" class="form-error" role="status"></p><button data-close="invite-dialog" class="button soft dialog-wide">继续选片</button></dialog>
-<dialog id="settings-dialog" aria-labelledby="settings-title"><form id="settings-form"><div class="dialog-heading"><div><div class="eyebrow">SETTINGS</div><h2 id="settings-title">设置与帮助</h2></div><button type="button" data-close="settings-dialog" class="icon-button" aria-label="关闭">${icon('close')}</button></div><details class="advanced"><summary>版本与更新</summary><p class="dialog-note">Windows / Android 0.4.2</p><div class="dialog-buttons"><button id="update-action" type="button" class="button soft">检查更新</button><a class="button soft" href="https://github.com/BorderArea01/VideoSreeeen/releases/latest/download/VideoSreeeen-Setup.exe" target="_blank" rel="noopener noreferrer">Windows 安装版</a><a class="button soft" href="https://github.com/BorderArea01/VideoSreeeen/releases/latest/download/VideoSreeeen-Android.apk" target="_blank" rel="noopener noreferrer">Android APK</a></div><p id="update-status" class="dialog-note" role="status"></p></details><details id="connection-details" class="advanced"><summary>高级 · 房间服务器</summary><p class="dialog-note">仅自建或局域网用户需要修改。保存后用于下一次建房或邀请码加入，不会切换当前房间。</p><label>服务器地址<input id="server-input" type="url" placeholder="https://你的服务器" required></label><div class="dialog-buttons"><button type="submit" class="button accent">保存设置</button><button id="reset-server" type="button" class="button outline">恢复默认</button></div><p id="settings-error" class="form-error" role="alert"></p><p id="settings-status" class="dialog-note" role="status"></p></details><details id="watch-help" class="advanced"><summary>第一次使用 · 怎么一起看？</summary><ol class="help-steps"><li>创建房间，把邀请链接发给朋友；朋友打开后填写昵称即可加入。</li><li>视频直链可直接同步播放；原站链接会显示可用的播放方式。</li><li>电脑浏览器在“提供视频给房间”窗口完成两步：打开原站播放，再选择该标签页并勾选音频。完成后房间才会显示画面；原站负责播放进度。Windows 客户端也可共享原站画面，或识别视频源以使用同步播放、暂停和拖动。</li><li>默认边播边看。仅在大家都卡时，可手动开启共同缓存，完整下载后播放。</li></ol></details><details class="advanced"><summary>浏览器与客户端有什么区别？</summary><p class="dialog-note">浏览器可建房、聊天、看直链、共享本地文件和接收画面；支持屏幕共享的电脑浏览器还可提供视频标签页。网页不能自动读取第三方网站的播放器。浏览器完整缓存目前限总计 128 MiB；长视频缓存请用客户端。Windows / Android 可在应用内打开原站，苹果设备使用浏览器。</p></details><div class="help-links"><button id="project-link" type="button" class="text-button">开源项目与构建说明 ↗</button><button id="feedback-link" type="button" class="text-button">反馈问题 ↗</button></div><p class="dialog-note">GPL-3.0 · 无需注册。昵称会保存在本机；房间服务会处理昵称、聊天和同步信息。公共服务可能受免费额度或网络影响，也可以自行部署。</p><button data-close="settings-dialog" type="button" class="button soft dialog-wide">返回观影</button></form></dialog><div id="toast" class="toast" role="status" hidden></div>`;
+<dialog id="settings-dialog" aria-labelledby="settings-title"><form id="settings-form"><div class="dialog-heading"><div><div class="eyebrow">SETTINGS</div><h2 id="settings-title">设置与帮助</h2></div><button type="button" data-close="settings-dialog" class="icon-button" aria-label="关闭">${icon('close')}</button></div><details class="advanced"><summary>版本与更新</summary><p class="dialog-note">Windows / Android 0.4.3</p><div class="dialog-buttons"><button id="update-action" type="button" class="button soft">检查更新</button><a class="button soft" href="https://github.com/BorderArea01/VideoSreeeen/releases/latest/download/VideoSreeeen-Setup.exe" target="_blank" rel="noopener noreferrer">Windows 安装版</a><a class="button soft" href="https://github.com/BorderArea01/VideoSreeeen/releases/latest/download/VideoSreeeen-Android.apk" target="_blank" rel="noopener noreferrer">Android APK</a></div><p id="update-status" class="dialog-note" role="status"></p></details><details id="connection-details" class="advanced"><summary>高级 · 房间服务器</summary><p class="dialog-note">仅自建或局域网用户需要修改。保存后用于下一次建房或邀请码加入，不会切换当前房间。</p><label>服务器地址<input id="server-input" type="url" placeholder="https://你的服务器" required></label><div class="dialog-buttons"><button type="submit" class="button accent">保存设置</button><button id="reset-server" type="button" class="button outline">恢复默认</button></div><p id="settings-error" class="form-error" role="alert"></p><p id="settings-status" class="dialog-note" role="status"></p></details><details id="watch-help" class="advanced"><summary>第一次使用 · 怎么一起看？</summary><ol class="help-steps"><li>创建房间，把邀请链接发给朋友；朋友打开后填写昵称即可加入。</li><li>视频直链可直接同步播放；原站链接会显示可用的播放方式。</li><li>电脑浏览器在“提供视频给房间”窗口完成两步：打开原站播放，再选择该标签页并勾选音频。完成后房间才会显示画面；原站负责播放进度。Windows 客户端也可共享原站画面，或识别视频源以使用同步播放、暂停和拖动。</li><li>默认边播边看。仅在大家都卡时，可手动开启共同缓存，完整下载后播放。</li></ol></details><details class="advanced"><summary>浏览器与客户端有什么区别？</summary><p class="dialog-note">浏览器可建房、聊天、看直链、共享本地文件和接收画面；支持屏幕共享的电脑浏览器还可提供视频标签页。网页不能自动读取第三方网站的播放器。浏览器完整缓存目前限总计 128 MiB；长视频缓存请用客户端。Windows / Android 可在应用内打开原站，苹果设备使用浏览器。</p></details><div class="help-links"><button id="project-link" type="button" class="text-button">开源项目与构建说明 ↗</button><button id="feedback-link" type="button" class="text-button">反馈问题 ↗</button></div><p class="dialog-note">GPL-3.0 · 无需注册。昵称会保存在本机；房间服务会处理昵称、聊天和同步信息。公共服务可能受免费额度或网络影响，也可以自行部署。</p><button data-close="settings-dialog" type="button" class="button soft dialog-wide">返回观影</button></form></dialog><div id="toast" class="toast" role="status" hidden></div>`;
 
 $('platform').textContent = platform;
 const playbackPicker = new PlaybackPicker((choice) => {
@@ -259,8 +261,10 @@ let nativeBusy = false,
   siteSample: Sample | null = null,
   cacheStartBusy = false,
   cleanupState: 'idle' | 'running' | 'done' | 'error' = 'idle';
-let renderedChat = '',
-  lastChatLength = 0;
+let renderedChat = '';
+let nextBusy = false;
+let nextAutoplay: { code: string; url: string } | null = null;
+const playbackHealth = new PlaybackHealth();
 
 function toast(message: string) {
   $('toast').textContent = message;
@@ -456,6 +460,7 @@ async function connect(kind: 'create' | 'join', reconnect = false) {
           pendingControl = false;
           adopt(message.room);
         } else if (message.type === 'error') {
+          nextAutoplay = null;
           pendingControl = false;
           stoppingBroadcast = false;
           const rejectedBroadcastUrl = pendingBroadcastUrl;
@@ -609,6 +614,12 @@ function adopt(snapshot: Snapshot) {
     siteActions.reset();
   }
   room = snapshot;
+  if (
+    nextAutoplay &&
+    snapshot.media?.url !== nextAutoplay.url &&
+    previous?.media?.url !== snapshot.media?.url
+  )
+    nextAutoplay = null;
   latencies.update(snapshot.members, performance.now());
   // Accept offers immediately. Native file cleanup may finish after signaling
   // has already arrived; starting a new download still awaits `clearing`.
@@ -652,6 +663,23 @@ function adopt(snapshot: Snapshot) {
   if (!previous || changed || previous.playback.revision !== snapshot.playback.revision)
     applyPlayback(true);
   presentDanmaku(snapshot);
+  startNextWhenReady();
+}
+function startNextWhenReady() {
+  if (!nextAutoplay || !connected || !room?.media || pendingControl) return;
+  if (room.code !== nextAutoplay.code) {
+    nextAutoplay = null;
+    return;
+  }
+  if (room.media.url !== nextAutoplay.url) return;
+  if (room.playback.intent !== 'snapshot') {
+    nextAutoplay = null;
+    return;
+  }
+  if (room.mode === 'cache' && !room.cacheReady) return;
+  if (siteOpen ? (siteSample?.readyState ?? 0) < 2 : video.readyState < 2) return;
+  nextAutoplay = null;
+  control('play');
 }
 function openProvider() {
   if (!room?.media || room.media.broadcast || isNative) return;
@@ -842,6 +870,15 @@ function render() {
               ? '当前：共同播放 · 共同缓存'
               : '当前：共同播放';
   $('active-source').hidden = !media;
+  const nextButton = $<HTMLButtonElement>('next-episode');
+  nextButton.hidden =
+    !media || !!media.broadcast || !['bilibili', 'xifan', 'mgn'].includes(media.provider);
+  nextButton.disabled = !connected || pendingControl || nextBusy;
+  nextButton.textContent = nextBusy
+    ? '正在切换…'
+    : media?.provider === 'bilibili'
+      ? '下一分 P →'
+      : '下一集 →';
   $('control-summary').innerHTML =
     `${icon('shield', 14)} ${media?.broadcast?.kind === 'screen' ? '共享画面 · 原站控制进度' : '多人可控 · 自动同步'}`;
   $('screen-unavailable').hidden = canShareTab || !!window.desktop;
@@ -1088,6 +1125,7 @@ function renderChat() {
   renderedChat = signature;
   const messages = $('chat-messages');
   const nearBottom = messages.scrollHeight - messages.scrollTop - messages.clientHeight < 90;
+  const previousTop = messages.scrollTop;
   messages.replaceChildren();
   if (!room?.chat.length) {
     const empty = document.createElement('div');
@@ -1139,11 +1177,10 @@ function renderChat() {
     row.append(meta, bubble);
     messages.append(row);
   }
-  if (nearBottom || (room?.chat.length ?? 0) !== lastChatLength)
-    messages.scrollTop = messages.scrollHeight;
-  lastChatLength = room?.chat.length ?? 0;
+  messages.scrollTop = nearBottom ? messages.scrollHeight : previousTop;
 }
 async function clearPlayback(keepSite = false, keepPreview = false) {
+  playbackHealth.reset();
   window.__VS_Danmaku.clear();
   if (isNative && siteOpen)
     void nativeCall('danmaku', { enabled: danmakuEnabled, clear: true }).catch(error);
@@ -1216,10 +1253,19 @@ async function setPlayer(src: string, audioSrc?: string, isHls = false) {
     if (generation !== playerGeneration) return;
     if (Hls.isSupported()) {
       hls = new Hls({ maxBufferLength: 30, backBufferLength: 15, enableWorker: false });
+      const instance = hls;
+      let recoveries = 0;
       hls.loadSource(src);
       hls.attachMedia(video);
       hls.on(Hls.Events.ERROR, (_event, data) => {
-        if (data.fatal) toast('视频流加载失败：' + data.details);
+        if (generation !== playerGeneration || !data.fatal) return;
+        if (recoveries < 2 && data.type === Hls.ErrorTypes.NETWORK_ERROR) {
+          recoveries++;
+          instance.startLoad(video.currentTime, true);
+        } else if (recoveries < 2 && data.type === Hls.ErrorTypes.MEDIA_ERROR) {
+          recoveries++;
+          instance.recoverMediaError();
+        } else toast('视频流加载失败：' + data.details);
       });
     } else video.src = src;
   } else video.src = src;
@@ -1285,13 +1331,14 @@ async function loadStream(media: NonNullable<Snapshot['media']>) {
     $('browser-hint').hidden = false;
   }
 }
-function applyPlayback(explicit = false) {
+function applyPlayback(_explicit = false) {
   if (hasPendingPreview()) return;
   if (!room || !connected || pendingControl || (room.mode === 'cache' && !room.cacheReady)) return;
   const playback = room.playback,
     target = currentPosition();
-  const seek = explicit && lastRevision !== playback.revision && playback.intent === 'seek';
-  lastRevision = playback.revision;
+  // Keep a seek pending until its actual player can accept it. Metadata loading
+  // or a busy native bridge must not consume the authoritative revision.
+  const seek = lastRevision !== playback.revision && playback.intent === 'seek';
   if (room.media?.broadcast) {
     if (room.media.broadcast.host !== memberId || room.media.broadcast.kind === 'screen') {
       // A remote MediaStream has a live timeline. Seeking or rate-correcting it
@@ -1299,6 +1346,7 @@ function applyPlayback(explicit = false) {
       if (playback.paused) video.pause();
       else if (broadcastFallback.active()) broadcastFallback.resume();
       else if (video.srcObject && video.paused) playElement(video);
+      lastRevision = playback.revision;
       return;
     }
     if (publisher) {
@@ -1310,17 +1358,19 @@ function applyPlayback(explicit = false) {
         seek,
         false,
       );
-      if (correction.kind === 'seek')
+      if (correction.kind === 'seek' && (seek || (!publisher.seeking && publisher.readyState >= 3)))
         publisher.currentTime = Math.min(target, publisher.duration || target);
       publisher.playbackRate = correction.rate;
       if (playback.paused) publisher.pause();
       else if (publisher.paused) playElement(publisher);
+      lastRevision = playback.revision;
       return;
     }
   }
   if (siteOpen) {
     if (!nativeBusy) {
       nativeBusy = true;
+      lastRevision = playback.revision;
       void nativeCall('applySite', {
         position: target,
         rate: playback.rate,
@@ -1349,24 +1399,46 @@ function applyPlayback(explicit = false) {
     catchingUp,
   );
   catchingUp = correction.kind === 'rate';
-  if (correction.kind === 'seek' && Number.isFinite(target))
+  if (
+    correction.kind === 'seek' &&
+    Number.isFinite(target) &&
+    (seek || (!video.seeking && video.readyState >= 3))
+  )
     video.currentTime = Math.min(
       target,
       Number.isFinite(video.duration) ? Math.max(0, video.duration - 0.01) : target,
     );
   if (Math.abs(video.playbackRate - correction.rate) > 0.001) video.playbackRate = correction.rate;
   if (audio.src) {
-    if (Math.abs(audio.currentTime - video.currentTime) > 0.15)
+    if (
+      !video.seeking &&
+      !audio.seeking &&
+      audio.readyState >= 2 &&
+      Math.abs(audio.currentTime - video.currentTime) > 0.15
+    )
       audio.currentTime = video.currentTime;
     audio.playbackRate = video.playbackRate;
   }
   if (playback.paused) {
+    playbackHealth.reset();
     video.pause();
     audio.pause();
   } else {
     if (video.paused) playElement(video);
     if (audio.src && audio.paused) playElement(audio);
+    if (document.hidden) playbackHealth.reset();
+    else if (playbackHealth.check(video)) {
+      // This is a local decoder recovery, never a shared pause/play operation.
+      video.pause();
+      audio.pause();
+      playRequests.delete(video);
+      playRequests.delete(audio);
+      hls?.startLoad(video.currentTime, true);
+      playElement(video);
+      if (audio.src) playElement(audio);
+    }
   }
+  lastRevision = playback.revision;
 }
 async function hideSite(hide: boolean) {
   if (isNative && siteOpen)
@@ -1966,6 +2038,7 @@ $('invite-button').onclick = () => {
 };
 $('source-form').onsubmit = (event) => {
   event.preventDefault();
+  nextAutoplay = null;
   try {
     const media = describeUrl($<HTMLInputElement>('source-url').value);
     if (!isNative && !media.source && ['mgn', 'xifan'].includes(media.provider)) {
@@ -1984,6 +2057,61 @@ $('source-form').onsubmit = (event) => {
     error(e);
   }
 };
+$('next-episode').onclick = () => {
+  if (!room?.media || !connected || nextBusy || pendingControl || room.media.broadcast) return;
+  const scope = { code: room.code, media: room.media.id, member: memberId, url: room.media.url };
+  nextBusy = true;
+  render();
+  void (async () => {
+    let candidate: unknown;
+    let episodeTitle = '下一集';
+    if (isNative && siteOpen) {
+      candidate = await nativeCall('nextEpisode');
+    } else {
+      const response = await fetch(`${activeServer}/resolve-source/${scope.code}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: 'Bearer ' + resume,
+          'X-Member-Id': scope.member,
+        },
+        body: JSON.stringify({ action: 'next', url: scope.url }),
+        signal: AbortSignal.timeout(15000),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || '暂时无法读取剧集信息');
+      candidate = result.next?.url;
+      if (typeof result.next?.title === 'string') episodeTitle = result.next.title;
+    }
+    if (
+      !connected ||
+      room?.code !== scope.code ||
+      room.media?.id !== scope.media ||
+      memberId !== scope.member
+    )
+      return;
+    const next = nextEpisode(scope.url, candidate, episodeTitle);
+    if (!next) {
+      toast('原站没有提供下一集；可能已到最后一集');
+      return;
+    }
+    const media = describeUrl(next.url);
+    const autoplay = !room.playback.paused;
+    $<HTMLInputElement>('source-url').value = next.url;
+    playbackPicker.select('link');
+    if (!isNative && !media.source && ['mgn', 'xifan'].includes(media.provider))
+      await resolveSiteSource(media, autoplay, next.title);
+    else if (isNative || media.source) {
+      nextAutoplay = autoplay ? { code: room.code, url: media.url } : null;
+      operation({ type: 'media', media });
+    } else toast('此站共同播放需要客户端，当前视频保持不变');
+  })()
+    .catch(error)
+    .finally(() => {
+      nextBusy = false;
+      render();
+    });
+};
 $('source-url').oninput = () => {
   cancelSourceResolution();
   $('link-unavailable').hidden = true;
@@ -1996,7 +2124,7 @@ function cancelSourceResolution() {
   button.textContent = '同步此链接';
   $('source-form').setAttribute('aria-busy', 'false');
 }
-async function resolveSiteSource(media: MediaInput) {
+async function resolveSiteSource(media: MediaInput, autoplay = false, episodeTitle?: string) {
   if (!room || !connected) {
     toast('请先创建或加入房间');
     return;
@@ -2034,6 +2162,8 @@ async function resolveSiteSource(media: MediaInput) {
     }
     if (!resolved?.source || resolved.provider !== media.provider)
       throw new Error('原站没有提供可播放视频源');
+    if (media.provider === 'xifan' && episodeTitle)
+      resolved.title = `喜番 · ${episodeTitle}`.slice(0, 200);
     button.textContent = '检查视频…';
     await checkResolvedVideo(resolved, signal);
     if (
@@ -2044,6 +2174,7 @@ async function resolveSiteSource(media: MediaInput) {
       room.media?.id !== previous
     )
       return;
+    nextAutoplay = autoplay ? { code, url: resolved.url } : null;
     operation({ type: 'media', media: resolved });
   } catch (cause) {
     if (controller.signal.aborted || sourceResolution !== controller) return;
@@ -2229,6 +2360,7 @@ const ended = () => {
 };
 video.onended = ended;
 video.onloadedmetadata = () => applyPlayback(true);
+video.onloadeddata = startNextWhenReady;
 for (const element of [video, audio])
   element.addEventListener('playing', () => {
     if (playbackPermissionNeeded && !video.paused && (!audio.src || !audio.paused)) {
@@ -2249,6 +2381,7 @@ function playbackError() {
 video.onerror = playbackError;
 audio.onerror = playbackError;
 $('leave-button').onclick = () => {
+  nextAutoplay = null;
   danmakuFeed.reset();
   latencies.clear();
   cancelSourceResolution();
@@ -2317,18 +2450,39 @@ $('image-button').onclick = () => {
 $<HTMLInputElement>('image-input').onchange = () => {
   const input = $<HTMLInputElement>('image-input');
   const file = input.files?.[0];
-  if (!file) return;
-  if (file.size > 20 * 1024 * 1024) {
-    toast('图片最大 20 MiB，支持 GIF 原图');
-    input.value = '';
+  input.value = '';
+  if (file) void sendImage(file);
+};
+$<HTMLTextAreaElement>('chat-input').addEventListener('paste', (event) => {
+  const file = [...(event.clipboardData?.items ?? [])]
+    .find((item) => item.kind === 'file' && item.type.startsWith('image/'))
+    ?.getAsFile();
+  if (!file) return; // Keep ordinary text paste and the current draft intact.
+  event.preventDefault();
+  void sendImage(file);
+});
+async function sendImage(file: File) {
+  if (!['image/png', 'image/jpeg', 'image/gif', 'image/webp'].includes(file.type)) {
+    toast('支持 PNG、JPEG、GIF 和 WebP 图片');
     return;
   }
-  if (!room || !connected) return;
+  if (file.size > 20 * 1024 * 1024) {
+    toast('图片最大 20 MiB，支持 GIF 原图');
+    return;
+  }
+  if (!room || !connected) {
+    toast('请先加入房间');
+    return;
+  }
   const code = room.code;
   const button = $<HTMLButtonElement>('image-button');
+  if (button.disabled) {
+    toast('上一张图片仍在发送，请稍后粘贴');
+    return;
+  }
   button.disabled = true;
   button.title = '正在发送图片…';
-  void fetch(`${activeServer}/images/${code}`, {
+  await fetch(`${activeServer}/images/${code}`, {
     method: 'POST',
     headers: {
       'Content-Type': file.type,
@@ -2343,11 +2497,10 @@ $<HTMLInputElement>('image-input').onchange = () => {
     })
     .catch(error)
     .finally(() => {
-      input.value = '';
       button.disabled = false;
       button.title = '发送图片或 GIF（最大 20 MiB）';
     });
-};
+}
 $('chat-toggle').onclick = () => {
   $('sidebar').hidden = !$('sidebar').hidden;
   document.body.classList.toggle('chat-hidden', $('sidebar').hidden);
@@ -2457,6 +2610,7 @@ setInterval(() => {
       if (!expectedMediaId || room?.media?.id !== expectedMediaId) return;
       const availabilityChanged = siteSample?.available !== sample.available;
       siteSample = sample;
+      startNextWhenReady();
       if (availabilityChanged) render();
       if (
         !room.media.source &&
@@ -2484,8 +2638,10 @@ setInterval(() => {
             position: sample.position,
             duration: sample.duration,
           });
-      } else if (sample.action === 'seek') control('seek', { position: sample.position! });
-      else if (sample.action === 'rate') control('rate', { rate: sample.rate! });
+      } else if (sample.action === 'seek')
+        control('seek', { position: sample.actionPosition ?? sample.position! });
+      else if (sample.action === 'rate')
+        control('rate', { rate: sample.actionRate ?? sample.rate! });
       else control(sample.action);
     })
     .catch(error);

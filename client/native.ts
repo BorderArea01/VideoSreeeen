@@ -6,8 +6,12 @@ export interface Sample {
   duration?: number;
   paused?: boolean;
   rate?: number;
+  readyState?: number;
+  frames?: number;
   source?: import('../shared/protocol').Source;
   action?: 'play' | 'pause' | 'seek' | 'rate' | 'ended';
+  actionPosition?: number;
+  actionRate?: number;
   seq?: number;
   frame?: string;
 }

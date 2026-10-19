@@ -182,6 +182,32 @@ try {
         paused: state.playback.paused,
         rate: state.playback.rate,
       };
+      if (process.env.VS_TEST_NEXT && name === 'bilibili') {
+        assert.equal(await host.evaluate(() => window.desktop!.call('nextEpisode')), null);
+        const previous = state.media.id;
+        await host.locator('#next-episode').click();
+        await host.locator('#toast').filter({ hasText: '原站没有提供下一集' }).waitFor();
+        assert.equal(state.media.id, previous);
+        p.singlePartKeepsCurrentVideo = true;
+      }
+      if (process.env.VS_TEST_NEXT && name === 'mgn') {
+        const candidate = await host.evaluate(() => window.desktop!.call('nextEpisode'));
+        assert.equal(new URL(candidate, url).href, 'https://www.mgnacg.com/bangumi/193-3-18/');
+        await host.locator('#next-episode').click();
+        await confirm(() => state.media?.url === 'https://www.mgnacg.com/bangumi/193-3-18/');
+        for (const page of [host, guest])
+          await waitForNativeSample(page, (s) => s.available && (s.readyState ?? 0) >= 2);
+        await guest.locator('#play-button').click();
+        await confirm(() => !state.playback.paused);
+        p.nextEpisode = { url: state.media.url, players: [] };
+        for (const page of [host, guest]) {
+          const s = await waitForNativeSample(
+            page,
+            (s) => !s.paused && (s.frames ?? 0) > 10 && (s.position ?? 0) > 0.5,
+          );
+          p.nextEpisode.players.push({ frames: s.frames, position: s.position, paused: s.paused });
+        }
+      }
       p.passed = true;
       console.log(JSON.stringify(p));
     } catch (e: any) {

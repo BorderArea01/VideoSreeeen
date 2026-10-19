@@ -23,7 +23,7 @@ export const playbackPickerMarkup = `
     <details id="site-source-options" class="advanced" hidden><summary>原站与视频源</summary><div class="site-chips"><button data-site="bilibili">哔哩哔哩</button><button data-site="xifan">喜番</button><button data-site="mgn">蜜柑</button></div><button id="extract-button" class="text-button" hidden title="仅适用于房间成员均可直接访问的视频源">识别并共享原站视频源</button></details>
   </section>
   <section id="file-choice" class="playback-choice" role="tabpanel" aria-labelledby="choose-file" hidden><p class="playback-copy">选择本机视频，实时传给房间；提供者保持在线。无需整部上传，支持同步暂停和进度。</p><button id="local-video-button" class="button accent" type="button">选择视频文件</button><input id="local-video-input" type="file" accept="video/*,.mkv,.mp4,.webm,.mov" hidden><small class="file-format" title="实际格式支持取决于当前浏览器或客户端的解码器">推荐 H.264 / AAC 的 MP4 文件</small></section>
-  <div id="active-source" class="source-actions active-source" hidden><span id="provider" class="subtle"></span><span id="broadcast-status" class="subtle" role="status"></span><button id="stop-broadcast" class="text-button" type="button" hidden>停止共享</button></div>
+  <div id="active-source" class="source-actions active-source" hidden><span id="provider" class="subtle"></span><span id="broadcast-status" class="subtle" role="status"></span><button id="next-episode" class="button soft small" type="button" title="读取原站剧集列表，让整个房间切换到下一集；B站支持同一视频的分P" hidden>下一集 →</button><button id="stop-broadcast" class="text-button" type="button" hidden>停止共享</button></div>
 </section>`;
 
 // This selection only changes the input panel. The room's playback mode remains

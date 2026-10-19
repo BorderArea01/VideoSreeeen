@@ -812,7 +812,7 @@ input[type='range'] {
   height: 450px;
   min-height: 300px;
   display: flex;
-  flex: 1;
+  flex: 0 0 auto;
   flex-direction: column;
   background: #1a191f;
   border: 1px solid #2d2933;
@@ -821,6 +821,7 @@ input[type='range'] {
   overflow: hidden;
 }
 .chat-heading {
+  flex-shrink: 0;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -855,9 +856,11 @@ input[type='range'] {
 }
 .chat-messages {
   overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
   padding: 14px;
   flex: 1;
-  min-height: 100px;
+  min-height: 0;
   scrollbar-width: thin;
   scrollbar-color: #493d4b transparent;
 }
@@ -888,6 +891,7 @@ input[type='range'] {
   color: #77677f;
 }
 .chat-compose {
+  flex-shrink: 0;
   border-top: 1px solid #2d2933;
   padding: 12px 14px;
 }

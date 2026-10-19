@@ -57,7 +57,7 @@ export default {
         ok: true,
         app: 'videosreeeen',
         runtime: 'cloudflare',
-        version: '0.4.2',
+        version: '0.4.3',
         mediaRelay: false,
         broadcastRelay: true,
         p2p: true,

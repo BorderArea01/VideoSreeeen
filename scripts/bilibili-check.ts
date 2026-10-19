@@ -22,7 +22,7 @@ const browser = await chromium.launch({
 });
 let desktop: Awaited<ReturnType<typeof electron.launch>> | undefined;
 const evidence: Record<string, any> = {
-  version: '0.4.2',
+  version: '0.4.3',
   origin,
   source,
   windowsClient: process.env.VS_PACKAGED_APP ? 'packaged' : 'development',

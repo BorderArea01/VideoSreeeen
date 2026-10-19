@@ -284,6 +284,13 @@ app.whenReady().then(async () => {
         return closeSite();
       case 'sampleSite':
         return sampleSite();
+      case 'nextEpisode':
+        return site && !site.webContents.isDestroyed()
+          ? site.webContents.mainFrame.executeJavaScript(
+              bridge + ';window.__VS.nextEpisode()',
+              true,
+            )
+          : null;
       case 'siteBounds':
         if (site) {
           for (const key of ['x', 'y', 'width', 'height'])

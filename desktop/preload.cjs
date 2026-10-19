@@ -8,6 +8,7 @@ const allowed = new Set([
   'closeSite',
   'siteBounds',
   'sampleSite',
+  'nextEpisode',
   'applySite',
   'cacheStart',
   'cacheClear',

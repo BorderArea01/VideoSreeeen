@@ -115,6 +115,24 @@ try {
     {},
     { timeout: 20000 },
   );
+  await guest.locator('#seek').evaluate((element) => {
+    (element as HTMLInputElement).value = '0.3';
+    element.dispatchEvent(new Event('change'));
+  });
+  const seekFrames = await guest
+    .locator('#video')
+    .evaluate(
+      (element) => (element as HTMLVideoElement).getVideoPlaybackQuality().totalVideoFrames,
+    );
+  await guest.waitForFunction(
+    (before) => {
+      const video = document.querySelector<HTMLVideoElement>('#video')!;
+      return !video.paused && video.getVideoPlaybackQuality().totalVideoFrames > before + 15;
+    },
+    seekFrames,
+    { timeout: 12000 },
+  );
+  assert.equal([...app.rooms.rooms.values()][0]!.playback.paused, false);
   await guest.locator('#play-button').click();
   if (!process.env.VS_FORCE_CANVAS)
     await host.waitForFunction(() => (window as any).__filePublisher?.paused === true);

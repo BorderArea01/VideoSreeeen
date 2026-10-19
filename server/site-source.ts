@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import type { MediaInput } from '../shared/protocol';
 import type { Rooms } from './rooms';
+import { nextEpisode, pageString } from '../shared/episodes';
 
 class SiteSourceError extends Error {}
 
@@ -27,14 +28,49 @@ export function mgnPage(raw: string) {
 export function allowedSiteMetadata(raw: string) {
   const url = new URL(raw);
   return (
-    !url.username &&
-    !url.password &&
-    url.protocol === 'https:' &&
-    ((url.hostname === 'www.mgnacg.com' &&
+    (!url.username &&
+      !url.password &&
+      url.protocol === 'https:' &&
+      ((url.hostname === 'www.mgnacg.com' &&
+        !url.port &&
+        (PAGE.test(url.pathname) || url.pathname === '/static/js/playerconfig.js')) ||
+        (url.origin + url.pathname === PARSER &&
+          /^\?url=[A-Za-z0-9%+\/=]{1,8192}$/.test(url.search)))) ||
+    (!url.username &&
+      !url.password &&
       !url.port &&
-      (PAGE.test(url.pathname) || url.pathname === '/static/js/playerconfig.js')) ||
-      (url.origin + url.pathname === PARSER && /^\?url=[A-Za-z0-9%+\/=]{1,8192}$/.test(url.search)))
+      url.protocol === 'https:' &&
+      ((url.hostname === 'next.xifanacg.com' &&
+        /^\/anime\/\d+\/play\/\d+\/?$/.test(url.pathname) &&
+        /^\?source=[a-z0-9]+$/.test(url.search)) ||
+        (url.hostname === 'www.bilibili.com' &&
+          /^\/video\/BV[A-Za-z0-9]+\/$/.test(url.pathname) &&
+          (!url.search || /^\?p=\d+$/.test(url.search)))))
   );
+}
+
+export function readNextEpisode(page: string, html: string) {
+  const url = new URL(page);
+  if (url.hostname === 'next.xifanacg.com')
+    return nextEpisode(
+      page,
+      pageString(html, 'nextHref'),
+      [pageString(html, 'nextLabel'), pageString(html, 'nextTitle')].filter(Boolean).join(' · ') ||
+        '下一集',
+    );
+  if (url.hostname === 'www.bilibili.com') {
+    const state = assignedJson(html, '__INITIAL_STATE__');
+    const pages = state.videoData?.pages;
+    const part = Number(url.searchParams.get('p') || 1);
+    if (!Array.isArray(pages)) return null;
+    const index = pages.findIndex((p: any) => p.page === part);
+    const next = index < 0 ? undefined : pages[index + 1];
+    return next
+      ? nextEpisode(page, url.pathname + '?p=' + next.page, String(next.part || '下一分P'))
+      : null;
+  }
+  const player = assignedJson(html, 'player_aaaa');
+  return nextEpisode(page, player.link_next);
 }
 async function smallText(
   body: ReadableStream<Uint8Array> | null,
@@ -234,14 +270,33 @@ export class RoomSources {
     if (!this.rooms.memberAccess(code, member, secret))
       return reply({ error: '请先加入房间' }, 401);
     if (this.busy.has(code)) return reply({ error: '房间正在识别视频，请稍候' }, 409);
-    const identity = code + ':' + member;
-    if (Date.now() - (this.attempts.get(identity) ?? 0) < 4000)
-      return reply({ error: '请稍候再重试识别' }, 429);
     this.busy.add(code);
     const signal = AbortSignal.any([request.signal, AbortSignal.timeout(12000)]);
     try {
       const body = JSON.parse(await smallText(request.body, 4096, signal));
       if (typeof body.url !== 'string') return reply({ error: '请提供播放页面地址' }, 400);
+      const identity = code + ':' + member + (body.action === 'next' ? ':next' : ':source');
+      if (Date.now() - (this.attempts.get(identity) ?? 0) < 4000)
+        return reply({ error: '请稍候再重试识别' }, 429);
+      if (body.action === 'next') {
+        const page = new URL(body.url);
+        if (!allowedSiteMetadata(page.href) || !/\/(anime|bangumi|video)\//.test(page.pathname))
+          throw new SiteSourceError('此视频没有可识别的剧集列表');
+        this.attempts.set(identity, Date.now());
+        if (this.attempts.size > 256) this.attempts.delete(this.attempts.keys().next().value!);
+        const response = await this.fetchText(page.href, signal);
+        if (!response.ok) {
+          await response.body?.cancel();
+          throw new SiteSourceError(`暂时无法读取原站剧集信息（HTTP ${response.status}）`);
+        }
+        const next = readNextEpisode(
+          page.href,
+          await smallText(response.body, 1024 * 1024, signal),
+        );
+        if (!this.rooms.memberAccess(code, member, secret))
+          return reply({ error: '已离开房间' }, 401);
+        return reply({ next });
+      }
       const url = mgnPage(body.url);
       this.attempts.set(identity, Date.now());
       if (this.attempts.size > 256) this.attempts.delete(this.attempts.keys().next().value!);

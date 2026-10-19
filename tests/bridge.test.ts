@@ -12,6 +12,7 @@ test('原站桥接：持续同步不吞掉新的手动操作，远端跟随不�
     paused: true,
     playbackRate: 1,
     seeking: false,
+    readyState: 4,
     clientWidth: 640,
     clientHeight: 360,
     currentSrc: 'https://example.com/movie.mp4',
@@ -56,6 +57,14 @@ test('原站桥接：持续同步不吞掉新的手动操作，远端跟随不�
   win.__VS.apply({ position: 10, paused: false, rate: 1 });
   assert.equal(video.paused, false);
   assert.equal(win.__VS.sample().seq, 1);
+  now += 20;
+  gestures.get('pointerdown')!();
+  video.currentTime = 33;
+  listeners.get('seeked')!();
+  now += 2000;
+  win.__VS.apply({ position: 10, paused: true, rate: 1 });
+  assert.equal(win.__VS.sample().position, 10);
+  assert.equal(win.__VS.sample().actionPosition, 33, '采样延迟不能把真实拖动替换成后来的纠偏位置');
 });
 test('B站视频源使用原站提供的 HTTPS 常规端口备源和兼容音轨', () => {
   const win: any = {
