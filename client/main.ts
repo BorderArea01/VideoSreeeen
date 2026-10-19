@@ -228,6 +228,7 @@ let liveMuted = false;
 let autoSharedMedia = '';
 let requestedScreenPage = '';
 let sourceResolution: AbortController | null = null;
+let nextResolution: AbortController | null = null;
 let publisher: HTMLVideoElement | null = null;
 let publisherStream: MediaStream | null = null;
 let providingMediaId = '',
@@ -2038,6 +2039,7 @@ $('invite-button').onclick = () => {
 };
 $('source-form').onsubmit = (event) => {
   event.preventDefault();
+  cancelSourceResolution();
   nextAutoplay = null;
   try {
     const media = describeUrl($<HTMLInputElement>('source-url').value);
@@ -2060,6 +2062,9 @@ $('source-form').onsubmit = (event) => {
 $('next-episode').onclick = () => {
   if (!room?.media || !connected || nextBusy || pendingControl || room.media.broadcast) return;
   const scope = { code: room.code, media: room.media.id, member: memberId, url: room.media.url };
+  cancelSourceResolution();
+  const controller = new AbortController();
+  nextResolution = controller;
   nextBusy = true;
   render();
   void (async () => {
@@ -2076,7 +2081,7 @@ $('next-episode').onclick = () => {
           'X-Member-Id': scope.member,
         },
         body: JSON.stringify({ action: 'next', url: scope.url }),
-        signal: AbortSignal.timeout(15000),
+        signal: AbortSignal.any([controller.signal, AbortSignal.timeout(15000)]),
       });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || '暂时无法读取剧集信息');
@@ -2084,6 +2089,7 @@ $('next-episode').onclick = () => {
       if (typeof result.next?.title === 'string') episodeTitle = result.next.title;
     }
     if (
+      controller.signal.aborted ||
       !connected ||
       room?.code !== scope.code ||
       room.media?.id !== scope.media ||
@@ -2096,6 +2102,8 @@ $('next-episode').onclick = () => {
       return;
     }
     const media = describeUrl(next.url);
+    // Hand off cancellation to the source resolver before changing its panel.
+    nextResolution = null;
     const autoplay = !room.playback.paused;
     $<HTMLInputElement>('source-url').value = next.url;
     playbackPicker.select('link');
@@ -2106,8 +2114,11 @@ $('next-episode').onclick = () => {
       operation({ type: 'media', media });
     } else toast('此站共同播放需要客户端，当前视频保持不变');
   })()
-    .catch(error)
+    .catch((cause) => {
+      if (!controller.signal.aborted) error(cause);
+    })
     .finally(() => {
+      if (nextResolution === controller) nextResolution = null;
       nextBusy = false;
       render();
     });
@@ -2117,6 +2128,8 @@ $('source-url').oninput = () => {
   $('link-unavailable').hidden = true;
 };
 function cancelSourceResolution() {
+  nextResolution?.abort();
+  nextResolution = null;
   sourceResolution?.abort();
   sourceResolution = null;
   const button = document.querySelector<HTMLButtonElement>('#source-form button')!;

@@ -284,13 +284,23 @@ app.whenReady().then(async () => {
         return closeSite();
       case 'sampleSite':
         return sampleSite();
-      case 'nextEpisode':
-        return site && !site.webContents.isDestroyed()
-          ? site.webContents.mainFrame.executeJavaScript(
+      case 'nextEpisode': {
+        if (!site || site.webContents.isDestroyed()) return null;
+        let timer;
+        try {
+          return await Promise.race([
+            site.webContents.mainFrame.executeJavaScript(
               bridge + ';window.__VS.nextEpisode()',
               true,
-            )
-          : null;
+            ),
+            new Promise((_, reject) => {
+              timer = setTimeout(() => reject(new Error('原站剧集信息读取超时，请稍后再试')), 1500);
+            }),
+          ]);
+        } finally {
+          clearTimeout(timer);
+        }
+      }
       case 'siteBounds':
         if (site) {
           for (const key of ['x', 'y', 'width', 'height'])

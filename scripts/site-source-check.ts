@@ -111,12 +111,30 @@ try {
   assert.equal(latest.media.provider, provider);
   assert.ok(latest.media.source);
   assert.equal(latest.media.broadcast, undefined);
-  for (const page of [host, guest])
-    await page.waitForFunction(
-      () => document.querySelector<HTMLVideoElement>('#video')!.readyState >= 2,
-      {},
-      { timeout: 30000 },
-    );
+  try {
+    for (const page of [host, guest])
+      await page.waitForFunction(
+        () => document.querySelector<HTMLVideoElement>('#video')!.readyState >= 2,
+        {},
+        { timeout: 30000 },
+      );
+  } catch (cause) {
+    proof.initialPlayers = [];
+    for (const page of [host, guest])
+      proof.initialPlayers.push(
+        await page.locator('#video').evaluate((el) => {
+          const v = el as HTMLVideoElement;
+          return {
+            readyState: v.readyState,
+            network: v.networkState,
+            error: v.error?.code,
+            hidden: v.hidden,
+            paused: v.paused,
+          };
+        }),
+      );
+    throw cause;
+  }
   await guest.locator('#play-button').click();
   for (const page of [host, guest])
     await page.waitForFunction(
@@ -318,6 +336,47 @@ try {
   proof.unplayableResultNotPublished = true;
   await host.unroute(metadataRoute);
   if (process.env.VS_TEST_NEXT) {
+    const unchanged = latest.media.id,
+      mediaCommands = commands.length;
+    let started!: () => void, finish!: () => void;
+    const requested = new Promise<void>((resolve) => {
+      started = resolve;
+    });
+    const delayed = new Promise<void>((resolve) => {
+      finish = resolve;
+    });
+    const metadata = '**/resolve-source/**';
+    const delayNext = async (route: Route) => {
+      if (route.request().postDataJSON()?.action !== 'next') {
+        await route.continue();
+        return;
+      }
+      started();
+      await delayed;
+      await route
+        .fulfill({
+          json: {
+            next: {
+              url: 'https://next.xifanacg.com/anime/151/play/1987?source=xfy2',
+              title: '迟到的下一集',
+            },
+          },
+        })
+        .catch(() => {});
+    };
+    await host.route(metadata, delayNext);
+    await host.locator('#next-episode').click();
+    await requested;
+    await choosePlayback(host, 'file');
+    finish();
+    await host.waitForFunction(
+      () => !document.querySelector<HTMLButtonElement>('#next-episode')!.disabled,
+    );
+    await host.unroute(metadata, delayNext);
+    assert.equal(latest.media.id, unchanged);
+    assert.equal(commands.length, mediaCommands);
+    proof.cancelledNextKeepsMedia = true;
+    await choosePlayback(host, 'link');
     await host.locator('#play-button').click();
     const playingDeadline = Date.now() + 15000;
     while (latest.playback.paused) {

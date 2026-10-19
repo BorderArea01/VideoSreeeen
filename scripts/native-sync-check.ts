@@ -177,6 +177,19 @@ try {
     '.local/screenshots/native-common-source.png',
     Buffer.from(sourceImage, 'base64'),
   );
+  // Only the owned local fixture is modified: an unresponsive original-page
+  // metadata promise must not leave the trusted UI's next-episode action busy.
+  await desktop.evaluate(async ({ webContents }, url) => {
+    const contents = webContents.getAllWebContents().find((w) => w.getURL() === url)!;
+    await contents.executeJavaScript('window.__VS.nextEpisode=()=>new Promise(()=>{})');
+  }, source);
+  const readBegan = performance.now();
+  await assert.rejects(
+    host.evaluate(() => window.desktop!.call('nextEpisode')),
+    /剧集信息读取超时/,
+  );
+  assert.ok(performance.now() - readBegan < 4000);
+  evidence.nextEpisodeReadHasDeadline = true;
   assert.deepEqual(errors, []);
   evidence.errors = errors;
   console.log(JSON.stringify(evidence));
