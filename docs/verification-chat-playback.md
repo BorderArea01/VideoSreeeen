@@ -49,4 +49,4 @@
 - 便携版 SHA-256：`f8c9e3da9fa2f34b2642bd3abbf164a7027ec9822996e3ee2d4e0292a831dd90`。
 - APK SHA-256：`7174988f83194e171585f74ee973bdc93dfd434179cb83e043d3b791ebfd7d3f`。
 
-GitHub 7 项发布附件已在本机准备；发布状态在完成后补录。匿名访问此前返回 404，不能据此承诺公开自动更新可达。没有启用付费服务或 TURN。
+GitHub `v0.4.3` 已发布并为 latest，非 draft；目标提交 `d1e92ef713f0af91eff5cbfc45a755f5dd8ebbab`，与运行时提交之间仅增加验收脚本和验证记录。7 项附件的大小和 SHA-256 均由发布器逐项与认证 API 核对。发布后认证 API 确认 latest / 7 assets / draft=false；匿名 latest API 与本轮 `v0.4.3/update.json` 仍为 404，不能承诺公开自动更新可达。本机保留已验证安装包、便携版和 APK 供直接取用。没有启用付费服务或 TURN。
