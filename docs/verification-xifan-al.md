@@ -68,3 +68,5 @@ $env:VS_TEST_RECOVERY='1'
 正式入口 `test:broadcast-relay` 回归通过：测试生成的 1280×720 画面与音频经既有 WebSocket 视频通道接收，未启动视频 WebRTC；首播约 6.7 秒，晚加入和离开不重启已有编码，提供者重连、切换流畅画质及停止清理均通过。观众本机静音和全屏正常，实时画面不显示虚假进度、暂停或倍速；连续 6 秒采样均继续出帧，无页面错误。验收脚本同步改为显式选择共享画面，避免依赖已改变的默认面板。
 
 公网脱敏摘要保存在忽略目录 `.local/xifan-al-playback-public-evidence.json` 与 `.local/public-web-source-evidence.json`。以上仍是同一电脑上两份独立浏览器资料的公网服务验收，未完成异地网络、Android / iOS 真机或 B 站登录后高清验收。
+
+随后用户反馈 Android Edge 无法播放同一 AL 视频，实际 HEVC 编码、加载波动、本机恢复与后续部署记录见 [手机播放失败记录](verification-mobile-source.md)。此用户现场失败不因上述电脑实播通过而被排除。

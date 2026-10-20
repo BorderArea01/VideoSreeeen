@@ -31,3 +31,21 @@
 - 无页面错误。仍未完成用户手机上的实际错误诊断，不宣称已修复该手机的 HEVC 解码或网络连通问题。
 
 错误含义依据：[HTML Standard MediaError](https://html.spec.whatwg.org/multipage/media.html#error-codes)。真实 Android 设备未安装或操作。
+
+## 网页部署与正式入口验收
+
+沿用此前用户授权的免费账号和资源部署恢复入口与诊断，未启用付费中继、未代理原站视频、未生成或安装新客户端。
+
+- 运行时提交：`9d73c3ff4fdbc003d8418feeb7c49171fee89a5d`，已推送 GitHub。
+- Worker：`285625ae-a20f-432d-ba08-accb212232b5`。
+- Pages：`9a7585c0-0022-48f5-a1db-ac30172e0c49`。
+- 正式入口：[videosreeeen.pages.dev](https://videosreeeen.pages.dev)，健康版本仍为 0.4.3。
+- 活跃脚本：`assets/index-CEz-ycDs.js`，SHA-256 `2f4437fff83573945cbe92c6a42adc46ccb7d054a1fc508a69337326388f8352`。线上 HTML、脚本、样式与本次构建逐字节一致。
+
+`VS_PUBLIC_URL=https://videosreeeen.pages.dev npm run test:playback-retry` 已通过与本地相同的真实房间／原站故障恢复流程，包括再次失败、重新加载成功、不改房间媒体和播放版本、不发观众控制指令及换片取消旧重试。正式配置不经过测试覆盖，视频仍直接来自原 CDN。移动视口失败页面已实际截图、检查，无横向溢出。
+
+首次两轮公网验收在房主发布前失败：原站接口均 HTTP 200，但首帧检查未在限时内完成，显示识别失败。增加网络结果记录后的复验取得 CDN HTTP 206 / video/mp4 并通过完整流程；不能将前两次超时归为手机解码问题，也不能把后一次成功当作原站长期稳定性保证。
+
+同一正式入口的 `test:broadcast-relay` 回归通过：实际 1280×720 画面与音频解码、静音、全屏、晚加入、提供者重连、画质切换、连续出帧与停止清理正常，未重新出现虚假时间线控制，无页面错误。
+
+本地与公网脱敏证据分别保存在忽略目录 `.local/playback-retry-local-evidence.json`、`.local/playback-retry-public-evidence.json`；运行时来源核对为 `.local/public-web-source-evidence.json`。部署后已向用户请求一个最小现场动作：刷新手机当前房间，重试本机视频，仍失败时复制诊断。尚未收到该手机的错误码或恢复确认，真实手机问题保持待定位，不标记通过。

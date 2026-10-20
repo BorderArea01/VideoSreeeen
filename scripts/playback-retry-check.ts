@@ -34,6 +34,7 @@ const proof: Record<string, any> = {
   realAndroidDevice: false,
   videoProxy: false,
 };
+let releasePending: (() => void) | undefined;
 try {
   const ownerContext = await browser.newContext();
   const viewerContext = await browser.newContext(devices['Pixel 7']);
@@ -73,12 +74,31 @@ try {
   await owner.locator('#invite-dialog').waitFor();
   const invite = await owner.locator('#invite-link').inputValue();
   await closeInvitation(owner);
+  proof.stage = 'initial-source';
+  owner.on('response', (response) => {
+    if (response.url().includes('/issue-web-playback'))
+      proof.initialMetadataStatus = response.status();
+    if (new URL(response.url()).hostname === 'play.xfvod.pro')
+      (proof.videoResponses ??= []).push({
+        status: response.status(),
+        type: response.headers()['content-type'],
+      });
+  });
+  owner.on('requestfailed', (request) => {
+    if (new URL(request.url()).hostname === 'play.xfvod.pro')
+      (proof.videoRequestFailures ??= []).push(request.failure()?.errorText);
+  });
   await selectSource(owner, original);
-  await owner.waitForFunction(
-    () => document.querySelector<HTMLVideoElement>('#video')!.readyState >= 2,
-    {},
-    { timeout: 30000 },
-  );
+  await owner
+    .waitForFunction(
+      () => document.querySelector<HTMLVideoElement>('#video')!.readyState >= 2,
+      {},
+      { timeout: 30000 },
+    )
+    .catch(async (cause) => {
+      proof.initialFailure = await owner.locator('#link-error').textContent();
+      throw cause;
+    });
   const blocked = 'https://play.xfvod.pro:8088/**';
   await viewer.route(blocked, (route) => route.abort('failed'));
   await viewer.goto(invite);
@@ -146,6 +166,7 @@ try {
   let release!: () => void, started!: () => void;
   const gate = new Promise<void>((r) => (release = r)),
     requested = new Promise<void>((r) => (started = r));
+  releasePending = release;
   await viewer.route(endpoint, async (route: Route) => {
     if (route.request().method() === 'OPTIONS') {
       await route.continue();
@@ -172,6 +193,7 @@ try {
   assert.equal(await viewer.locator('#browser-hint').isVisible(), false);
   assert.deepEqual(commands, []);
   proof.mediaChangeCancelsLocalRetry = true;
+  proof.stage = 'complete';
   proof.errors = errors;
   assert.deepEqual(errors, []);
   await mkdir('.local/screenshots', { recursive: true });
@@ -183,6 +205,7 @@ try {
   await viewer.locator('#leave-button').click();
   console.log(JSON.stringify(proof));
 } finally {
+  releasePending?.();
   await browser.close();
   await app?.close();
   await mkdir('.local', { recursive: true });
