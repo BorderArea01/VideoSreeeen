@@ -16,11 +16,7 @@ export function reconcile(
   catchingUp = false,
 ): Correction {
   const drift = target - local;
-  if (
-    explicitSeek ||
-    (paused && Math.abs(drift) > 0.12) ||
-    Math.abs(drift) > 1.2 * Math.max(1, rate)
-  )
+  if (explicitSeek || (paused && Math.abs(drift) > 0.12) || drift > 1.2 * Math.max(1, rate))
     return { kind: 'seek', target, rate };
   if (!paused && Math.abs(drift) > (catchingUp ? 0.06 : 0.3) * Math.max(1, rate))
     return {

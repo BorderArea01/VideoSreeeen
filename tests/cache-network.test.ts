@@ -1,6 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { browserCacheNetwork, cacheRequest, checkBrowserCacheSize } from '../client/cache-network';
+import {
+  browserCacheNetwork,
+  cacheRequest,
+  checkBrowserCacheSize,
+  downloadWholeTrack,
+} from '../client/cache-network';
 
 const source = 'https://example.com/movie.mp4?temporary=secret';
 const fresh = () => new AbortController();
@@ -58,6 +63,7 @@ test('CDN 未公开 Content-Range 时通过 HEAD 识别超限整集，仍不放�
   });
   assert.deepEqual(await browserCacheNetwork('probe', source, fresh().signal, 0, 1, network), {
     size,
+    sequential: true,
   });
   assert.deepEqual(methods, ['GET', 'HEAD']);
   assert.throws(() => checkBrowserCacheSize([{ size }]), /394\.0 MiB.*单轨 96 MiB、合计 128 MiB/);
@@ -92,6 +98,57 @@ test('网络与跨域失败保留不确定性，错误不泄漏源 URL；取消�
   await assert.rejects(browserCacheNetwork('fetch', source, controller.signal, 0, 1, network), {
     name: 'AbortError',
   });
+});
+
+test('完整响应按 256 KiB 写入，短响应、超长和中断均不能完成', async () => {
+  const size = 600000,
+    original = new Uint8Array(size).map((_, i) => i % 251),
+    received: Uint8Array[] = [];
+  await downloadWholeTrack(
+    source,
+    size,
+    fresh().signal,
+    async (offset, data) => {
+      assert.equal(
+        offset,
+        received.reduce((n, p) => n + p.length, 0),
+      );
+      assert.ok(data.length <= 256 * 1024);
+      received.push(data.slice());
+    },
+    fetcher(async () => new Response(original, { headers: { 'Content-Length': String(size) } })),
+  );
+  assert.deepEqual(Buffer.concat(received), Buffer.from(original));
+  for (const length of [size - 1, size + 1])
+    await assert.rejects(
+      downloadWholeTrack(
+        source,
+        size,
+        fresh().signal,
+        async () => {},
+        fetcher(
+          async () =>
+            new Response(new Uint8Array(length), { headers: { 'Content-Length': String(size) } }),
+        ),
+      ),
+      /完整|预计大小/,
+    );
+  const controller = fresh();
+  let blocks = 0;
+  await assert.rejects(
+    downloadWholeTrack(
+      source,
+      size,
+      controller.signal,
+      async () => {
+        blocks++;
+        controller.abort();
+      },
+      fetcher(async () => new Response(original, { headers: { 'Content-Length': String(size) } })),
+    ),
+    { name: 'AbortError' },
+  );
+  assert.equal(blocks, 1);
 });
 
 test('服务器忽略 Range、视频过期或 HEAD 无有效总大小不能进入就绪', async () => {

@@ -27,6 +27,15 @@ try {
   await writeFile('.local/flower.mp4', data);
 }
 let downloads = 0;
+let holdSource = false,
+  held = 0;
+if (process.env.VS_TEST_LARGE_CACHE) {
+  const size = 100 * 1024 ** 2,
+    header = Buffer.alloc(8);
+  header.writeUInt32BE(size);
+  header.write('free', 4);
+  data = Buffer.concat([data, header, Buffer.alloc(size - 8)]);
+}
 const source = createServer((request, response) => {
   // Deliberately omit Vary: Origin, as observed on the actual CDN. A media
   // element's response cannot be reused by the later CORS cache downloader.
@@ -45,6 +54,11 @@ const source = createServer((request, response) => {
   }
   response.setHeader('Content-Length', end - start + 1);
   if (request.headers.origin && request.method !== 'HEAD') downloads += end - start + 1;
+  if (holdSource && request.headers.origin && end - start + 1 === 256 * 1024) {
+    held++;
+    response.write(data.subarray(start, start + 100));
+    return;
+  }
   response.end(request.method === 'HEAD' ? undefined : data.subarray(start, end + 1));
 });
 source.listen(0, '127.0.0.1');
@@ -64,11 +78,25 @@ const proof: Record<string, any> = {
   videoProxy: false,
   networkProxy: !!process.env.VS_TEST_PROXY,
 };
-const ready = (page: Page) =>
-  page
-    .locator('#cache-title')
-    .filter({ hasText: '本机已准备好' })
-    .waitFor({ state: 'attached', timeout: 30000 });
+const ready = async (page: Page, timeout = 30000) => {
+  await page.waitForFunction(
+    () => {
+      const title = document.querySelector('#cache-title')!.textContent;
+      return (
+        title === '本机已准备好' ||
+        (title === '本机缓存未完成' &&
+          !document.querySelector<HTMLButtonElement>('#cache-button')!.disabled)
+      );
+    },
+    {},
+    { timeout },
+  );
+  assert.equal(
+    await page.locator('#cache-title').textContent(),
+    '本机已准备好',
+    (await page.locator('#cache-description').textContent()) ?? '缓存未完成',
+  );
+};
 try {
   const contexts = [await browser.newContext(), await browser.newContext(devices['Pixel 7'])];
   for (const context of contexts) {
@@ -78,7 +106,11 @@ try {
       const response = await route.fetch();
       await route.fulfill({
         response,
-        json: { ...(await response.json()), mediaRelay: false, p2p: false },
+        json: {
+          ...(await response.json()),
+          mediaRelay: false,
+          p2p: !!process.env.VS_CACHE_REAL_AL,
+        },
       });
     });
     if (app)
@@ -153,7 +185,19 @@ try {
       }
       return { names: names.length, bytes: size };
     });
-    assert.deepEqual(stored, { names: 1, bytes: data.length });
+    if (process.env.VS_TEST_LARGE_CACHE) {
+      const sizes = await page.evaluate(async () => {
+        const root = await (
+          await navigator.storage.getDirectory()
+        ).getDirectoryHandle('videosreeeen-disk');
+        const result: number[] = [];
+        for await (const directory of (root as any).values())
+          for await (const f of directory.values()) result.push((await f.getFile()).size);
+        return result;
+      });
+      assert.deepEqual(sizes, [data.length]);
+      assert.equal(stored.names, 0);
+    } else assert.deepEqual(stored, { names: 1, bytes: data.length });
     assert.ok((await page.locator('#video').getAttribute('src'))?.startsWith('blob:'));
   }
   proof.fixture = {
@@ -180,6 +224,42 @@ try {
       [],
     );
   proof.fixture.endedCleanup = true;
+  for (const page of [owner, viewer]) {
+    const count = await page.evaluate(async () => {
+      try {
+        const root = await (
+          await navigator.storage.getDirectory()
+        ).getDirectoryHandle('videosreeeen-disk');
+        let n = 0;
+        for await (const _ of (root as any).keys()) n++;
+        return n;
+      } catch (e) {
+        if ((e as DOMException).name === 'NotFoundError') return 0;
+        throw e;
+      }
+    });
+    assert.equal(count, 0);
+  }
+  if (process.env.VS_TEST_LARGE_CACHE) {
+    await owner.locator('#cache-button').click();
+    await owner.locator('#cache-button').filter({ hasText: '开始本机缓存' }).waitFor();
+    holdSource = true;
+    await owner.locator('#cache-button').click();
+    for (let i = 0; i < 100 && !held; i++) await owner.waitForTimeout(50);
+    assert.ok(held, 'A real block response was held after disk initialization');
+    await owner.locator('#cache-options').evaluate((e: HTMLDetailsElement) => (e.open = true));
+    await owner.locator('#mode-toggle').click();
+    await owner.locator('#cache-overlay').waitFor({ state: 'hidden' });
+    await owner.waitForFunction(async () => {
+      const root = await (
+        await navigator.storage.getDirectory()
+      ).getDirectoryHandle('videosreeeen-disk');
+      for await (const _ of (root as any).keys()) return false;
+      return true;
+    });
+    holdSource = false;
+    proof.fixture.cancelledDownloadCleanup = true;
+  }
   if (process.env.VS_CACHE_REAL_AL) {
     await owner.locator('#cache-options').evaluate((e: HTMLDetailsElement) => (e.open = true));
     await owner.locator('#mode-toggle').click();
@@ -197,41 +277,67 @@ try {
     );
     if (latest.mode !== 'cache') await owner.locator('#mode-toggle').click();
     await owner.locator('#cache-button').click();
-    await owner
-      .locator('#cache-title')
-      .filter({ hasText: '本机缓存未完成' })
-      .waitFor({ timeout: 30000 });
-    proof.al = {
-      error: await owner.locator('#cache-description').textContent(),
-      ready: latest.cacheReady,
-    };
-    assert.match(proof.al.error, /394\.0 MiB.*单轨 96 MiB、合计 128 MiB/);
+    const progress = setInterval(
+      () =>
+        console.log(
+          'AL cache: ' +
+            latest?.members
+              .map((m: any) => `${m.cache.state}:${Math.floor(m.cache.progress * 100)}%`)
+              .join(', '),
+        ),
+      10000,
+    );
+    try {
+      await ready(owner, 600000);
+    } finally {
+      clearInterval(progress);
+    }
     assert.equal(latest.cacheReady, false);
-    assert.doesNotMatch(proof.al.error, /Failed to fetch/);
-    // The error travels through the real room snapshot to the phone viewport.
     await viewer.locator('#cache-button').click();
-    await viewer
-      .locator('#cache-title')
-      .filter({ hasText: '本机缓存未完成' })
-      .waitFor({ timeout: 30000 });
+    await ready(viewer, 600000);
+    assert.equal(latest.cacheReady, true);
+    const fingerprints = latest.members.map((m: any) => m.cache.fingerprint);
+    assert.equal(new Set(fingerprints).size, 1);
+    proof.al = {
+      bytes: latest.members.map((m: any) => m.cache.bytes),
+      fingerprint: fingerprints[0],
+      allReady: latest.cacheReady,
+      viewer: await viewer.locator('#cache-description').textContent(),
+    };
     await viewer.screenshot({
-      path: '.local/screenshots/cache-capacity-mobile.png',
+      path: '.local/screenshots/cache-disk-mobile.png',
       fullPage: true,
     });
     await owner.screenshot({
-      path: '.local/screenshots/cache-capacity-desktop.png',
+      path: '.local/screenshots/cache-disk-desktop.png',
       fullPage: true,
     });
-    await owner.locator('#cache-stream').click();
-    await owner.locator('#cache-overlay').waitFor({ state: 'hidden' });
-    await viewer.locator('#cache-overlay').waitFor({ state: 'hidden' });
+    // Neither cached player may depend on its CDN during play or a real seek.
+    for (const page of [owner, viewer])
+      await page.route('https://play.xfvod.pro:8088/**', (route) => route.abort());
     await owner.locator('#play-button').click();
     await viewer.waitForFunction(
       () => document.querySelector<HTMLVideoElement>('#video')!.currentTime > 0.3,
       {},
       { timeout: 20000 },
     );
-    proof.al.returnedToStreaming = true;
+    await owner.locator('#seek').fill('60');
+    await owner.locator('#seek').dispatchEvent('change');
+    for (const page of [owner, viewer])
+      await page.waitForFunction(
+        () => {
+          const v = document.querySelector<HTMLVideoElement>('#video')!;
+          return (
+            v.currentSrc.startsWith('blob:') &&
+            v.videoWidth === 1920 &&
+            v.currentTime > 60.2 &&
+            !v.seeking
+          );
+        },
+        {},
+        { timeout: 20000 },
+      );
+    proof.al.offlineCdnPlaybackAndSeek = true;
   }
   await owner.locator('#leave-button').click();
   await viewer.locator('#leave-button').click();

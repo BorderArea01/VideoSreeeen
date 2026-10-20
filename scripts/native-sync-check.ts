@@ -41,14 +41,18 @@ try {
   );
   desktop = await electron.launch({
     ...(process.env.VS_PACKAGED_EXE ? { executablePath: process.env.VS_PACKAGED_EXE } : {}),
-    args: [process.env.VS_PACKAGED_EXE ? '--user-data-dir=' + profile : entry, '--mute-audio'],
+    args: [
+      ...(process.env.VS_PACKAGED_EXE ? [] : [entry]),
+      '--user-data-dir=' + profile,
+      '--mute-audio',
+    ],
     env: { ...process.env, VS_DEV_URL: process.env.VS_PACKAGED_EXE ? '' : origin },
   });
-  assert.equal(await desktop.evaluate(({ app }) => app.getPath('userData')), profile);
   evidence.packaged = !!process.env.VS_PACKAGED_EXE;
   const host = await desktop.firstWindow(),
     context = await browser.newContext(),
     guest = await context.newPage();
+  assert.equal(await desktop.evaluate(({ app }) => app.getPath('userData')), profile);
   const errors: string[] = [];
   for (const page of [host, guest]) page.on('pageerror', (error) => errors.push(error.message));
   await configureRoomServer(host, origin);

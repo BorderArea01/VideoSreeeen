@@ -9,7 +9,14 @@ import {
 import type { Source } from '../shared/protocol';
 import { isNative, cacheNative, nativeCall, type NativeCache } from './native';
 import { RoomPeers, decode, encode, hexDigest, type FileInfo } from './peers';
-import { browserCacheNetwork, cacheRequest, checkBrowserCacheSize } from './cache-network';
+import {
+  browserCacheNetwork,
+  cacheRequest,
+  checkBrowserCacheSize,
+  downloadWholeTrack,
+  RangeMetadataUnavailable,
+} from './cache-network';
+import { BrowserDiskCache } from './disk-cache';
 
 const PREFIX = 'videosreeeen-';
 export class DeviceCache {
@@ -18,6 +25,8 @@ export class DeviceCache {
   private objectUrls: string[] = [];
   private peerBytes = 0;
   private sourceBytes = 0;
+  private disk: BrowserDiskCache | null = null;
+  private sequential = new Set<string>();
   jobId = '';
   constructor(
     private progress: (event: NativeCache) => void,
@@ -43,6 +52,8 @@ export class DeviceCache {
         length,
       });
     const result = await browserCacheNetwork(action, url, signal, offset, length);
+    if (typeof result === 'object' && 'sequential' in result && result.sequential)
+      this.sequential.add(url);
     return result instanceof Uint8Array ? encode(result) : result;
   }
   async start(jobId: string, server: string, planPath: string, source: Source) {
@@ -149,6 +160,7 @@ export class DeviceCache {
     const total = files.reduce((n, f) => n + f.size, 0);
     if (total > MAX_CACHE) throw new Error('视频超过 4 GiB 缓存上限');
     const browser = await this.prepare(jobId, plan, files);
+    const disk = this.disk;
     const cacheKey = (file: number, offset: number) =>
       new URL(`/__cache__/${jobId}/${files![file]!.name}/${offset}`, location.origin).href;
     const read = async (file: number, offset: number) =>
@@ -156,12 +168,46 @@ export class DeviceCache {
         ? decode(
             await nativeCall('cacheIO', { action: 'get', jobId, name: files![file]!.name, offset }),
           )
-        : new Uint8Array(await (await browser!.match(cacheKey(file, offset)))!.arrayBuffer());
+        : disk
+          ? disk.get(files![file]!.name, offset)
+          : new Uint8Array(await (await browser!.match(cacheKey(file, offset)))!.arrayBuffer());
     await this.peers.start(files, read);
     let bytes = 0,
       ordinal = 0;
     for (let file = 0; file < files.length; file++) {
       const f = files[file]!;
+      const complete = new Set<number>();
+      const store = async (offset: number, data: Uint8Array) => {
+        signal.throwIfAborted();
+        if (data.length !== Math.min(BLOCK_SIZE, f.size - offset)) throw new Error('分块长度不符');
+        const hash = await hexDigest(data);
+        signal.throwIfAborted();
+        if (isNative)
+          await nativeCall('cacheIO', {
+            action: 'put',
+            jobId,
+            name: f.name,
+            offset,
+            data: encode(data),
+          });
+        else if (disk) await disk.put(f.name, offset, data);
+        else
+          await browser!.put(cacheKey(file, offset), new Response(data as Uint8Array<ArrayBuffer>));
+        signal.throwIfAborted();
+        this.peers.announce(file, offset, hash);
+        if (!complete.has(offset)) {
+          bytes += data.length;
+          complete.add(offset);
+        }
+        this.progress({
+          state: 'downloading',
+          jobId,
+          progress: bytes / total,
+          bytes,
+          peerBytes: this.peerBytes,
+          sourceBytes: this.sourceBytes,
+        });
+      };
       const blocks = Array.from({ length: Math.ceil(f.size / BLOCK_SIZE) }, (_, i) => ({
         offset: i * BLOCK_SIZE,
         ordinal: ordinal++,
@@ -185,16 +231,33 @@ export class DeviceCache {
         if (data) this.peerBytes += data.length;
         else {
           let failure: unknown;
+          let whole = false;
           for (const url of urls[file]!)
             try {
+              if (!isNative && this.sequential.has(url)) throw new RangeMetadataUnavailable();
               data = decode(
                 await this.network('fetch', jobId, url, plan.referer, block.offset, length),
               );
               break;
             } catch (e) {
               signal.throwIfAborted();
+              if (e instanceof RangeMetadataUnavailable) {
+                try {
+                  await downloadWholeTrack(url, f.size, signal, async (offset, part) => {
+                    this.sourceBytes += part.length;
+                    await store(offset, part);
+                  });
+                  whole = true;
+                  break;
+                } catch (cause) {
+                  signal.throwIfAborted();
+                  failure = cause;
+                  continue;
+                }
+              }
               failure = e;
             }
+          if (whole) break;
           if (data) this.sourceBytes += data.length;
           else {
             data = await this.peers.get(file, block.offset, 8000);
@@ -202,39 +265,29 @@ export class DeviceCache {
             this.peerBytes += data.length;
           }
         }
-        signal.throwIfAborted();
-        if (data.length !== length) throw new Error('分块长度不符');
-        const hash = await hexDigest(data);
-        if (isNative)
-          await nativeCall('cacheIO', {
-            action: 'put',
-            jobId,
-            name: f.name,
-            offset: block.offset,
-            data: encode(data),
-          });
-        else
-          await browser!.put(
-            cacheKey(file, block.offset),
-            new Response(data as Uint8Array<ArrayBuffer>),
-          );
-        signal.throwIfAborted();
-        this.peers.announce(file, block.offset, hash);
-        bytes += length;
-        this.progress({
-          state: 'downloading',
-          jobId,
-          progress: bytes / total,
-          bytes,
-          peerBytes: this.peerBytes,
-          sourceBytes: this.sourceBytes,
-        });
+        await store(block.offset, data);
       }
     }
     signal.throwIfAborted();
     let ready: NativeCache;
     if (isNative) ready = await nativeCall('cacheIO', { action: 'finish', jobId });
-    else {
+    else if (disk) {
+      const fingerprint = await disk.finish();
+      signal.throwIfAborted();
+      const entry = URL.createObjectURL(await disk.file(plan.entry));
+      this.objectUrls.push(entry);
+      const audio = plan.audio ? URL.createObjectURL(await disk.file(plan.audio)) : undefined;
+      if (audio) this.objectUrls.push(audio);
+      ready = {
+        state: 'ready',
+        jobId,
+        progress: 1,
+        bytes,
+        fingerprint,
+        entry,
+        ...(audio ? { audio } : {}),
+      };
+    } else {
       const hashes: string[] = [],
         entries = new Map<string, string>();
       for (let file = 0; file < files.length; file++) {
@@ -277,17 +330,25 @@ export class DeviceCache {
     }
     if (!window.isSecureContext || !('caches' in window))
       throw new Error('浏览器完整缓存需要 HTTPS');
-    checkBrowserCacheSize(files);
+    const large =
+      files.reduce((n, f) => n + f.size, 0) > 128 * 1024 ** 2 ||
+      files.some((f) => f.size > 96 * 1024 ** 2);
+    if (large && !BrowserDiskCache.supported()) checkBrowserCacheSize(files);
     const estimate = await navigator.storage.estimate(),
       total = files.reduce((n, f) => n + f.size, 0);
-    if ((estimate.quota ?? 0) - (estimate.usage ?? 0) < total + 32 * 1024 ** 2)
+    if ((estimate.quota ?? 0) - (estimate.usage ?? 0) < total + (large ? 256 : 32) * 1024 ** 2)
       throw new Error('浏览器可用存储不足');
+    if (large) {
+      this.disk = await BrowserDiskCache.create(jobId, files, this.controller!.signal);
+      return null;
+    }
     this.browserName = PREFIX + Date.now() + '-' + jobId;
     return caches.open(this.browserName);
   }
   async clear() {
     this.controller?.abort();
     this.controller = null;
+    this.sequential.clear();
     this.peers.resetCache();
     for (const url of this.objectUrls) URL.revokeObjectURL(url);
     this.objectUrls = [];
@@ -295,10 +356,14 @@ export class DeviceCache {
       name = this.browserName;
     this.jobId = '';
     this.browserName = '';
+    const disk = this.disk;
+    this.disk = null;
+    if (disk) await disk.clear();
     if (isNative && previous) await nativeCall('cacheClear', { jobId: previous });
     if (name && 'caches' in window) await caches.delete(name);
   }
   async sweep() {
+    if (!isNative) await BrowserDiskCache.sweep();
     if (!isNative && 'caches' in window)
       for (const key of await caches.keys())
         if (key.startsWith(PREFIX)) {

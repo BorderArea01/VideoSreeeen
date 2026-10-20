@@ -7,6 +7,7 @@ import { SiteActions } from './site-actions';
 import { Latencies } from './latency';
 import { PlaybackHealth } from './playback-health';
 import { PlaybackClock } from './playback-clock';
+import { canSeekPlayback } from './playback-buffer';
 import { describePlaybackError, sourceDiagnostics, waitForPlayable } from './playback-source';
 import { DanmakuFeed } from './danmaku';
 import '../shared/danmaku.js';
@@ -68,7 +69,7 @@ $('cache-options').querySelector('summary')!.title =
 if (!isNative)
   $('cache-options').insertAdjacentHTML(
     'beforeend',
-    '<p class="dialog-note" title="网页需要源站允许跨域并公开分块范围；不会把普通预加载算作完整缓存。">网页缓存单轨限 96 MiB，合计 128 MiB。整集视频通常需要全员使用客户端缓存。</p>',
+    '<p class="dialog-note" title="支持浏览器磁盘存储时分块写盘，上限 4 GiB，受本机空间与源站下载许可限制；旧浏览器仍受小文件容量限制。">完整下载到各自设备后播放，看完自动清理。长视频使用浏览器磁盘缓存。</p>',
   );
 $('cache-button').insertAdjacentHTML(
   'afterend',
@@ -593,6 +594,7 @@ async function connect(kind: 'create' | 'join', reconnect = false) {
 }
 function adopt(snapshot: Snapshot) {
   const previous = room;
+  if (previous?.code === snapshot.code && snapshot.revision < previous.revision) return;
   const changed = previous?.media?.id !== snapshot.media?.id || previous?.epoch !== snapshot.epoch;
   if (changed) {
     cancelSourceResolution();
@@ -1158,6 +1160,13 @@ function renderLatencies() {
 }
 function renderNetworkStatus() {
   if (!room) return;
+  const local =
+    !!room.media?.source &&
+    !room.media.broadcast &&
+    !siteOpen &&
+    !sourceFailed &&
+    loadedMedia === room.media.id;
+  const lag = local && !room.playback.paused ? currentPosition() - video.currentTime : 0;
   $('sync-status').textContent = !connected
     ? '离线 · 暂停控制'
     : hasPendingPreview()
@@ -1170,7 +1179,11 @@ function renderNetworkStatus() {
             ? $('live-status').textContent || '共享已开始'
             : !isNative && room.media && !room.media.source
               ? '视频尚未开始提供'
-              : `房间延迟 · ${latencies.read(memberId, performance.now()).label}`;
+              : local && !room.playback.paused && video.readyState < 3
+                ? '本机缓冲中 · 其他成员继续播放'
+                : lag > 1.2
+                  ? `本机落后 ${lag.toFixed(1)} 秒 · 缓冲后追上`
+                  : `房间延迟 · ${latencies.read(memberId, performance.now()).label}`;
   $('sync-status').title = latencies.read(memberId, performance.now()).title;
 }
 function renderChat() {
@@ -1461,6 +1474,7 @@ function applyPlayback(_explicit = false) {
   // Keep a seek pending until its actual player can accept it. Metadata loading
   // or a busy native bridge must not consume the authoritative revision.
   const seek = lastRevision !== playback.revision && playback.intent === 'seek';
+  const initial = lastRevision === -1;
   if (room.media?.broadcast) {
     if (room.media.broadcast.host !== memberId || room.media.broadcast.kind === 'screen') {
       // A remote MediaStream has a live timeline. Seeking or rate-correcting it
@@ -1490,6 +1504,7 @@ function applyPlayback(_explicit = false) {
     }
   }
   if (siteOpen) {
+    if (!siteSample?.available || (siteSample.readyState ?? 0) < 1) return;
     if (!nativeBusy) {
       nativeBusy = true;
       lastRevision = playback.revision;
@@ -1497,7 +1512,7 @@ function applyPlayback(_explicit = false) {
         position: target,
         rate: playback.rate,
         paused: playback.paused,
-        seek,
+        seek: seek || initial,
       })
         .catch(error)
         .finally(() => {
@@ -1517,14 +1532,14 @@ function applyPlayback(_explicit = false) {
     target,
     playback.rate,
     playback.paused,
-    seek,
+    seek || initial,
     catchingUp,
   );
   catchingUp = correction.kind === 'rate';
   if (
     correction.kind === 'seek' &&
     Number.isFinite(target) &&
-    (seek || (!video.seeking && video.readyState >= 3))
+    canSeekPlayback(video, target, seek || initial, playback.paused)
   ) {
     if (seek) explicitSeeks++;
     else automaticSeeks++;
@@ -2477,6 +2492,8 @@ $('cache-button').onclick = () => {
     try {
       await clearing;
       if (room?.media?.id !== mediaId || room.epoch !== epoch || !room.media.source) return;
+      if (loadedKind === 'cache') await stopCachedPlayback();
+      if (room?.media?.id !== mediaId || room.epoch !== epoch || !room.media.source) return;
       peers.configure(room, memberId);
       cacheContext = { jobId, mediaId, epoch };
       await cache.start(
@@ -2550,6 +2567,17 @@ function playbackError(event: Event) {
     audio.pause();
     video.hidden = true;
     render();
+  } else if (loadedKind === 'cache' && room?.media && !clearingBusy && !cacheStartBusy) {
+    send({
+      type: 'cache',
+      mediaId: room.media.id,
+      epoch: room.epoch,
+      state: 'error',
+      progress: 0,
+      bytes: 0,
+      error: '本机缓存无法读取或解码，请重新缓存或返回边播边看。',
+    });
+    void stopCachedPlayback().catch(error);
   } else toast('本地视频无法播放，请检查格式或换用客户端。');
 }
 video.addEventListener('error', playbackError);
@@ -2755,7 +2783,14 @@ setInterval(() => {
   if (room) {
     applyPlayback();
     if (room.media?.broadcast?.kind !== 'screen' && !hasPendingPreview()) {
-      const position = currentPosition(),
+      const position =
+          room.media?.source &&
+          !room.media.broadcast &&
+          !siteOpen &&
+          loadedMedia === room.media.id &&
+          video.readyState >= 1
+            ? video.currentTime
+            : currentPosition(),
         duration =
           room.media?.duration ||
           (Number.isFinite(video.duration) ? video.duration : siteSample?.duration) ||

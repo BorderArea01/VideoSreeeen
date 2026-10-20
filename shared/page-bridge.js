@@ -250,10 +250,19 @@
       muteUntil = performance.now() + 800;
       mutedGesture = lastGesture;
       const delta = state.position - video.currentTime;
+      let bufferedTarget = false;
+      for (let i = 0; i < video.buffered.length; i++)
+        if (
+          video.buffered.start(i) <= state.position &&
+          video.buffered.end(i) >= Math.min(video.duration, state.position + 0.5 * state.rate)
+        )
+          bufferedTarget = true;
       if (
         state.seek ||
         (video.readyState >= 3 &&
-          Math.abs(delta) > (state.paused ? 0.12 : 1.2 * Math.max(1, state.rate)))
+          (state.paused
+            ? Math.abs(delta) > 0.12
+            : delta > 1.2 * Math.max(1, state.rate) && bufferedTarget))
       )
         video.currentTime = Math.max(0, Math.min(state.position, video.duration || state.position));
       catchingUp = !state.paused && Math.abs(delta) > (catchingUp ? 0.06 : 0.3);

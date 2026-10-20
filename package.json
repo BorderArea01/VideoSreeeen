@@ -49,9 +49,11 @@
     "test:site-source": "tsx scripts/site-source-check.ts",
     "test:bilibili-quality": "tsx scripts/bilibili-quality-check.ts",
     "test:playback-retry": "tsx scripts/playback-retry-check.ts",
-    "test:playback-clock": "tsx scripts/playback-clock-check.ts"
+    "test:playback-clock": "tsx scripts/playback-clock-check.ts",
+    "test:playback-buffering": "tsx scripts/playback-buffering-check.ts"
   },
   "dependencies": {
+    "@noble/hashes": "2.4.0",
     "electron-updater": "^6.8.9",
     "hls.js": "^1.6.13",
     "ipaddr.js": "^2.3.0",
