@@ -36,4 +36,18 @@
 
 ## 部署
 
-待本轮回归完成后记录正式入口版本和公网验收结果。脱敏原始记录保存在忽略目录 `.local/cache-ui-before.json`、`.local/cache-download-local-evidence.json`。
+沿用已确认账号和现有免费资源，没有迁移房间状态或修改服务绑定。
+
+- 运行时提交：`5d003f6db45f12a9c0e6be0eeb9777bca1fbb4e7`，已推送 GitHub。
+- Worker：`c445ad50-fb28-48a8-ab41-7ea494b18849`。
+- Pages：`607f7de7-9ba4-4cf5-840a-8cd24c06f42d`。
+- 正式入口：[videosreeeen.pages.dev](https://videosreeeen.pages.dev)，健康版本仍为 0.4.3。
+- 活跃 JS：`assets/index-C7Ju689p.js`，SHA-256 `4ed7d72c375cd7a57c22163944128699d422605bb554016484b6702b41361441`。
+- 活跃 CSS：`assets/index-Cmi4kqGf.css`，SHA-256 `e5434e9dee7baa4cb29df91a7e5618d3fa5050e78aa5a51169f42691ff230303`。
+- 正式 HTML、JS、CSS 与本次构建逐字节一致，Pages 元数据指向上述提交。
+
+正式入口的同一下载验收通过：两端各持久化 1,128,375 字节、全员相同指纹、计划请求中断后重试、实际缓存播放及结束清理；AL 返回真实 394.0 MiB 的容量说明，返回普通共同播放后继续出帧。手机视口截图确认失败面板、重试和返回按钮可见，隐藏无意义进度条，也没有重复报错浮层。
+
+首轮公网验收因测试工具直连 `/config` 超时中断，改用维护机现有 Clash HTTP 代理后完整通过；这是测试机器的出站代理，不是 Cloudflare 原站视频代理。脚本通过可选 `VS_TEST_PROXY` 指定代理，不强制其他开源使用者安装 Clash。公网仍为同机两份浏览器资料，不是异地或手机真机证明。
+
+脱敏原始记录保存在忽略目录 `.local/cache-ui-before.json`、`.local/cache-download-local-evidence.json`、`.local/cache-download-public-evidence.json`、`.local/public-cache-assets-evidence.json`。早期下载验收 JSON 中的 `proxy: false` 指未启用视频服务代理；新版字段明确区分 `videoProxy` 与测试机 `networkProxy`。

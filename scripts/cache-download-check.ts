@@ -53,9 +53,17 @@ const sourceUrl = `http://127.0.0.1:${(source.address() as any).port}/flower.mp4
 const browser = await chromium.launch({
   executablePath: 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',
   headless: true,
+  ...(process.env.VS_TEST_PROXY
+    ? { proxy: { server: process.env.VS_TEST_PROXY, bypass: '127.0.0.1,localhost' } }
+    : {}),
   args: ['--mute-audio', '--disable-extensions', '--js-flags=--max-old-space-size=96'],
 });
-const proof: Record<string, any> = { origin, realAndroidDevice: false, proxy: false };
+const proof: Record<string, any> = {
+  origin,
+  realAndroidDevice: false,
+  videoProxy: false,
+  networkProxy: !!process.env.VS_TEST_PROXY,
+};
 const ready = (page: Page) =>
   page
     .locator('#cache-title')
