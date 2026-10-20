@@ -6,6 +6,7 @@ import { resolveXifanPage, checkResolvedVideo } from './site-source';
 import { SiteActions } from './site-actions';
 import { Latencies } from './latency';
 import { PlaybackHealth } from './playback-health';
+import { PlaybackClock } from './playback-clock';
 import { describePlaybackError, sourceDiagnostics, waitForPlayable } from './playback-source';
 import { DanmakuFeed } from './danmaku';
 import '../shared/danmaku.js';
@@ -230,13 +231,16 @@ let ws: WebSocket | null = null,
   reconnectTimer: ReturnType<typeof setTimeout> | undefined;
 let desiredSession = false,
   connected = false,
-  retries = 0,
-  anchoredAt = 0,
-  rtt: number | null = null;
+  retries = 0;
+const playbackClock = new PlaybackClock();
+const playbackKey = (snapshot: Snapshot) =>
+  `${snapshot.code}:${snapshot.media?.id ?? ''}:${snapshot.epoch}:${snapshot.playback.revision}`;
 let mediaRelay = true;
 let sourceFailed = false;
 let localRetry: AbortController | null = null;
 let sourceTimedOut = false;
+let automaticSeeks = 0,
+  explicitSeeks = 0;
 let playbackPermissionNeeded = false;
 let liveMuted = false;
 let autoSharedMedia = '';
@@ -327,7 +331,7 @@ function currentPosition() {
         room.playback.position,
         room.playback.paused,
         room.playback.rate,
-        performance.now() - anchoredAt,
+        playbackClock.elapsed(performance.now()),
       )
     : 0;
 }
@@ -400,7 +404,7 @@ async function connect(kind: 'create' | 'join', reconnect = false) {
   clearTimeout(reconnectTimer);
   ws?.close();
   connected = false;
-  rtt = null;
+  playbackClock.reset();
   latencies.clear();
   connectionView(reconnect ? '正在重新连接' : '正在连接');
   mediaRelay = true;
@@ -497,7 +501,6 @@ async function connect(kind: 'create' | 'join', reconnect = false) {
         } else if (message.type === 'pong') {
           const elapsed = performance.now() - message.sentAt;
           if (elapsed >= 0 && elapsed < 15000) {
-            rtt = elapsed;
             const clock = message.clock;
             if (
               clock &&
@@ -509,7 +512,7 @@ async function connect(kind: 'create' | 'join', reconnect = false) {
               Number.isFinite(clock.ageMs) &&
               clock.ageMs >= 0
             )
-              anchoredAt = performance.now() - clock.ageMs - elapsed / 2;
+              playbackClock.calibrate(playbackKey(room), clock.ageMs, elapsed, performance.now());
           }
         } else if (message.type === 'probe') send({ type: 'probe', nonce: message.nonce });
         else if (message.type === 'signal') {
@@ -656,7 +659,7 @@ function adopt(snapshot: Snapshot) {
   if (pendingBroadcastUrl === snapshot.media?.url && snapshot.media.broadcast?.host === memberId)
     pendingBroadcastUrl = '';
   if (changed) void clearing.catch(error);
-  anchoredAt = performance.now() - snapshot.playbackAgeMs - (rtt ?? 0) / 2;
+  playbackClock.adopt(playbackKey(snapshot), snapshot.playbackAgeMs, performance.now());
   render();
   if (changed) {
     if (
@@ -1221,6 +1224,7 @@ function renderChat() {
   messages.scrollTop = nearBottom ? messages.scrollHeight : previousTop;
 }
 async function clearPlayback(keepSite = false, keepPreview = false) {
+  automaticSeeks = explicitSeeks = 0;
   localRetry?.abort();
   localRetry = null;
   sourceTimedOut = false;
@@ -1511,11 +1515,14 @@ function applyPlayback(_explicit = false) {
     correction.kind === 'seek' &&
     Number.isFinite(target) &&
     (seek || (!video.seeking && video.readyState >= 3))
-  )
+  ) {
+    if (seek) explicitSeeks++;
+    else automaticSeeks++;
     video.currentTime = Math.min(
       target,
       Number.isFinite(video.duration) ? Math.max(0, video.duration - 0.01) : target,
     );
+  }
   if (Math.abs(video.playbackRate - correction.rate) > 0.001) video.playbackRate = correction.rate;
   if (audio.src) {
     if (
@@ -2026,6 +2033,8 @@ $('copy-video-diagnostics').onclick = () => {
                   : 'none',
           ...sourceDiagnostics(video, audio),
           sourceTimedOut,
+          corrections: { automaticSeeks, explicitSeeks },
+          clock: playbackClock.diagnostics(performance.now()),
           provider: room?.media?.provider ?? null,
           mode: room?.mode ?? null,
           paused: video.paused,

@@ -16,6 +16,10 @@ export function describePlaybackError(code: number | null, timedOut = false) {
 }
 
 export function sourceDiagnostics(video: HTMLVideoElement, audio: HTMLAudioElement) {
+  let bufferedAhead = 0;
+  for (let i = 0; i < (video.buffered?.length ?? 0); i++)
+    if (video.buffered.start(i) <= video.currentTime && video.buffered.end(i) > video.currentTime)
+      bufferedAhead = video.buffered.end(i) - video.currentTime;
   let source: { protocol: string; host?: string; port?: string } | null = null;
   try {
     const url = new URL(video.currentSrc || video.getAttribute('src') || '');
@@ -28,6 +32,10 @@ export function sourceDiagnostics(video: HTMLVideoElement, audio: HTMLAudioEleme
   return {
     source,
     networkState: video.networkState,
+    position: video.currentTime,
+    playbackRate: video.playbackRate,
+    bufferedAhead,
+    droppedFrames: video.getVideoPlaybackQuality?.().droppedVideoFrames ?? null,
     error: video.error
       ? { code: video.error.code, track: 'video' }
       : audio.error
