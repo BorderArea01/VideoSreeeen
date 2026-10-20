@@ -68,8 +68,12 @@ $('cache-options').querySelector('summary')!.title =
 if (!isNative)
   $('cache-options').insertAdjacentHTML(
     'beforeend',
-    '<p class="dialog-note">网页完整缓存限 128 MiB，长视频请使用 Windows 或 Android 客户端。</p>',
+    '<p class="dialog-note" title="网页需要源站允许跨域并公开分块范围；不会把普通预加载算作完整缓存。">网页缓存单轨限 96 MiB，合计 128 MiB。整集视频通常需要全员使用客户端缓存。</p>',
   );
+$('cache-button').insertAdjacentHTML(
+  'afterend',
+  '<button id="cache-stream" class="text-button" hidden title="关闭全房间共同缓存，继续各自加载视频">返回边播边看</button>',
+);
 const latencies = new Latencies();
 document.querySelector<HTMLElement>('.members-card .live-label')!.title =
   '到房间服务器的往返延迟，不代表画面缓冲延迟';
@@ -1087,6 +1091,7 @@ function render() {
   const mine = room?.members.find((m) => m.id === memberId)?.cache;
   const needsCache = !!caching && (!room?.cacheReady || loadedKind !== 'cache');
   $('cache-overlay').hidden = !needsCache || preview;
+  $('cache-overlay').classList.toggle('cache-failed', mine?.state === 'error');
   $('cache-progress').style.width = `${Math.round((mine?.progress ?? 0) * 100)}%`;
   $('cache-title').textContent = room?.finished
     ? cleanupState === 'done'
@@ -1098,7 +1103,10 @@ function render() {
       ? '本机已准备好'
       : mine?.state === 'downloading'
         ? `正在完整缓存 · ${Math.floor(mine.progress * 100)}%`
-        : '等待完整缓存';
+        : mine?.state === 'error'
+          ? '本机缓存未完成'
+          : '等待完整缓存';
+  $('cache-stream').hidden = mine?.state !== 'error' || !!room?.finished;
   $('cache-description').textContent =
     mine?.state === 'error'
       ? (mine.error ?? '缓存失败')
@@ -1120,7 +1128,9 @@ function render() {
         ? '正在准备缓存…'
         : mine?.state === 'downloading'
           ? '正在下载…'
-          : '开始本机缓存';
+          : mine?.state === 'error'
+            ? '重试本机缓存'
+            : '开始本机缓存';
   $('extract-button').hidden =
     !isNative || !room?.media || room.media.provider === 'direct' || caching;
   $('welcome').hidden = !!room?.media || preview;
@@ -2449,6 +2459,7 @@ $('fullscreen').onclick = () => {
 };
 $('mode-toggle').onclick = () =>
   operation({ type: 'mode', mode: room?.mode === 'cache' ? 'stream' : 'cache' });
+$('cache-stream').onclick = () => operation({ type: 'mode', mode: 'stream' });
 $('cache-button').onclick = () => {
   if (room?.finished) {
     operation({ type: 'mode', mode: 'cache' });
@@ -2476,7 +2487,7 @@ $('cache-button').onclick = () => {
       );
     } catch (e) {
       if (room?.media?.id === mediaId && room.epoch === epoch) {
-        send({
+        const reported = send({
           type: 'cache',
           mediaId,
           epoch,
@@ -2485,7 +2496,7 @@ $('cache-button').onclick = () => {
           bytes: 0,
           error: (e instanceof Error ? e.message : '缓存失败').slice(0, 200),
         });
-        error(e);
+        if (!reported) error(e);
       }
     } finally {
       cacheStartBusy = false;

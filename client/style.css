@@ -1184,6 +1184,13 @@ input[type='range'] {
   background: var(--orange);
   transition: width 0.3s;
 }
+.cache-failed .cache-track {
+  display: none;
+}
+#cache-stream {
+  margin-top: 10px;
+  padding: 8px 12px;
+}
 dialog {
   padding: 30px;
   width: 480px;

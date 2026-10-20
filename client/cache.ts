@@ -9,6 +9,7 @@ import {
 import type { Source } from '../shared/protocol';
 import { isNative, cacheNative, nativeCall, type NativeCache } from './native';
 import { RoomPeers, decode, encode, hexDigest, type FileInfo } from './peers';
+import { browserCacheNetwork, cacheRequest, checkBrowserCacheSize } from './cache-network';
 
 const PREFIX = 'videosreeeen-';
 export class DeviceCache {
@@ -41,46 +42,8 @@ export class DeviceCache {
         offset,
         length,
       });
-    const response = await fetch(url, {
-      signal: AbortSignal.any([signal, AbortSignal.timeout(15000)]),
-      headers: action === 'text' ? {} : { Range: `bytes=${offset}-${offset + length - 1}` },
-      credentials: 'omit',
-    });
-    const match = /^bytes (\d+)-(\d+)\/(\d+)$/.exec(response.headers.get('content-range') ?? '');
-    if (
-      !response.ok ||
-      (action !== 'text' &&
-        (response.status !== 206 ||
-          !match ||
-          Number(match[1]) !== offset ||
-          Number(match[2]) !== offset + length - 1))
-    ) {
-      await response.body?.cancel();
-      throw new Error('源站无法分块下载，浏览器还需要源站允许跨域访问');
-    }
-    const reader = response.body!.getReader(),
-      parts: Uint8Array[] = [];
-    let size = 0;
-    const max = action === 'text' ? 2 * 1024 ** 2 : length;
-    while (true) {
-      const p = await reader.read();
-      if (p.done) break;
-      size += p.value.length;
-      if (size > max) {
-        await reader.cancel();
-        throw new Error('下载超过分块上限');
-      }
-      parts.push(p.value);
-    }
-    if (action !== 'text' && size !== max) throw new Error('分块未完整下载');
-    if (action === 'probe') return { size: Number(match![3]) };
-    const data = new Uint8Array(size);
-    let n = 0;
-    for (const p of parts) {
-      data.set(p, n);
-      n += p.length;
-    }
-    return action === 'text' ? new TextDecoder().decode(data) : encode(data);
+    const result = await browserCacheNetwork(action, url, signal, offset, length);
+    return result instanceof Uint8Array ? encode(result) : result;
   }
   async start(jobId: string, server: string, planPath: string, source: Source) {
     await this.clear();
@@ -89,8 +52,29 @@ export class DeviceCache {
     this.peerBytes = 0;
     this.sourceBytes = 0;
     const signal = this.controller.signal;
+    try {
+      await this.download(jobId, server, planPath, source, signal);
+    } catch (cause) {
+      // Failure during planning/probing must clean up too, without clearing a
+      // later job that replaced this one while a response was in flight.
+      if (this.controller?.signal === signal) await this.clear();
+      throw cause;
+    }
+  }
+  private async download(
+    jobId: string,
+    server: string,
+    planPath: string,
+    source: Source,
+    signal: AbortSignal,
+  ) {
     let plan: CachePlan;
-    const response = await fetch(new URL(planPath, server), { signal });
+    const response = await cacheRequest(
+      new URL(planPath, server),
+      AbortSignal.any([signal, AbortSignal.timeout(15000)]),
+      {},
+      'plan',
+    );
     if (response.ok) plan = (await response.json()) as CachePlan;
     else if (response.status === 501) {
       plan =
@@ -176,115 +160,109 @@ export class DeviceCache {
     await this.peers.start(files, read);
     let bytes = 0,
       ordinal = 0;
-    try {
-      for (let file = 0; file < files.length; file++) {
-        const f = files[file]!;
-        const blocks = Array.from({ length: Math.ceil(f.size / BLOCK_SIZE) }, (_, i) => ({
-          offset: i * BLOCK_SIZE,
-          ordinal: ordinal++,
-        }));
-        const distribution = this.peers.distribution();
-        blocks.sort(
-          (a, b) =>
-            (a.ordinal % distribution.count === distribution.index ? 0 : 1) -
-              (b.ordinal % distribution.count === distribution.index ? 0 : 1) ||
-            a.ordinal - b.ordinal,
+    for (let file = 0; file < files.length; file++) {
+      const f = files[file]!;
+      const blocks = Array.from({ length: Math.ceil(f.size / BLOCK_SIZE) }, (_, i) => ({
+        offset: i * BLOCK_SIZE,
+        ordinal: ordinal++,
+      }));
+      const distribution = this.peers.distribution();
+      blocks.sort(
+        (a, b) =>
+          (a.ordinal % distribution.count === distribution.index ? 0 : 1) -
+            (b.ordinal % distribution.count === distribution.index ? 0 : 1) ||
+          a.ordinal - b.ordinal,
+      );
+      for (const block of blocks) {
+        signal.throwIfAborted();
+        const length = Math.min(BLOCK_SIZE, f.size - block.offset);
+        const preferred = block.ordinal % distribution.count === distribution.index;
+        let data = await this.peers.get(
+          file,
+          block.offset,
+          bytes === 0 ? 1500 : preferred ? 0 : 1600,
         );
-        for (const block of blocks) {
-          signal.throwIfAborted();
-          const length = Math.min(BLOCK_SIZE, f.size - block.offset);
-          const preferred = block.ordinal % distribution.count === distribution.index;
-          let data = await this.peers.get(
-            file,
-            block.offset,
-            bytes === 0 ? 1500 : preferred ? 0 : 1600,
-          );
-          if (data) this.peerBytes += data.length;
-          else {
-            let failure: unknown;
-            for (const url of urls[file]!)
-              try {
-                data = decode(
-                  await this.network('fetch', jobId, url, plan.referer, block.offset, length),
-                );
-                break;
-              } catch (e) {
-                signal.throwIfAborted();
-                failure = e;
-              }
-            if (data) this.sourceBytes += data.length;
-            else {
-              data = await this.peers.get(file, block.offset, 8000);
-              if (!data) throw failure ?? new Error('无法从成员或视频源获取分块');
-              this.peerBytes += data.length;
+        if (data) this.peerBytes += data.length;
+        else {
+          let failure: unknown;
+          for (const url of urls[file]!)
+            try {
+              data = decode(
+                await this.network('fetch', jobId, url, plan.referer, block.offset, length),
+              );
+              break;
+            } catch (e) {
+              signal.throwIfAborted();
+              failure = e;
             }
+          if (data) this.sourceBytes += data.length;
+          else {
+            data = await this.peers.get(file, block.offset, 8000);
+            if (!data) throw failure ?? new Error('无法从成员或视频源获取分块');
+            this.peerBytes += data.length;
           }
-          signal.throwIfAborted();
-          if (data.length !== length) throw new Error('分块长度不符');
-          const hash = await hexDigest(data);
-          if (isNative)
-            await nativeCall('cacheIO', {
-              action: 'put',
-              jobId,
-              name: f.name,
-              offset: block.offset,
-              data: encode(data),
-            });
-          else
-            await browser!.put(
-              cacheKey(file, block.offset),
-              new Response(data as Uint8Array<ArrayBuffer>),
-            );
-          signal.throwIfAborted();
-          this.peers.announce(file, block.offset, hash);
-          bytes += length;
-          this.progress({
-            state: 'downloading',
+        }
+        signal.throwIfAborted();
+        if (data.length !== length) throw new Error('分块长度不符');
+        const hash = await hexDigest(data);
+        if (isNative)
+          await nativeCall('cacheIO', {
+            action: 'put',
             jobId,
-            progress: bytes / total,
-            bytes,
-            peerBytes: this.peerBytes,
-            sourceBytes: this.sourceBytes,
+            name: f.name,
+            offset: block.offset,
+            data: encode(data),
           });
-        }
-      }
-      signal.throwIfAborted();
-      let ready: NativeCache;
-      if (isNative) ready = await nativeCall('cacheIO', { action: 'finish', jobId });
-      else {
-        const hashes: string[] = [],
-          entries = new Map<string, string>();
-        for (let file = 0; file < files.length; file++) {
-          const f = files[file]!,
-            data = new Uint8Array(f.size);
-          for (let offset = 0; offset < f.size; offset += BLOCK_SIZE) {
-            signal.throwIfAborted();
-            data.set(await read(file, offset), offset);
-          }
-          hashes.push(await hexDigest(data));
-          const url = URL.createObjectURL(
-            new Blob([data], { type: f.name.endsWith('m4a') ? 'audio/mp4' : 'video/mp4' }),
+        else
+          await browser!.put(
+            cacheKey(file, block.offset),
+            new Response(data as Uint8Array<ArrayBuffer>),
           );
-          this.objectUrls.push(url);
-          entries.set(f.name, url);
-        }
-        ready = {
-          state: 'ready',
+        signal.throwIfAborted();
+        this.peers.announce(file, block.offset, hash);
+        bytes += length;
+        this.progress({
+          state: 'downloading',
           jobId,
-          progress: 1,
+          progress: bytes / total,
           bytes,
-          fingerprint: await hexDigest(new TextEncoder().encode(hashes.join('\n'))),
-          entry: entries.get(plan.entry),
-          audio: plan.audio ? entries.get(plan.audio) : undefined,
-        };
+          peerBytes: this.peerBytes,
+          sourceBytes: this.sourceBytes,
+        });
       }
-      signal.throwIfAborted();
-      this.progress({ ...ready, peerBytes: this.peerBytes, sourceBytes: this.sourceBytes });
-    } catch (e) {
-      this.peers.resetCache();
-      if (!signal.aborted) await this.clear();
-      throw e;
     }
+    signal.throwIfAborted();
+    let ready: NativeCache;
+    if (isNative) ready = await nativeCall('cacheIO', { action: 'finish', jobId });
+    else {
+      const hashes: string[] = [],
+        entries = new Map<string, string>();
+      for (let file = 0; file < files.length; file++) {
+        const f = files[file]!,
+          data = new Uint8Array(f.size);
+        for (let offset = 0; offset < f.size; offset += BLOCK_SIZE) {
+          signal.throwIfAborted();
+          data.set(await read(file, offset), offset);
+        }
+        hashes.push(await hexDigest(data));
+        const url = URL.createObjectURL(
+          new Blob([data], { type: f.name.endsWith('m4a') ? 'audio/mp4' : 'video/mp4' }),
+        );
+        this.objectUrls.push(url);
+        entries.set(f.name, url);
+      }
+      ready = {
+        state: 'ready',
+        jobId,
+        progress: 1,
+        bytes,
+        fingerprint: await hexDigest(new TextEncoder().encode(hashes.join('\n'))),
+        entry: entries.get(plan.entry),
+        audio: plan.audio ? entries.get(plan.audio) : undefined,
+      };
+    }
+    signal.throwIfAborted();
+    this.progress({ ...ready, peerBytes: this.peerBytes, sourceBytes: this.sourceBytes });
   }
   private async prepare(jobId: string, plan: CachePlan, files: FileInfo[]) {
     if (isNative) {
@@ -299,10 +277,9 @@ export class DeviceCache {
     }
     if (!window.isSecureContext || !('caches' in window))
       throw new Error('浏览器完整缓存需要 HTTPS');
+    checkBrowserCacheSize(files);
     const estimate = await navigator.storage.estimate(),
       total = files.reduce((n, f) => n + f.size, 0);
-    if (total > 128 * 1024 ** 2 || files.some((f) => f.size > 96 * 1024 ** 2))
-      throw new Error('此视频超过浏览器安全缓存容量，请使用客户端完整缓存');
     if ((estimate.quota ?? 0) - (estimate.usage ?? 0) < total + 32 * 1024 ** 2)
       throw new Error('浏览器可用存储不足');
     this.browserName = PREFIX + Date.now() + '-' + jobId;
