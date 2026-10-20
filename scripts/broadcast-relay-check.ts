@@ -3,7 +3,7 @@ import { once } from 'node:events';
 import { writeFile, mkdir } from 'node:fs/promises';
 import { chromium } from 'playwright';
 import { createApp } from '../server/index';
-import { closeInvitation } from './room-ui';
+import { choosePlayback, closeInvitation } from './room-ui';
 import { readRelayPacket } from '../shared/broadcast-relay';
 
 // No camera/mic or user screen: generated frames and inaudible test audio only.
@@ -154,6 +154,7 @@ try {
   await guest.locator('#name-input').fill('阻断直连观众');
   await guest.locator('#join-button').click();
   await host.locator('#member-count').filter({ hasText: '2' }).waitFor();
+  await choosePlayback(host, 'screen');
   const began = Date.now();
   await host.locator('#broadcast-screen').click();
   await host.waitForFunction(
