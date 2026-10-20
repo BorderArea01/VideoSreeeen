@@ -6,6 +6,7 @@ import { resolveXifanPage, checkResolvedVideo } from './site-source';
 import { SiteActions } from './site-actions';
 import { Latencies } from './latency';
 import { PlaybackHealth } from './playback-health';
+import { describePlaybackError, sourceDiagnostics, waitForPlayable } from './playback-source';
 import { DanmakuFeed } from './danmaku';
 import '../shared/danmaku.js';
 import type { ClientMessage, MediaInput, ServerMessage, Snapshot } from '../shared/protocol';
@@ -123,6 +124,16 @@ $('site-account-login').onclick = () => {
     .catch(error);
 };
 $('bili-login-button').onclick = $('site-account-login').onclick;
+$('browser-provide').insertAdjacentHTML(
+  'beforebegin',
+  '<button id="retry-video" type="button" class="button accent" title="只重新加载本机视频，不暂停房间或更换视频" hidden>重试本机视频</button><button id="copy-playback-diagnostics" type="button" class="button soft" hidden>复制诊断</button>',
+);
+$('retry-video').onclick = () => void retryLocalVideo();
+$('copy-playback-diagnostics').onclick = () => {
+  $('settings-button').click();
+  $<HTMLDetailsElement>('video-diagnostics').open = true;
+  $('copy-video-diagnostics').click();
+};
 if (isNative) {
   $<HTMLInputElement>('source-url').placeholder = '粘贴视频直链或原站页面地址';
   $('screen-open-note').textContent = window.desktop
@@ -224,6 +235,8 @@ let desiredSession = false,
   rtt: number | null = null;
 let mediaRelay = true;
 let sourceFailed = false;
+let localRetry: AbortController | null = null;
+let sourceTimedOut = false;
 let playbackPermissionNeeded = false;
 let liveMuted = false;
 let autoSharedMedia = '';
@@ -837,7 +850,7 @@ function render() {
   const joined = !!room;
   const preview = hasPendingPreview();
   const sourceNeeded = !isNative && !!room?.media && !room.media.source && !room.media.broadcast;
-  const blocked = !preview && (sourceNeeded || sourceFailed);
+  const blocked = !preview && (sourceNeeded || sourceFailed || !!localRetry);
   const liveScreen = room?.media?.broadcast?.kind === 'screen' || preview;
   for (const id of ['play-button', 'position', 'seek', 'duration', 'rate'])
     $(id).hidden = liveScreen;
@@ -896,16 +909,33 @@ function render() {
   $<HTMLButtonElement>('mode-toggle').disabled =
     !joined || (!cacheAvailable && room?.mode !== 'cache');
   $('browser-hint').hidden = !blocked || room?.mode === 'cache';
-  $('browser-title').textContent = sourceNeeded
-    ? provideDialogMediaId === media?.id
-      ? '将视频提供给房间'
-      : '此端暂不支持原站共同播放'
-    : '当前视频地址无法直接播放';
-  $('browser-description').textContent = sourceNeeded
-    ? media?.provider === 'bilibili'
-      ? 'B站共同播放需各自使用客户端内的原站播放器。共享画面仍可手动选择，浏览器观众可直接接收。'
-      : '共同播放需要此设备能独立加载视频。可使用客户端原站播放器、可播放的视频直链，或手动选择共享画面。'
-    : '地址可能已失效，或视频源限制外部播放。可以换一个视频直链，或手动选择共享画面。';
+  const failure = describePlaybackError(
+    video.error?.code ?? audio.error?.code ?? null,
+    sourceTimedOut,
+  );
+  $('browser-title').textContent = localRetry
+    ? '正在重新加载本机视频'
+    : sourceNeeded
+      ? provideDialogMediaId === media?.id
+        ? '将视频提供给房间'
+        : '此端暂不支持原站共同播放'
+      : failure.title;
+  $('browser-description').textContent = localRetry
+    ? '其他成员继续观看，重连后跟随房间当前进度。'
+    : sourceNeeded
+      ? media?.provider === 'bilibili'
+        ? 'B站共同播放需各自使用客户端内的原站播放器。共享画面仍可手动选择，浏览器观众可直接接收。'
+        : '共同播放需要此设备能独立加载视频。可使用客户端原站播放器、可播放的视频直链，或手动选择共享画面。'
+      : failure.description;
+  const localFailure =
+    !!media?.source &&
+    !media.broadcast &&
+    room?.mode === 'stream' &&
+    (sourceFailed || !!localRetry);
+  $('retry-video').hidden = !localFailure;
+  $<HTMLButtonElement>('retry-video').disabled = !!localRetry || !connected || clearingBusy;
+  $('retry-video').textContent = localRetry ? '正在重试…' : '重试本机视频';
+  $('copy-playback-diagnostics').hidden = !localFailure;
 
   $<HTMLButtonElement>('play-button').disabled = !room?.media || blocked || preview;
   for (const id of ['play-button', 'position', 'seek', 'duration', 'rate'])
@@ -916,6 +946,14 @@ function render() {
   $('browser-takeover').hidden = !sourceNeeded || providing;
   $('browser-local-video').hidden = sourceNeeded && !providing;
   $('browser-invite').hidden = sourceNeeded && !providing;
+  if (localFailure)
+    for (const id of [
+      'browser-provide',
+      'browser-takeover',
+      'browser-local-video',
+      'browser-invite',
+    ])
+      $(id).hidden = true;
   $('provide-steps').hidden = !canShareTab;
   $('provide-unavailable').hidden = canShareTab;
   $('provide-status').textContent = !connected
@@ -1183,6 +1221,9 @@ function renderChat() {
   messages.scrollTop = nearBottom ? messages.scrollHeight : previousTop;
 }
 async function clearPlayback(keepSite = false, keepPreview = false) {
+  localRetry?.abort();
+  localRetry = null;
+  sourceTimedOut = false;
   playbackHealth.reset();
   window.__VS_Danmaku.clear();
   if (isNative && siteOpen)
@@ -1234,6 +1275,70 @@ function mediaPath(slot: string) {
   if (!mediaRelay && room?.media?.source)
     return slot === 'audio' ? room.media.source.audio! : room.media.source.video;
   return `${activeServer}/media/${room!.code}/${room!.mediaToken}/${slot}`;
+}
+async function retryLocalVideo() {
+  const media = room?.media,
+    epoch = room?.epoch;
+  if (
+    localRetry ||
+    !connected ||
+    !media?.source ||
+    media.broadcast ||
+    room?.mode !== 'stream' ||
+    siteOpen ||
+    clearingBusy
+  )
+    return;
+  const request = new AbortController();
+  localRetry = request;
+  sourceTimedOut = false;
+  const current = () =>
+    !request.signal.aborted &&
+    localRetry === request &&
+    connected &&
+    room?.media?.id === media.id &&
+    room.epoch === epoch &&
+    room.mode === 'stream';
+  const timeout = setTimeout(
+    () => request.abort(new DOMException('视频加载超时', 'TimeoutError')),
+    20000,
+  );
+  render();
+  try {
+    // Reissue only a public source for this device. Room media, cache generation
+    // and the authoritative timeline remain unchanged; no room command is sent.
+    const resolved =
+      !mediaRelay && media.provider === 'xifan'
+        ? await resolveXifanPage(media, request.signal)
+        : media;
+    if (!current()) return;
+    await setPlayer(
+      mediaRelay ? mediaPath('video') : resolved.source!.video,
+      media.source.audio ? mediaPath('audio') : undefined,
+      media.source.kind === 'hls',
+    );
+    if (!current()) return;
+    render();
+    await Promise.all([
+      waitForPlayable(video, request.signal),
+      ...(media.source.audio ? [waitForPlayable(audio, request.signal)] : []),
+    ]);
+    if (!current()) return;
+    sourceFailed = false;
+    lastRevision = -1;
+  } catch (cause) {
+    if (localRetry !== request) return;
+    sourceFailed = true;
+    sourceTimedOut = cause instanceof DOMException && cause.name === 'TimeoutError';
+    video.hidden = true;
+  } finally {
+    clearTimeout(timeout);
+    if (localRetry === request) {
+      localRetry = null;
+      render();
+      if (!sourceFailed) applyPlayback(true);
+    }
+  }
 }
 async function setPlayer(src: string, audioSrc?: string, isHls = false) {
   sourceFailed = false;
@@ -1907,13 +2012,27 @@ $('copy-video-diagnostics').onclick = () => {
         ...network,
         fallback: broadcastFallback.diagnostics(),
         player: {
-          bound: !!video.srcObject || broadcastFallback.active(),
-          transport: broadcastFallback.active() ? 'websocket' : video.srcObject ? 'webrtc' : 'none',
+          bound: !!video.srcObject || !!video.getAttribute('src') || broadcastFallback.active(),
+          transport: broadcastFallback.active()
+            ? 'websocket'
+            : video.srcObject
+              ? 'webrtc'
+              : loadedKind === 'cache'
+                ? 'cache'
+                : video.getAttribute('src')
+                  ? mediaRelay
+                    ? 'proxy'
+                    : 'direct'
+                  : 'none',
+          ...sourceDiagnostics(video, audio),
+          sourceTimedOut,
+          provider: room?.media?.provider ?? null,
+          mode: room?.mode ?? null,
           paused: video.paused,
           readyState: video.readyState,
           width: video.videoWidth,
           height: video.videoHeight,
-          frames: video.getVideoPlaybackQuality().totalVideoFrames,
+          frames: video.getVideoPlaybackQuality?.().totalVideoFrames ?? 0,
         },
       },
       null,
@@ -2377,7 +2496,22 @@ const ended = () => {
 };
 video.onended = ended;
 video.onloadedmetadata = () => applyPlayback(true);
-video.onloadeddata = startNextWhenReady;
+video.onloadeddata = () => {
+  if (
+    sourceFailed &&
+    video.readyState >= 2 &&
+    !video.error &&
+    !audio.error &&
+    !room?.media?.broadcast
+  ) {
+    sourceFailed = false;
+    sourceTimedOut = false;
+    video.hidden = false;
+    render();
+    applyPlayback(true);
+  }
+  startNextWhenReady();
+};
 for (const element of [video, audio])
   element.addEventListener('playing', () => {
     if (playbackPermissionNeeded && !video.paused && (!audio.src || !audio.paused)) {
@@ -2385,7 +2519,10 @@ for (const element of [video, audio])
       render();
     }
   });
-function playbackError() {
+function playbackError(event: Event) {
+  // Reset/replace operations can queue events for a resource already detached.
+  // Only the current element's real error may block the active video.
+  if (!(event.currentTarget as HTMLMediaElement).error) return;
   if (!video.getAttribute('src')) return;
   if (room?.mode === 'stream') {
     sourceFailed = true;
@@ -2395,8 +2532,8 @@ function playbackError() {
     render();
   } else toast('本地视频无法播放，请检查格式或换用客户端。');
 }
-video.onerror = playbackError;
-audio.onerror = playbackError;
+video.addEventListener('error', playbackError);
+audio.addEventListener('error', playbackError);
 $('leave-button').onclick = () => {
   nextAutoplay = null;
   danmakuFeed.reset();
