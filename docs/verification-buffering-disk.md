@@ -45,4 +45,24 @@
 
 4 秒心跳排队与同版本聊天的校时回归也通过：两端各 626 帧、25.892812 / 25.910707 秒，没有自动 seek 或显示进度跳变，手动拖动仍即时跟随。
 
-没有操作任何 Android 设备或用户原房间，也不以 Windows 浏览器的手机视口模拟冒充手机真机。正式部署和公网摘要在完成后补充；当前记录不代表新安装包已发布。
+没有操作任何 Android 设备或用户原房间，也不以 Windows 浏览器的手机视口模拟冒充手机真机。当前记录不代表新安装包已发布。
+
+## 正式部署与公网验证
+
+沿用已确认的账号、免费资源、每房间一个 Durable Object 和 Pages 的既有 WATCH 服务绑定，没有数据迁移或付费产品。
+
+- 运行时提交：`bebcfd6ebdcb08ecea805795a7bd6226158b44c1`，已推送 GitHub。
+- Worker：`cac880ad-9d6e-402c-b00b-16d2bfafb34f`。
+- Pages：`3479643c-f14f-4c82-b95f-f91f3a6e149b`。
+- 正式入口：[videosreeeen.pages.dev](https://videosreeeen.pages.dev)，健康版本仍为 0.4.3；本次为网页更新，没有发布新客户端安装包。
+- 主脚本 `assets/index-DaB2wQHv.js`，SHA-256 `125784ba1777cf994389eda5074bf7653780b6df6638f34f1eb9d1f026478680`。
+- 磁盘线程 `assets/disk-cache-worker-CukDIisx.js`，7,797 字节，SHA-256 `d83cdf61c826762b79ded378f1d1615b1caf051781e8ce15b694b0c8fecfc002`。
+- HTML、主脚本、CSS、磁盘线程及 MIT 许可文件分别核对，与本地构建逐字节一致；部署元数据指向上述提交。
+
+正式入口重新执行大文件缓存验收：两个独立浏览器各完整落盘 105,985,975 字节，指纹为 `57d6f3755e5697f5895c427eef55ddc917bd26263fa458dd109fbd0445a0a33a`；计划中断重试、真实播放、自然结束清理及下载中取消清理均通过。这里使用合法 MP4 free box 扩大的 CC0 文件，不将它冒充 AL 真实整集；AL 的 394 MiB 实际整集和 P2P 验证见上文的本地记录。
+
+正式入口三端限速验收通过：正常两端播放到 13.825899 / 13.687072 秒，实际解码 336 / 332 帧，无 waiting、自动 seek 或回退；慢成员实际缓冲后恢复到 13.672321 秒，与第一端相差约 0.154 秒，只发生一次向前追赶，没有向房间发送控制指令。慢成员手动拖回第 4 秒仍同步到全部成员。
+
+公网验收通过维护机现有 Clash 出站代理，不是服务器视频代理；三个页面仍在同一台 Windows 上，不是异地网络或 Android 真机证明。成员刷新网页后加载新脚本；旧客户端安装包内置代码不会因本次网页部署自动改变。
+
+脱敏摘要：`.local/cache-disk-large-public-evidence.json`、`.local/playback-buffering-public-evidence.json`、`.local/public-buffering-disk-assets-evidence.json`、`.local/public-disk-assets-evidence.json`。
