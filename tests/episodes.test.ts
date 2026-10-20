@@ -46,11 +46,21 @@ test('静态解析原站下一集元数据及最后一集，不执行脚本', ()
   assert.equal(readNextEpisode(bili + '?p=2', data), null);
 });
 test('剧集元数据请求保持原站路径白名单，不开放通用代理', () => {
-  for (const url of [xifan, mgn, 'https://www.bilibili.com/video/BV13Aa66LEAW/?p=2'])
+  const al = 'https://next.xifanacg.com/anime/3434/play/203799?source=AL';
+  assert.equal(
+    readNextEpisode(
+      al,
+      JSON.stringify({ nextHref: '/anime/3434/play/203800?source=AL', nextLabel: '第 2 集' }),
+    )?.url,
+    'https://next.xifanacg.com/anime/3434/play/203800?source=AL',
+  );
+  assert.equal(nextEpisode(al, '/anime/3434/play/203800?source=xfy2'), null);
+  for (const url of [xifan, al, mgn, 'https://www.bilibili.com/video/BV13Aa66LEAW/?p=2'])
     assert.ok(allowedSiteMetadata(url));
   for (const url of [
     'https://next.xifanacg.com/admin',
     xifan + '&redirect=http://127.0.0.1',
+    al + '&redirect=http://127.0.0.1',
     'https://www.bilibili.com/account',
     'http://next.xifanacg.com/anime/151/play/1986?source=xfy2',
   ])

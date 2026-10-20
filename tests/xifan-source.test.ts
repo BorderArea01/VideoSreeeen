@@ -14,6 +14,47 @@ const result = () => ({
 });
 const signal = () => new AbortController().signal;
 
+test('稀饭 AL 按原站线路 1 请求，不改成旧番线路，也不接受串线结果', async () => {
+  const al = 'https://next.xifanacg.com/anime/3434/play/203799?source=AL';
+  const payload = {
+    ...result(),
+    anime_id: 3434,
+    episode_id: 203799,
+    candidates: [{ source_id: 1, source_code: 'AL', url: issued }],
+  };
+  const media = await resolveXifanPage(describeUrl(al), signal(), (async (_url, init) => {
+    assert.deepEqual(JSON.parse(init!.body as string), {
+      action: 'fallback',
+      episode_id: 203799,
+      source_id: 1,
+    });
+    assert.equal(init?.credentials, 'omit');
+    return Response.json(payload);
+  }) as typeof fetch);
+  assert.equal(media.url, al);
+  assert.equal(media.source?.video, issued);
+  for (const candidates of [
+    result().candidates,
+    [{ source_id: 1, source_code: 'xfy2', url: issued }],
+    [null],
+  ])
+    await assert.rejects(
+      resolveXifanPage(describeUrl(al), signal(), (async () =>
+        Response.json({ ...payload, candidates })) as typeof fetch),
+    );
+  for (const url of [
+    al.replace('source=AL', 'source=al'),
+    al + '&source=xfy2',
+    al.replace('source=AL', 'source=__proto__'),
+  ])
+    await assert.rejects(
+      resolveXifanPage(describeUrl(url), signal(), (async () => {
+        throw new Error('must not fetch');
+      }) as typeof fetch),
+      /暂未适配/,
+    );
+});
+
 test('稀饭匿名公共播放接口：不附带房间凭据，保留原站签发地址和端口', async () => {
   let calls = 0;
   const media = await resolveXifanPage(describeUrl(page), signal(), (async (url, init) => {

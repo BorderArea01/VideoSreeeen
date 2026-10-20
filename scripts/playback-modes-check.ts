@@ -53,8 +53,9 @@ try {
   await guest.locator('#name-input').fill('独立播放观众');
   await guest.locator('#join-button').click();
   await host.locator('#member-count').filter({ hasText: '2' }).waitFor();
-  assert.equal(await host.locator('#screen-choice').isVisible(), true);
-  assert.equal(await host.locator('#source-form').isVisible(), false);
+  assert.equal(await host.locator('#link-choice').isVisible(), true);
+  assert.equal(await host.locator('#source-form').isVisible(), true);
+  assert.equal(await host.locator('#screen-choice').isVisible(), false);
   await selectSource(host, source);
   for (const page of [host, guest])
     await page.waitForFunction(
@@ -120,7 +121,7 @@ try {
   );
   await host.locator('#choose-link').focus();
   await host.keyboard.press('Home');
-  assert.equal(await host.locator('#choose-screen').getAttribute('aria-selected'), 'true');
+  assert.equal(await host.locator('#choose-link').getAttribute('aria-selected'), 'true');
   await host.keyboard.press('End');
   assert.equal(await host.locator('#choose-file').getAttribute('aria-selected'), 'true');
   await choosePlayback(host, 'link');

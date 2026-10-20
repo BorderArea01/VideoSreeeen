@@ -8,6 +8,7 @@ import { closeInvitation, selectSource, choosePlayback } from './room-ui';
 const site = process.argv[2] || 'https://www.mgnacg.com/bangumi/193-3-17/';
 const xifan = new URL(site).hostname === 'next.xifanacg.com';
 const provider = xifan ? 'xifan' : 'mgn';
+const directMedia = process.env.VS_TEST_DIRECT_MEDIA === '1';
 const metadataRoute = xifan
   ? 'https://api.xifanacg.com/functions/v1/issue-web-playback'
   : '**/resolve-source/**';
@@ -41,13 +42,20 @@ const proof: Record<string, any> = {
   page: site,
   realSite: true,
   screenCapture: false,
-  sourceHttpProxy: !!app,
+  sourceHttpProxy: !!app && !directMedia,
+  localConfigUsesDirectCdn: !!app && directMedia,
   network: process.env.VS_TEST_PROXY ? 'explicit-test-proxy' : 'system-default',
   isolatedViewerStorage: true,
 };
 try {
   const context = await browser.newContext({ viewport: { width: 1440, height: 1080 } });
   const guestContext = await browser.newContext({ viewport: { width: 1440, height: 1080 } });
+  if (app && directMedia)
+    for (const currentContext of [context, guestContext])
+      await currentContext.route(origin + '/config', async (route) => {
+        const response = await route.fetch();
+        await route.fulfill({ response, json: { ...(await response.json()), mediaRelay: false } });
+      });
   const host = await context.newPage(),
     guest = await guestContext.newPage();
   const errors: string[] = [],
@@ -276,7 +284,7 @@ try {
     assert.equal(player.width, 1920);
     assert.equal(player.stream, false);
     assert.ok(player.audioBytes > 0);
-    if (process.env.VS_PUBLIC_URL)
+    if (process.env.VS_PUBLIC_URL || directMedia)
       assert.equal(player.host, xifan ? 'play.xfvod.pro' : 'r2.jzacg.com');
   }
   await mkdir('.local/screenshots', { recursive: true });
@@ -298,10 +306,16 @@ try {
     xifan
       ? {
           ok: true,
-          anime_id: 151,
-          episode_id: 1986,
+          anime_id: Number(new URL(site).pathname.split('/')[2]),
+          episode_id: Number(new URL(site).pathname.split('/')[4]),
           expires_at: Date.now() / 1000 + 60,
-          candidates: [{ source_id: 5, source_code: 'xfy2', url: video }],
+          candidates: [
+            {
+              source_id: new URL(site).searchParams.get('source') === 'AL' ? 1 : 5,
+              source_code: new URL(site).searchParams.get('source'),
+              url: video,
+            },
+          ],
         }
       : { media: { ...latest.media, title: '迟到结果不应发布', source: { kind: 'file', video } } };
   const cors: Record<string, string> = xifan
@@ -465,5 +479,7 @@ try {
   await browser.close();
   await app?.close();
   await mkdir('.local', { recursive: true });
-  await writeFile(`.local/${provider}-playback-evidence.json`, JSON.stringify(proof, null, 2));
+  const evidenceName =
+    xifan && new URL(site).searchParams.get('source') === 'AL' ? 'xifan-al' : provider;
+  await writeFile(`.local/${evidenceName}-playback-evidence.json`, JSON.stringify(proof, null, 2));
 }

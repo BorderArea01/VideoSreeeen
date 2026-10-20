@@ -4,6 +4,11 @@ import type { MediaInput } from '../shared/protocol';
 // identifier, not a user session, secret key, or our room credential.
 const XIFAN_PUBLIC_KEY = 'sb_publishable_OBIVAWACIX6lPXrO98_z24_HcsmalkA';
 const XIFAN_ENDPOINT = 'https://api.xifanacg.com/functions/v1/issue-web-playback';
+// Source codes and IDs observed in the original site's public player.
+const XIFAN_SOURCES = new Map([
+  ['xfy2', 5],
+  ['AL', 1],
+]);
 
 export async function resolveXifanPage(
   media: MediaInput,
@@ -12,14 +17,19 @@ export async function resolveXifanPage(
 ): Promise<MediaInput> {
   const page = new URL(media.url);
   const match = /^\/anime\/([1-9]\d{0,8})\/play\/([1-9]\d{0,8})\/?$/.exec(page.pathname);
+  const sourceCode = page.searchParams.get('source') ?? '';
+  const sourceId = XIFAN_SOURCES.get(sourceCode);
   if (
     page.origin !== 'https://next.xifanacg.com' ||
     page.username ||
     page.password ||
     !match ||
-    page.searchParams.get('source') !== 'xfy2'
+    sourceId === undefined ||
+    page.searchParams.getAll('source').length !== 1
   )
-    throw new Error('当前支持稀饭旧番主线 xfy2；其他线路请使用客户端或共享画面');
+    throw new Error(
+      '当前支持稀饭旧番主线 xfy2、新番主线 AL；此链接的线路暂未适配，可使用客户端或共享画面',
+    );
   const response = await fetcher(XIFAN_ENDPOINT, {
     method: 'POST',
     mode: 'cors',
@@ -27,7 +37,7 @@ export async function resolveXifanPage(
     redirect: 'error',
     cache: 'no-store',
     headers: { apikey: XIFAN_PUBLIC_KEY, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ action: 'fallback', episode_id: Number(match[2]), source_id: 5 }),
+    body: JSON.stringify({ action: 'fallback', episode_id: Number(match[2]), source_id: sourceId }),
     signal,
   });
   if (!response.ok) {
@@ -74,7 +84,9 @@ export async function resolveXifanPage(
         : '原站没有向当前访客提供视频源，请使用原站或共享画面',
     );
   const candidate = Array.isArray(result.candidates)
-    ? result.candidates.find((item: any) => item.source_id === 5 && item.source_code === 'xfy2')
+    ? result.candidates.find(
+        (item: any) => item?.source_id === sourceId && item.source_code === sourceCode,
+      )
     : undefined;
   if (
     result.anime_id !== Number(match[1]) ||

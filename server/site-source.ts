@@ -42,7 +42,7 @@ export function allowedSiteMetadata(raw: string) {
       url.protocol === 'https:' &&
       ((url.hostname === 'next.xifanacg.com' &&
         /^\/anime\/\d+\/play\/\d+\/?$/.test(url.pathname) &&
-        /^\?source=[a-z0-9]+$/.test(url.search)) ||
+        /^\?source=[A-Za-z0-9]+$/.test(url.search)) ||
         (url.hostname === 'www.bilibili.com' &&
           /^\/video\/BV[A-Za-z0-9]+\/$/.test(url.pathname) &&
           (!url.search || /^\?p=\d+$/.test(url.search)))))
