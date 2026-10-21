@@ -3,6 +3,8 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { WebSocket } from 'ws';
 import { Miniflare, convertV4MiniflareOptions } from 'miniflare';
 import { RELAY_MIMES, relayPacket } from '../shared/broadcast-relay';
+import { voicePacket, bytesUuid } from '../shared/voice';
+import { randomUUID } from 'node:crypto';
 import { Response as MockResponse } from 'miniflare';
 import { metadataFixture, playerFixture } from '../tests/site-source.fixture';
 const sourceFixture = metadataFixture(await playerFixture());
@@ -23,6 +25,7 @@ const runtime = new Miniflare(
           run_worker_first: [
             '/ws',
             '/broadcast-relay',
+            '/voice',
             '/healthz',
             '/config',
             '/cache-plan/*',
@@ -51,6 +54,7 @@ const runtime = new Miniflare(
           run_worker_first: [
             '/ws',
             '/broadcast-relay',
+            '/voice',
             '/healthz',
             '/config',
             '/cache-plan/*',
@@ -136,6 +140,48 @@ try {
   const b = await client('ABC234');
   b.send({ type: 'join', name: 'b', invite: welcome.room.invite, protocol: 1 });
   const bw = await b.next('welcome');
+  async function voiceClient(welcome: any) {
+    const socket = new WebSocket(origin.replace('http', 'ws') + '/voice?room=ABC234', { origin });
+    sockets.push(socket);
+    const messages: Array<any> = [];
+    socket.on('message', (raw, binary) =>
+      messages.push(binary ? new Uint8Array(raw as Buffer) : JSON.parse(String(raw))),
+    );
+    await new Promise<void>((resolve, reject) => {
+      socket.once('open', resolve);
+      socket.once('error', reject);
+    });
+    const session = randomUUID();
+    socket.send(
+      JSON.stringify({
+        type: 'hello',
+        code: 'ABC234',
+        member: welcome.memberId,
+        secret: welcome.resume,
+        session,
+        opus: true,
+      }),
+    );
+    const until = Date.now() + 5000;
+    while (!messages.some((m) => m.type === 'roster')) {
+      assert.ok(Date.now() < until, 'Voice roster through Pages binding');
+      await new Promise((r) => setTimeout(r, 20));
+    }
+    return { socket, messages, session };
+  }
+  const voiceA = await voiceClient(welcome),
+    voiceB = await voiceClient(bw);
+  voiceA.socket.send(JSON.stringify({ type: 'mute', muted: false }));
+  voiceA.socket.send(voicePacket(voiceA.session, 0, 'opus', [new Uint8Array([1, 2, 3])]));
+  const voiceUntil = Date.now() + 5000;
+  while (!voiceB.messages.some((m) => m instanceof Uint8Array)) {
+    assert.ok(Date.now() < voiceUntil, 'Voice binary relay');
+    await new Promise((r) => setTimeout(r, 20));
+  }
+  assert.equal(
+    bytesUuid(voiceB.messages.find((m) => m instanceof Uint8Array)!.subarray(4, 20)),
+    welcome.memberId,
+  );
   a.clear();
   b.clear();
   a.send({ type: 'chat', text: 'before hibernation' });
@@ -149,6 +195,17 @@ try {
   const restored = await a.next('state');
   assert.equal(restored.room.chat.at(-1).text, 'before hibernation');
   assert.equal(restored.room.members.filter((m: any) => m.online).length, 2);
+  await new Promise((r) => setTimeout(r, 100));
+  assert.notEqual(voiceA.socket.readyState, WebSocket.OPEN);
+  assert.notEqual(voiceB.socket.readyState, WebSocket.OPEN);
+  const freshVoice = await voiceClient(welcome);
+  freshVoice.socket.close();
+  evidence.voice = {
+    pagesBinding: true,
+    authenticatedFanout: true,
+    hibernationClosesEphemeralAudio: true,
+    freshSessionAfterWake: true,
+  };
   const image = Buffer.concat([
     Buffer.from('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7', 'base64'),
     Buffer.alloc(2 * 1024 * 1024),

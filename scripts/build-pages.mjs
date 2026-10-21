@@ -11,6 +11,7 @@ await writeFile(
     include: [
       '/ws',
       '/broadcast-relay',
+      '/voice',
       '/healthz',
       '/config',
       '/cache-plan/*',

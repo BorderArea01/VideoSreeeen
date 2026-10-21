@@ -21,6 +21,7 @@ import { RoomPeers } from './peers';
 import { setupUpdates } from './updates';
 import { BroadcastPeers } from './broadcast';
 import { BroadcastRelayClient } from './broadcast-relay';
+import { RoomVoice } from './voice';
 import { isNative, nativeCall, onNative, platform, type NativeCache, type Sample } from './native';
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -238,6 +239,7 @@ let desiredSession = false,
   connected = false,
   retries = 0;
 const playbackClock = new PlaybackClock();
+const voice = new RoomVoice($('chat-panel'));
 const playbackKey = (snapshot: Snapshot) =>
   `${snapshot.code}:${snapshot.media?.id ?? ''}:${snapshot.epoch}:${snapshot.playback.revision}`;
 let mediaRelay = true;
@@ -409,6 +411,7 @@ async function connect(kind: 'create' | 'join', reconnect = false) {
   clearTimeout(reconnectTimer);
   ws?.close();
   connected = false;
+  voice.configure(null, '', '', '');
   playbackClock.reset();
   latencies.clear();
   connectionView(reconnect ? '正在重新连接' : '正在连接');
@@ -562,6 +565,8 @@ async function connect(kind: 'create' | 'join', reconnect = false) {
       clearTimeout(timeout);
       if (ws !== socket) return;
       connected = false;
+      voice.leave();
+      voice.configure(null, '', '', '');
       danmakuFeed.reset();
       window.__VS_Danmaku.clear();
       if (isNative && siteOpen)
@@ -638,6 +643,7 @@ function adopt(snapshot: Snapshot) {
     siteActions.reset();
   }
   room = snapshot;
+  voice.configure(room, memberId, resume, activeServer);
   if (
     nextAutoplay &&
     snapshot.media?.url !== nextAutoplay.url &&
@@ -2583,6 +2589,8 @@ function playbackError(event: Event) {
 video.addEventListener('error', playbackError);
 audio.addEventListener('error', playbackError);
 $('leave-button').onclick = () => {
+  voice.leave();
+  voice.configure(null, '', '', '');
   nextAutoplay = null;
   danmakuFeed.reset();
   latencies.clear();
@@ -2774,6 +2782,7 @@ window.addEventListener('hashchange', () => {
   }
 });
 window.addEventListener('pagehide', () => {
+  voice.leave();
   cancelSourceResolution();
   releasePublisher();
   void cache.clear().catch(() => {});

@@ -37,6 +37,7 @@
     "test:broadcast": "tsx scripts/broadcast-check.ts",
     "test:browser-share": "tsx scripts/browser-share-check.ts",
     "test:broadcast-relay": "tsx scripts/broadcast-relay-check.ts",
+    "test:voice": "tsx scripts/voice-check.ts",
     "release:prepare": "node scripts/prepare-release.mjs",
     "release:publish": "node scripts/publish-release.mjs",
     "test:site-broadcast": "tsx scripts/site-broadcast-check.ts",

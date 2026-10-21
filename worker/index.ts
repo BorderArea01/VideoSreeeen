@@ -4,6 +4,7 @@ import { clientMessageSchema, parseInvite, type Chat } from '../shared/protocol'
 import { directPlan } from '../shared/cache-plan';
 import { RoomImages, type ImageMeta } from '../server/images';
 import { BroadcastRelay } from '../server/broadcast-relay';
+import { VoiceRelay } from '../server/voice';
 import type { RelayHello } from '../shared/broadcast-relay';
 import { RoomSources } from '../server/site-source';
 import { startProbe, finishProbe } from '../server/latency';
@@ -15,7 +16,7 @@ interface Env {
   ICE_SERVERS?: string;
 }
 interface Connection {
-  kind?: 'broadcast-relay';
+  kind?: 'broadcast-relay' | 'voice';
   relayAuth?: RelayHello;
   memberId?: string;
   opened: number;
@@ -60,6 +61,7 @@ export default {
         version: '0.4.3',
         mediaRelay: false,
         broadcastRelay: true,
+        voice: true,
         p2p: true,
       });
     else if (url.pathname === '/config')
@@ -67,10 +69,11 @@ export default {
         mediaRelay: false,
         p2p: true,
         roomRouting: true,
+        voice: true,
         broadcastRelay: true,
         iceServers: JSON.parse(env.ICE_SERVERS ?? '[{"urls":"stun:stun.cloudflare.com:3478"}]'),
       });
-    else if (url.pathname === '/ws' || url.pathname === '/broadcast-relay') {
+    else if (['/ws', '/broadcast-relay', '/voice'].includes(url.pathname)) {
       if (request.headers.get('Upgrade')?.toLowerCase() !== 'websocket')
         return new Response('WebSocket required', { status: 426 });
       const code = url.searchParams.get('room');
@@ -105,6 +108,7 @@ export default {
 export class WatchRoom extends DurableObject<Env> {
   private rooms = new Rooms();
   private broadcastRelay = new BroadcastRelay(this.rooms);
+  private voice = new VoiceRelay(this.rooms);
   private sources = new RoomSources(this.rooms);
   private chatIds: string[] = [];
   private images = new RoomImages(
@@ -145,6 +149,8 @@ export class WatchRoom extends DurableObject<Env> {
       for (const socket of ctx.getWebSockets()) {
         const c = socket.deserializeAttachment() as Connection;
         if (c?.kind === 'broadcast-relay') this.broadcastRelay.connect(socket, c.relayAuth);
+        // Live voice never persists. Wake-up establishes a fresh session and jitter buffer.
+        if (c?.kind === 'voice') socket.close(4001, 'voice restart');
       }
       this.broadcastRelay.restored();
     });
@@ -164,7 +170,7 @@ export class WatchRoom extends DurableObject<Env> {
         return new Response('请在客户端解析完整 HLS 列表', { status: 501 });
       return json(directPlan(room.media.source));
     }
-    if (this.ctx.getWebSockets().length >= 24)
+    if (this.ctx.getWebSockets().length >= 32)
       return new Response('房间连接数已满', { status: 429 });
     const code = url.searchParams.get('room');
     if (!code || !/^[A-HJ-NP-Z2-9]{6}$/.test(code))
@@ -177,6 +183,7 @@ export class WatchRoom extends DurableObject<Env> {
     this.ctx.acceptWebSocket(server);
     server.serializeAttachment({
       ...(url.pathname === '/broadcast-relay' ? { kind: 'broadcast-relay' as const } : {}),
+      ...(url.pathname === '/voice' ? { kind: 'voice' as const } : {}),
       opened: now,
       seen: now,
       tokens: 100,
@@ -189,6 +196,13 @@ export class WatchRoom extends DurableObject<Env> {
   async webSocketMessage(socket: WebSocket, raw: string | ArrayBuffer) {
     const c = socket.deserializeAttachment() as Connection,
       now = Date.now();
+    if (c.kind === 'voice') {
+      c.seen = now;
+      this.voice.connect(socket);
+      this.voice.message(socket, typeof raw === 'string' ? raw : new Uint8Array(raw));
+      socket.serializeAttachment(c);
+      return;
+    }
     if (c.kind === 'broadcast-relay') {
       c.seen = now;
       this.broadcastRelay.connect(socket, c.relayAuth);
@@ -276,6 +290,7 @@ export class WatchRoom extends DurableObject<Env> {
       });
     }
     this.broadcastRelay.sweep();
+    this.voice.sweep();
     socket.serializeAttachment(c);
   }
   private async save() {
@@ -309,6 +324,11 @@ export class WatchRoom extends DurableObject<Env> {
     const c = socket.deserializeAttachment() as Connection,
       room = this.room,
       seat = c?.memberId && room?.members.get(c.memberId);
+    if (c?.kind === 'voice') {
+      this.voice.close(socket);
+      socket.close(1000, 'closed');
+      return;
+    }
     if (c?.kind === 'broadcast-relay') {
       this.broadcastRelay.close(socket);
       socket.close(1000, 'closed');
@@ -331,6 +351,7 @@ export class WatchRoom extends DurableObject<Env> {
     }
     this.rooms.sweep();
     this.broadcastRelay.sweep();
+    this.voice.sweep();
     await this.images.sweep();
     await this.save();
     if (this.room || this.ctx.getWebSockets().length)

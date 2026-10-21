@@ -10,6 +10,7 @@ import { ImageFiles } from './image-files';
 import { once } from 'node:events';
 import { MediaRelay } from './media';
 import { BroadcastRelay } from './broadcast-relay';
+import { VoiceRelay } from './voice';
 import { RoomSources } from './site-source';
 import { fetchSiteMetadata } from './site-fetch';
 import { startProbe, finishProbe, type ProbeState } from './latency';
@@ -22,6 +23,7 @@ export function createApp(
     images = new RoomImages(rooms, imageFiles);
   const relay = new MediaRelay(rooms);
   const broadcastRelay = new BroadcastRelay(rooms);
+  const voice = new VoiceRelay(rooms);
   const sources = new RoomSources(rooms, fetchSiteMetadata);
   const root = resolve(fileURLToPath(new URL('../dist/', import.meta.url)));
   const allowed =
@@ -139,6 +141,7 @@ export function createApp(
           JSON.stringify({
             mediaRelay: true,
             broadcastRelay: options.broadcastRelay !== false,
+            voice: true,
             p2p: true,
             iceServers: JSON.parse(
               process.env.ICE_SERVERS ?? '[{"urls":"stun:stun.cloudflare.com:3478"}]',
@@ -196,23 +199,37 @@ export function createApp(
     maxPayload: 65556,
     perMessageDeflate: false,
   });
+  const voiceSockets = new WebSocketServer({
+    noServer: true,
+    maxPayload: 4096,
+    perMessageDeflate: false,
+  });
   server.on('upgrade', (req, socket, head) => {
     const ip = req.socket.remoteAddress ?? 'unknown';
     const path = new URL(req.url ?? '/', 'http://localhost').pathname;
     if (
-      !['/ws', '/broadcast-relay'].includes(path) ||
+      !['/ws', '/broadcast-relay', '/voice'].includes(path) ||
       !originAllowed(req.headers.origin, req.headers.host) ||
-      (connections.get(ip) ?? 0) >= 24
+      (connections.get(ip) ?? 0) >= 32
     ) {
       socket.end('HTTP/1.1 403 Forbidden\r\n\r\n');
       return;
     }
-    const handler = path === '/broadcast-relay' ? mediaSockets : wss;
+    const handler =
+      path === '/voice' ? voiceSockets : path === '/broadcast-relay' ? mediaSockets : wss;
     handler.handleUpgrade(req, socket, head, (ws) => {
       connections.set(ip, (connections.get(ip) ?? 0) + 1);
       ws.once('close', () => connections.set(ip, Math.max(0, (connections.get(ip) ?? 1) - 1)));
       handler.emit('connection', ws);
     });
+  });
+  voiceSockets.on('connection', (socket: WebSocket) => {
+    voice.connect(socket);
+    socket.on('message', (raw, binary) =>
+      voice.message(socket, binary ? new Uint8Array(raw as Buffer) : String(raw)),
+    );
+    socket.on('close', () => voice.close(socket));
+    socket.on('error', () => {});
   });
   mediaSockets.on('connection', (socket: WebSocket) => {
     broadcastRelay.connect(socket);
@@ -329,6 +346,7 @@ export function createApp(
   const sweeper = setInterval(() => {
     rooms.sweep();
     broadcastRelay.sweep();
+    voice.sweep();
     relay.sweep();
     void images.sweep().catch(() => {});
   }, 5000);
@@ -337,6 +355,8 @@ export function createApp(
     clearInterval(sweeper);
     for (const ws of wss.clients) ws.terminate();
     for (const ws of mediaSockets.clients) ws.terminate();
+    for (const ws of voiceSockets.clients) ws.terminate();
+    await new Promise<void>((resolve) => voiceSockets.close(() => resolve()));
     await new Promise<void>((resolve) => mediaSockets.close(() => resolve()));
     await new Promise<void>((resolve) => wss.close(() => resolve()));
     await new Promise<void>((resolve) => server.close(() => resolve()));
