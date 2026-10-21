@@ -52,4 +52,12 @@
 
 成员按钮复用 DOM，避免实时说话状态刷新时丢失键盘焦点；已验证焦点保持及本机单人静音切换。另修正成员快照覆盖本机操作反馈的问题：仅首次语音连接成功设置“已连接”，后续成员刷新不再把麦克风权限拒绝、设备切换失败等提示覆盖掉。音频协议、缓存门槛、视频控制和服务配置未改。
 
-本地 TypeScript / 前端与 Node 构建、完整 `test:voice` 回归及上述截图检查通过。后续线上版本记录于下方。
+本轮格式检查、TypeScript / 前端与 Node 构建、本地及正式 Pages 地址的完整 `test:voice` 回归、键盘焦点保持、本机单人静音与三种宽度的布局检查通过。未重复执行与本次 UI 无关的全量单元测试；此前 80 项测试的基线见上文。语音设备的物理路由边界仍按前文，不以 API 桩或视口测试冒充真机。
+
+- 运行时代码：`2c4a87d996a14bd59cd3bb428e49777cded6d2cc`，后续文档提交不改变运行时。
+- Worker 版本：`0ad4275b-9216-4957-bc08-957b8c8188df`；Pages 部署：`2eb397fd-a23c-41d5-89b4-616a3dba7de7`。
+- 主 JS：`index-BEtvEQjX.js`，SHA-256 `e1084890dfc913880820c32ac20a97bcb9c5ea0fadbaf0b12b972e87a9058581`。
+- 样式：`index-CdBjmpwY.css`，SHA-256 `9fe811cacbe0f05fe7d4e15bc2247d62e3ebbe786fc7e74296e740ae9141e462`。
+- 正式入口的 HTML、JS 与 CSS 已逐字节核对本机构建，线上完整语音验收无页面错误、无额外房间播放控制。记录另存 `.local/voice-ui-public-evidence.json` 与 `.local/public-voice-ui-web-source-evidence.json`。
+
+这次仍只更新网页与同一服务的静态资产，不发布安装包，不新增收费资源。UI 更新前的 Worker `b87df3f1-c9ac-4d5f-83fe-2f90abfbe886`、Pages `78187e59-f8b8-47ed-9cb7-11de08e921f6` 为回退检查点。
