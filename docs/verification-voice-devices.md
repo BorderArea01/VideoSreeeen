@@ -25,4 +25,21 @@
 
 参考了 [Web Audio 1.1 setSinkId 草案](https://webaudio.github.io/web-audio-api/#dom-audiocontext-setsinkid)、[设备选择规范](https://w3c.github.io/mediacapture-output/) 与 [WebRTC 官方设备选择示例](https://github.com/webrtc/samples/tree/gh-pages/src/content/devices/input-output)。未复制第三方实现或增加音频依赖。
 
-本轮最终验收与部署版本在完成后记录于下方。
+## 本轮结果与部署
+
+- `npm run verify` 通过：80 项单元测试、格式、TypeScript、前端 / Node 构建、Workers 类型检查及 dry-run。服务端协议与权限逻辑未改动。
+- `test:voice` 本地与正式 Pages 地址均通过，包含上述设备切换、失败回退、移除、取消、偏好恢复及原有多人语音回归。正式通道接收端检测到切换后的合成输入频率，峰值约 -30.33 dB；三人视频分别解码 353 / 353 / 352 帧，均在播放。语音操作发出的房间播放控制为 0，页面错误为 0。
+- API 桩与物理设备边界保持前文描述，`physicalDeviceSwitchVerified` 为 false。没有把原生默认 sink 的调用成功当作真实耳机或蓝牙切换成功。
+- GitHub 运行时代码：`89db6d996afe24933e1e8be763037ae60e0c1593`；后续仅补验证文档，不改变运行时。未发布新 Release 或安装包。
+
+| 项目        | 结果                                                                                             |
+| ----------- | ------------------------------------------------------------------------------------------------ |
+| 正式入口    | <https://videosreeeen.pages.dev>                                                                 |
+| Worker 版本 | `b87df3f1-c9ac-4d5f-83fe-2f90abfbe886`                                                           |
+| Pages 部署  | `78187e59-f8b8-47ed-9cb7-11de08e921f6`                                                           |
+| 主 JS       | `index-Cg1-u86X.js`，SHA-256 `dd3ebf9ef3facde194052cad81c853590c0146062bd1743605ba787dea791092`  |
+| 样式        | `index-DpusuRWo.css`，SHA-256 `3c5c0303634cb02f85a16fdf4dcc9ee60e1b1635565d4bcd4c8ce727914dd0b5` |
+
+正式入口 HTML、主 JS 和样式与本机构建逐字节一致。上线前已再次核对原有授权账号、Pages 项目和 WATCH 绑定，没有新建计费资源。上线前 Worker `e69bdacc-6f9a-4cf5-8080-f52ff14c3fdb`、Pages `cffabbdc-0125-4932-852d-169bc1455148` 为回退检查点，未做数据库迁移。
+
+复验入口仍为 `npm run test:voice`；设置 `VS_PUBLIC_URL` 可测正式入口，代理可选 `VS_TEST_PROXY`。本机结果留在忽略目录 `.local/voice-devices-local-evidence.json`、`.local/voice-devices-public-evidence.json` 和 `.local/public-voice-devices-web-source-evidence.json`，不提交原始运行数据。
