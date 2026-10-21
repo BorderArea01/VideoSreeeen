@@ -49,6 +49,32 @@ $env:VS_TEST_RECOVERY='1'
 
 原有 AL `3434/play/203799?source=AL`、xfy2 `151/play/1986?source=xfy2` 也分别以双端视频直连回归：均解码 1920×1080 与音频，播放中拖动、暂停于 5 秒、1.25 倍速、取消 / 失败保留当前媒体及同线路下一集继续播放通过。两条旧线路的媒体请求没有被新增 Service Worker 接管。
 
+## 正式部署与公网复验
+
+沿用已授权账号和既有资源，更新同一个 Worker 与 Pages，未创建付费产品。上线前保存的回滚基线为 Worker `0ad4275b-9216-4957-bc08-957b8c8188df`、Pages `2eb397fd-a23c-41d5-89b4-616a3dba7de7`；WATCH 绑定仍指向 `videosreeeen`。
+
+- 入口：[videosreeeen.pages.dev](https://videosreeeen.pages.dev)。
+- 运行时代码：`cf3c48d6fcf1b1b42750bbca36d6330ed889488a`。
+- Worker：`c91a1fb3-387c-4cd2-8168-748ce5b85115`。
+- Pages：`3367084c-72b1-4260-a7e1-899363002cbd`，部署元数据对应上述提交。
+- 主脚本：`assets/index-JoS2ah6s.js`，SHA-256 `14fa2a5c0fd81b6095991274e613e90f0740ee8cf220f0e2ec625a9ab1cc9773`。
+- 本机视频 Worker：`public-video-sw.js`，SHA-256 `d02b3f05f2cf6c1402c0a75195e7689bb01b7d77a4134dd31730ae8ad602bfc7`。
+- 正式域名 HTML、主脚本、CSS 和本机视频 Worker 均与构建逐字节一致，健康版本仍为 0.4.3。
+
+使用 `VS_PUBLIC_URL=https://videosreeeen.pages.dev` 对同一链接重新执行完整双端脚本，不替换 `/config`、原站成功响应或视频，实际使用正式房间服务和原 CDN：
+
+| 项目            | 正式入口结果                                                          |
+| --------------- | --------------------------------------------------------------------- |
+| 识别与首帧      | 2374 ms，两端正确接管视频请求                                         |
+| 画面与音频      | 两端 1920×1080，445 / 442 帧，音频解码 474247 / 469209 字节           |
+| 连续观看 10 秒  | 新增 255 / 253 帧，时间前进 10.62 / 10.56 秒                          |
+| 播放控制与恢复  | 播放中拖动继续出帧；暂停、5 秒与 1.25 倍速一致；观众离线 3.5 秒后恢复 |
+| 下一集          | 同线路 `203803?source=xfxf1` 自动接播，两端解码                       |
+| 取消与失败      | 识别取消、接口失败、首帧失败及下一集取消均保留当前媒体                |
+| 页面 / 房间错误 | 无                                                                    |
+
+忽略目录中的证据为 `.local/xifan-xfxf1-playback-public-evidence.json` 和 `.local/public-xfxf1-web-source-evidence.json`。本节之后的记录提交仅更新文档，不重新构建或发布安装包。
+
 ## 验证边界
 
 这是同一电脑上两份独立浏览器资料的验证，不等于异地网络、Android / iOS 真机或整集连续观看通过。源站下载速度仍可能影响各端缓冲，缓冲保持本机隔离。xfxf1 整集落盘 / P2P 未实测；Service Worker 不为缓存下载开放原站没有提供的跨域权限。Windows / Android 没有重新打包或发布 Release。
