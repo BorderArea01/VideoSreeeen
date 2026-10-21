@@ -36,4 +36,24 @@ TCP 能重传短时丢包，但重传也可能增加延迟；无法承诺严重�
 
 编码依据：[W3C WebCodecs Opus 注册规范](https://www.w3.org/TR/webcodecs-opus-codec-registration/)、[Xiph Opus](https://github.com/xiph/opus)。实现没有复制第三方音频代码或新增音频依赖。
 
-部署版本及最终自动验收结果在本页末尾记录。
+## 本轮实际结果与部署
+
+- `npm run verify` 通过：80 项单元测试、格式检查、TypeScript、前端 / Node 构建、Worker 类型检查及 dry-run。随后补强的跨房间鉴权断言也重新通过语音单元测试。
+- `test:worker` 通过，包括已有图片、聊天、房间恢复和画面转发回归；新的语音转发及休眠后新会话通过。
+- `test:voice` 本地和正式 Pages 地址均通过。两人 Opus 实际双向解码；三人同时提供音频、兼容编码切换、麦克风拒绝后继续收听、单人静音、断线后收听、迟到权限清理均通过。
+- 线上 180 ms 到达抖动阶段，健康端无欠载，受影响端出现 1 次欠载等待、0 次跳帧重置；随后解码继续，取样时队列为 340 ms。测试未宣称全过程零停顿或真实人声不吞字。
+- 三人同时通话时，视频分别已解码 315 / 312 / 312 帧，均在播放，进度 12.930 / 12.794 / 12.804 秒；语音操作发出的房间播放控制指令为 0。实际混音输出的两个测试频率峰值约 -30.53 / -30.33 dB。物理输出静音，未调用真实麦克风，未保存音频样本。
+- 代码已推送 GitHub。网页 / 服务运行时代码为 `89702fb75acf5dd94f1ea01e27b2d622894b2673`；后续仅补充此验证文档，不改变运行时。没有发布新 Release、Windows 安装包或 APK。
+
+| 项目         | 线上结果                                                                                                           |
+| ------------ | ------------------------------------------------------------------------------------------------------------------ |
+| 入口         | <https://videosreeeen.pages.dev>                                                                                   |
+| Worker 版本  | `e69bdacc-6f9a-4cf5-8080-f52ff14c3fdb`                                                                             |
+| Pages 部署   | `cffabbdc-0125-4932-852d-169bc1455148`                                                                             |
+| 主 JS        | `index-BnRTgFnd.js`，SHA-256 `b5ce78b929980953e733732aad741c189bb34cab2f1807742a141c042e8224bf`                    |
+| 样式         | `index-CpjYtZ4E.css`，SHA-256 `6a7db401d8c621c9f076d7d8fa9f89ad2d876d4bea205207cb5470db7cf090b7`                   |
+| 音频 Worklet | `voice-worklet-BzsYllu4.js`，3314 字节，SHA-256 `4e9d91b443decfc9a68a46809343350d7a556dc5fbb5343e3664c456bdd3e25d` |
+
+正式入口的 HTML、主 JS、样式和音频 Worklet 均与本机构建逐字节一致。部署前已核对同一授权账号、原有 Pages 项目及 WATCH 绑定，未新增计费产品；本轮前的 Worker 版本 `cac880ad-9d6e-402c-b00b-16d2bfafb34f`、Pages 部署 `3479643c-f14f-4c82-b95f-f91f3a6e149b` 为回退检查点，无数据库迁移。
+
+原始计数证据留在忽略目录 `.local/voice-local-evidence.json`、`.local/voice-public-evidence.json`、`.local/worker-evidence.json`、`.local/public-voice-web-source-evidence.json` 和 `.local/public-voice-assets-evidence.json`。这些文件不提交；可用上述验收入口重新生成。手机真机与自然对话的边界仍以本页前文为准。
