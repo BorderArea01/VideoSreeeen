@@ -1,13 +1,15 @@
 import type { MediaInput } from '../shared/protocol';
+import { preparePublicVideo } from './public-video';
 
 // Published by the site's own browser client. This is its public application
 // identifier, not a user session, secret key, or our room credential.
 const XIFAN_PUBLIC_KEY = 'sb_publishable_OBIVAWACIX6lPXrO98_z24_HcsmalkA';
 const XIFAN_ENDPOINT = 'https://api.xifanacg.com/functions/v1/issue-web-playback';
 // Source codes and IDs observed in the original site's public player.
-const XIFAN_SOURCES = new Map([
-  ['xfy2', 5],
-  ['AL', 1],
+const XIFAN_SOURCES = new Map<string, { id: number; origins: string[] }>([
+  ['xfy2', { id: 5, origins: ['https://play.xfvod.pro', 'https://play.xfvod.pro:8088'] }],
+  ['AL', { id: 1, origins: ['https://play.xfvod.pro', 'https://play.xfvod.pro:8088'] }],
+  ['xfxf1', { id: 4, origins: ['https://apn.moedot.net'] }],
 ]);
 
 export async function resolveXifanPage(
@@ -18,17 +20,17 @@ export async function resolveXifanPage(
   const page = new URL(media.url);
   const match = /^\/anime\/([1-9]\d{0,8})\/play\/([1-9]\d{0,8})\/?$/.exec(page.pathname);
   const sourceCode = page.searchParams.get('source') ?? '';
-  const sourceId = XIFAN_SOURCES.get(sourceCode);
+  const source = XIFAN_SOURCES.get(sourceCode);
   if (
     page.origin !== 'https://next.xifanacg.com' ||
     page.username ||
     page.password ||
     !match ||
-    sourceId === undefined ||
+    !source ||
     page.searchParams.getAll('source').length !== 1
   )
     throw new Error(
-      '当前支持稀饭旧番主线 xfy2、新番主线 AL；此链接的线路暂未适配，可使用客户端或共享画面',
+      '当前支持稀饭 xfy2 / AL / xfxf1 线路；此链接的线路暂未适配，可使用客户端或共享画面',
     );
   const response = await fetcher(XIFAN_ENDPOINT, {
     method: 'POST',
@@ -37,7 +39,11 @@ export async function resolveXifanPage(
     redirect: 'error',
     cache: 'no-store',
     headers: { apikey: XIFAN_PUBLIC_KEY, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ action: 'fallback', episode_id: Number(match[2]), source_id: sourceId }),
+    body: JSON.stringify({
+      action: 'fallback',
+      episode_id: Number(match[2]),
+      source_id: source.id,
+    }),
     signal,
   });
   if (!response.ok) {
@@ -85,7 +91,7 @@ export async function resolveXifanPage(
     );
   const candidate = Array.isArray(result.candidates)
     ? result.candidates.find(
-        (item: any) => item?.source_id === sourceId && item.source_code === sourceCode,
+        (item: any) => item?.source_id === source.id && item.source_code === sourceCode,
       )
     : undefined;
   if (
@@ -101,8 +107,7 @@ export async function resolveXifanPage(
   const video = new URL(candidate.url);
   if (
     video.protocol !== 'https:' ||
-    video.hostname !== 'play.xfvod.pro' ||
-    !['', '8088'].includes(video.port) ||
+    !source.origins.includes(video.origin) ||
     video.username ||
     video.password ||
     !/\.(mp4|webm)$/i.test(video.pathname)
@@ -119,6 +124,7 @@ export async function resolveXifanPage(
 /** Verify actual first-frame loading on this network before replacing a movie. */
 export async function checkResolvedVideo(media: MediaInput, signal: AbortSignal) {
   if (media.source?.kind !== 'file' || media.source.audio) return;
+  await preparePublicVideo(media.source.video, signal);
   const video = document.createElement('video');
   video.muted = true;
   video.playsInline = true;

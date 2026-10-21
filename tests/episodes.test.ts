@@ -66,3 +66,17 @@ test('剧集元数据请求保持原站路径白名单，不开放通用代理',
   ])
     assert.equal(allowedSiteMetadata(url), false);
 });
+
+test('稀饭 xfxf1 下一集保留同番同线路，不退回 AL 或 xfy2', () => {
+  const current = 'https://next.xifanacg.com/anime/3434/play/203802?source=xfxf1';
+  assert.ok(allowedSiteMetadata(current));
+  assert.equal(
+    readNextEpisode(
+      current,
+      JSON.stringify({ nextHref: '/anime/3434/play/203803?source=xfxf1', nextLabel: '第 5 集' }),
+    )?.url,
+    'https://next.xifanacg.com/anime/3434/play/203803?source=xfxf1',
+  );
+  for (const source of ['AL', 'xfy2'])
+    assert.equal(nextEpisode(current, `/anime/3434/play/203803?source=${source}`), null);
+});

@@ -3,6 +3,7 @@ import './style.css';
 import { icon } from './icons';
 import { PlaybackPicker, playbackPickerMarkup } from './playback-picker';
 import { resolveXifanPage, checkResolvedVideo } from './site-source';
+import { preparePublicVideo } from './public-video';
 import { SiteActions } from './site-actions';
 import { Latencies } from './latency';
 import { PlaybackHealth } from './playback-health';
@@ -60,7 +61,7 @@ const playbackPicker = new PlaybackPicker((choice) => {
 });
 $('link-capability').textContent = isNative
   ? '每人独立加载视频，只同步进度，画质不经转码。支持视频直链和客户端内的原站播放器；原站需要各自登录。'
-  : '每人独立加载视频，只同步进度，画质不经转码。支持视频直链、稀饭 xfy2 / AL 线路；蜜柑存储线路为实验识别。';
+  : '每人独立加载视频，只同步进度，画质不经转码。支持视频直链、稀饭 xfy2 / AL / xfxf1 线路；蜜柑存储线路为实验识别。';
 if (!isNative) $<HTMLInputElement>('source-url').placeholder = '粘贴视频直链、稀饭或蜜柑播放页';
 $('site-source-options').hidden = !isNative;
 $('link-choice').append($('cache-options'));
@@ -1345,11 +1346,14 @@ async function retryLocalVideo() {
         ? await resolveXifanPage(media, request.signal)
         : media;
     if (!current()) return;
-    await setPlayer(
-      mediaRelay ? mediaPath('video') : resolved.source!.video,
-      media.source.audio ? mediaPath('audio') : undefined,
-      media.source.kind === 'hls',
-    );
+    if (
+      !(await setPlayer(
+        mediaRelay ? mediaPath('video') : resolved.source!.video,
+        media.source.audio ? mediaPath('audio') : undefined,
+        media.source.kind === 'hls',
+      ))
+    )
+      throw new Error('本机视频连接未能就绪');
     if (!current()) return;
     render();
     await Promise.all([
@@ -1376,6 +1380,17 @@ async function retryLocalVideo() {
 async function setPlayer(src: string, audioSrc?: string, isHls = false) {
   sourceFailed = false;
   const generation = ++playerGeneration;
+  try {
+    await preparePublicVideo(src);
+  } catch {
+    if (generation === playerGeneration) {
+      sourceFailed = true;
+      video.hidden = true;
+      render();
+    }
+    return false;
+  }
+  if (generation !== playerGeneration) return;
   hls?.destroy();
   hls = null;
   video.hidden = false;
@@ -1411,6 +1426,7 @@ async function setPlayer(src: string, audioSrc?: string, isHls = false) {
     } else video.src = src;
   } else video.src = src;
   if (!hls) video.load();
+  return true;
 }
 async function loadStream(media: NonNullable<Snapshot['media']>) {
   const epoch = room?.epoch;
@@ -2555,6 +2571,11 @@ video.onloadeddata = () => {
   }
   startNextWhenReady();
 };
+// A loadeddata event can already be queued when the initial timeline seek
+// lowers readyState again. Resume a requested next episode after that seek has
+// actually completed, rather than consuming the one early readiness event.
+video.addEventListener('canplay', startNextWhenReady);
+video.addEventListener('seeked', startNextWhenReady);
 for (const element of [video, audio])
   element.addEventListener('playing', () => {
     if (playbackPermissionNeeded && !video.paused && (!audio.src || !audio.paused)) {

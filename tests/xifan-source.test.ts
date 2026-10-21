@@ -14,6 +14,63 @@ const result = () => ({
 });
 const signal = () => new AbortController().signal;
 
+test('稀饭 xfxf1 使用原站线路 4 及独立 CDN，拒绝串线、换域或凭据', async () => {
+  const page = 'https://next.xifanacg.com/anime/3434/play/203802?source=xfxf1';
+  const issued = 'https://apn.moedot.net/example/04.mp4?issued=original';
+  const payload = {
+    ...result(),
+    anime_id: 3434,
+    episode_id: 203802,
+    candidates: [{ source_id: 4, source_code: 'xfxf1', url: issued }],
+  };
+  const media = await resolveXifanPage(describeUrl(page), signal(), (async (_url, init) => {
+    assert.deepEqual(JSON.parse(init!.body as string), {
+      action: 'fallback',
+      episode_id: 203802,
+      source_id: 4,
+    });
+    assert.equal(init?.credentials, 'omit');
+    assert.equal(new Headers(init?.headers).has('Authorization'), false);
+    assert.equal(new Headers(init?.headers).has('X-Member-Id'), false);
+    return Response.json(payload);
+  }) as typeof fetch);
+  assert.equal(media.url, page);
+  assert.equal(media.source?.video, issued);
+  for (const candidate of [
+    { source_id: 1, source_code: 'AL', url: issued },
+    { source_id: 4, source_code: 'AL', url: issued },
+    { source_id: 1, source_code: 'xfxf1', url: issued },
+    ...[
+      'http://apn.moedot.net/a.mp4',
+      'https://apn.moedot.net.evil.test/a.mp4',
+      'https://user:password@apn.moedot.net/a.mp4',
+      'https://apn.moedot.net:8088/a.mp4',
+      'https://127.0.0.1/a.mp4',
+      'https://apn.moedot.net/a.html',
+      'https://play.xfvod.pro/a.mp4',
+    ].map((url) => ({ source_id: 4, source_code: 'xfxf1', url })),
+  ])
+    await assert.rejects(
+      resolveXifanPage(describeUrl(page), signal(), (async () =>
+        Response.json({ ...payload, candidates: [candidate] })) as typeof fetch),
+    );
+  await assert.rejects(
+    resolveXifanPage(describeUrl(page + '&source=AL'), signal(), (async () => {
+      throw new Error('must not fetch');
+    }) as typeof fetch),
+    /暂未适配/,
+  );
+  // A newly allowed CDN must not expand an existing line's source permissions.
+  await assert.rejects(
+    resolveXifanPage(describeUrl(page.replace('xfxf1', 'AL')), signal(), (async () =>
+      Response.json({
+        ...payload,
+        candidates: [{ source_id: 1, source_code: 'AL', url: issued }],
+      })) as typeof fetch),
+    /来源暂不支持/,
+  );
+});
+
 test('稀饭 AL 按原站线路 1 请求，不改成旧番线路，也不接受串线结果', async () => {
   const al = 'https://next.xifanacg.com/anime/3434/play/203799?source=AL';
   const payload = {

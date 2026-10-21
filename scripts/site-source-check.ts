@@ -8,6 +8,18 @@ import { closeInvitation, selectSource, choosePlayback } from './room-ui';
 const site = process.argv[2] || 'https://www.mgnacg.com/bangumi/193-3-17/';
 const xifan = new URL(site).hostname === 'next.xifanacg.com';
 const provider = xifan ? 'xifan' : 'mgn';
+const sourceCode = new URL(site).searchParams.get('source');
+const xifanSourceId = new Map([
+  ['AL', 1],
+  ['xfy2', 5],
+  ['xfxf1', 4],
+]).get(sourceCode!);
+const expectedCdn = xifan
+  ? sourceCode === 'xfxf1'
+    ? 'apn.moedot.net'
+    : 'play.xfvod.pro'
+  : 'r2.jzacg.com';
+if (xifan) assert.ok(xifanSourceId, 'The test needs an observed original-site source ID');
 const directMedia = process.env.VS_TEST_DIRECT_MEDIA === '1';
 const metadataRoute = xifan
   ? 'https://api.xifanacg.com/functions/v1/issue-web-playback'
@@ -61,9 +73,28 @@ try {
   const errors: string[] = [],
     commands: string[] = [],
     serverErrors: string[] = [];
+  const mediaResponses: Record<string, unknown>[] = [];
+  proof.mediaResponses = mediaResponses;
+  const controls: Record<string, unknown>[] = [];
+  proof.controls = controls;
   let latest: any,
     metadataStatus = 0;
+  const timeline: Record<string, unknown>[] = [];
+  proof.timeline = timeline;
   for (const page of [host, guest]) {
+    page.on('response', (response) => {
+      if (response.request().resourceType() !== 'media' || mediaResponses.length >= 40) return;
+      const headers = response.headers();
+      mediaResponses.push({
+        client: page === host ? 'host' : 'guest',
+        host: new URL(response.url()).host,
+        status: response.status(),
+        fromServiceWorker: response.fromServiceWorker(),
+        range: response.request().headers().range,
+        contentRange: headers['content-range'],
+        contentType: headers['content-type'],
+      });
+    });
     await page.addInitScript(() => {
       (window as any).__playbackEvents = [];
       for (const name of ['seeking', 'seeked', 'waiting', 'playing', 'stalled', 'error'])
@@ -92,6 +123,8 @@ try {
           try {
             const m = JSON.parse(event.payload);
             if (m.type === 'media') commands.push(m.media.title);
+            if (m.type === 'control')
+              controls.push({ client: page === host ? 'host' : 'guest', action: m.action });
           } catch {}
         }
       });
@@ -100,7 +133,19 @@ try {
           if (typeof event.payload === 'string') {
             try {
               const m = JSON.parse(event.payload);
-              if (m.room) latest = m.room;
+              if (m.room) {
+                const changed =
+                  latest?.media?.id !== m.room.media?.id ||
+                  latest?.playback?.revision !== m.room.playback.revision;
+                latest = m.room;
+                if (changed && timeline.length < 40)
+                  timeline.push({
+                    media: commands.length,
+                    revision: latest.playback.revision,
+                    paused: latest.playback.paused,
+                    intent: latest.playback.intent,
+                  });
+              }
               if (m.type === 'error') serverErrors.push(m.code);
             } catch {}
           }
@@ -135,6 +180,13 @@ try {
     throw error;
   }
   proof.resolvedMs = Date.now() - began;
+  if (xifan && sourceCode === 'xfxf1') {
+    for (const page of [host, guest])
+      await page.waitForFunction(() =>
+        navigator.serviceWorker.controller?.scriptURL.endsWith('/public-video-sw.js'),
+      );
+    proof.publicVideoWorkerControlsBothClients = true;
+  }
   assert.equal(metadataStatus, 200);
   assert.equal(latest.media.url, site);
   assert.equal(latest.media.provider, provider);
@@ -196,15 +248,30 @@ try {
     );
   }
   proof.playingSeekContinuesDecoding = true;
+  if (sourceCode === 'xfxf1') {
+    const sample = async () => {
+      const samples = [];
+      for (const page of [host, guest])
+        samples.push(
+          await page.locator('#video').evaluate((el) => {
+            const v = el as HTMLVideoElement;
+            return { time: v.currentTime, frames: v.getVideoPlaybackQuality().totalVideoFrames };
+          }),
+        );
+      return samples;
+    };
+    const before = await sample();
+    await host.waitForTimeout(10000);
+    const after = await sample();
+    for (let i = 0; i < after.length; i++) {
+      assert.ok(after[i]!.time - before[i]!.time >= 8, 'Playback stalled during the watch window');
+      assert.ok(after[i]!.frames - before[i]!.frames > 100);
+    }
+    proof.continuousPlayback = { windowMs: 10000, before, after };
+  }
   if (process.env.VS_TEST_RECOVERY) {
-    const network = await guestContext.newCDPSession(guest);
-    await network.send('Network.enable');
-    await network.send('Network.emulateNetworkConditions', {
-      offline: true,
-      latency: 0,
-      downloadThroughput: -1,
-      uploadThroughput: -1,
-    });
+    // Context-level offline also affects media fetched by its service worker.
+    await guestContext.setOffline(true);
     try {
       await host.locator('#seek').evaluate((el) => {
         (el as HTMLInputElement).value = '300';
@@ -212,12 +279,7 @@ try {
       });
       await guest.waitForTimeout(3500);
     } finally {
-      await network.send('Network.emulateNetworkConditions', {
-        offline: false,
-        latency: 0,
-        downloadThroughput: -1,
-        uploadThroughput: -1,
-      });
+      await guestContext.setOffline(false);
     }
     await guest.waitForFunction(
       () => {
@@ -238,7 +300,6 @@ try {
       frames,
       { timeout: 15000 },
     );
-    await network.detach();
     proof.interruptedViewerNetworkResumesWithoutRoomPause = true;
   }
   await host.locator('#play-button').click();
@@ -284,8 +345,7 @@ try {
     assert.equal(player.width, 1920);
     assert.equal(player.stream, false);
     assert.ok(player.audioBytes > 0);
-    if (process.env.VS_PUBLIC_URL || directMedia)
-      assert.equal(player.host, xifan ? 'play.xfvod.pro' : 'r2.jzacg.com');
+    if (process.env.VS_PUBLIC_URL || directMedia) assert.equal(player.host, expectedCdn);
   }
   await mkdir('.local/screenshots', { recursive: true });
   await host
@@ -311,8 +371,8 @@ try {
           expires_at: Date.now() / 1000 + 60,
           candidates: [
             {
-              source_id: new URL(site).searchParams.get('source') === 'AL' ? 1 : 5,
-              source_code: new URL(site).searchParams.get('source'),
+              source_id: xifanSourceId,
+              source_code: sourceCode,
               url: video,
             },
           ],
@@ -353,10 +413,8 @@ try {
   assert.notEqual(latest.media.title, '迟到结果不应发布');
   proof.cancellationAndFailureKeepMedia = true;
   await host.unroute(metadataRoute);
-  const broken = xifan
-    ? 'https://play.xfvod.pro/verification-unavailable.mp4'
-    : 'https://r2.jzacg.com/verification-unavailable.mp4';
-  await host.route(broken, (route) => route.abort());
+  const broken = `https://${expectedCdn}/verification-unavailable.mp4`;
+  await context.route(broken, (route) => route.abort());
   await intercept((route) => route.fulfill({ headers: cors, json: reply(broken) }));
   await selectSource(host, site);
   await host
@@ -479,7 +537,6 @@ try {
   await browser.close();
   await app?.close();
   await mkdir('.local', { recursive: true });
-  const evidenceName =
-    xifan && new URL(site).searchParams.get('source') === 'AL' ? 'xifan-al' : provider;
+  const evidenceName = xifan ? `xifan-${sourceCode}` : provider;
   await writeFile(`.local/${evidenceName}-playback-evidence.json`, JSON.stringify(proof, null, 2));
 }
