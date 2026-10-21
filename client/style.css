@@ -1888,3 +1888,32 @@ button {
   width: 110px;
   accent-color: #f4ac83;
 }
+.voice-devices {
+  margin-top: 12px;
+  font-size: 12px;
+}
+.voice-devices summary {
+  cursor: pointer;
+  color: var(--muted);
+}
+.voice-devices label {
+  display: grid;
+  gap: 6px;
+  margin-top: 12px;
+}
+.voice-devices select {
+  width: 100%;
+  min-width: 0;
+  padding: 8px;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.voice-devices button {
+  margin-top: 10px;
+}
+.voice-devices p {
+  color: var(--muted);
+  line-height: 1.6;
+}

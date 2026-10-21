@@ -65,11 +65,23 @@ export class RoomVoice {
   private exitButton: HTMLButtonElement;
   private status: HTMLElement;
   private list: HTMLElement;
+  private inputSelect: HTMLSelectElement;
+  private outputSelect: HTMLSelectElement;
+  private deviceNote: HTMLElement;
+  private devices: MediaDeviceInfo[] = [];
+  private inputId = '';
+  private outputId = '';
+  private deviceRefresh = 0;
+  private outputRequest = 0;
+  private outputTask: Promise<void> = Promise.resolve();
+  private changingOutput = false;
+  private deviceNotice = '';
+  private deviceNoticeKind?: 'input' | 'output';
   constructor(before: HTMLElement) {
     this.panel = document.createElement('section');
     this.panel.className = 'voice-card';
     this.panel.id = 'voice-panel';
-    this.panel.innerHTML = `<div class="section-heading"><span>房间语音</span><span title="独立语音通道，不保存录音。使用耳机可减少回声；短时抖动会增加本机缓冲，严重断网仍会中断。服务器可处理语音数据，非端到端加密。">ⓘ</span></div><div id="voice-status" class="voice-status" role="status"></div><div class="voice-actions"><button id="voice-join" class="soft-button">加入语音</button><button id="voice-mic" class="soft-button" hidden>开麦</button><button id="voice-sound" class="outline-button" hidden>静音接收</button><button id="voice-leave" class="outline-button" hidden>退出</button></div><div id="voice-members" class="voice-members"></div><label id="voice-volume-label" class="voice-volume" hidden>语音音量<input id="voice-volume" type="range" min="0" max="100" value="80" aria-label="语音音量"></label>`;
+    this.panel.innerHTML = `<div class="section-heading"><span>房间语音</span><span title="独立语音通道，不保存录音。使用耳机可减少回声；短时抖动会增加本机缓冲，严重断网仍会中断。服务器可处理语音数据，非端到端加密。">ⓘ</span></div><div id="voice-status" class="voice-status" role="status"></div><div class="voice-actions"><button id="voice-join" class="soft-button">加入语音</button><button id="voice-mic" class="soft-button" hidden>开麦</button><button id="voice-sound" class="outline-button" hidden>静音接收</button><button id="voice-leave" class="outline-button" hidden>退出</button></div><div id="voice-members" class="voice-members"></div><label id="voice-volume-label" class="voice-volume" hidden>语音音量<input id="voice-volume" type="range" min="0" max="100" value="80" aria-label="语音音量"></label><details id="voice-devices" class="voice-devices"><summary>音频设备</summary><label>输入 · 麦克风<select id="voice-input" aria-label="语音输入设备"></select></label><label>输出 · 扬声器 / 耳机<select id="voice-output" aria-label="语音输出设备"></select></label><button id="voice-devices-refresh" class="text-button" type="button">刷新设备</button><p id="voice-device-note" role="status"></p></details>`;
     before.before(this.panel);
     const get = <T extends HTMLElement>(id: string) => this.panel.querySelector<T>('#' + id)!;
     this.joinButton = get('voice-join');
@@ -78,6 +90,23 @@ export class RoomVoice {
     this.exitButton = get('voice-leave');
     this.status = get('voice-status');
     this.list = get('voice-members');
+    this.inputSelect = get('voice-input');
+    this.outputSelect = get('voice-output');
+    this.deviceNote = get('voice-device-note');
+    try {
+      this.inputId = localStorage.getItem('vs-voice-input') ?? '';
+      this.outputId = localStorage.getItem('vs-voice-output') ?? '';
+    } catch {
+      /* Session-only choices still work. */
+    }
+    this.inputSelect.onchange = () => void this.chooseInput(this.inputSelect.value);
+    this.outputSelect.onchange = () => void this.chooseOutput(this.outputSelect.value);
+    get('voice-devices-refresh').onclick = () => void this.refreshDevices();
+    get<HTMLDetailsElement>('voice-devices').ontoggle = () => {
+      if (get<HTMLDetailsElement>('voice-devices').open) void this.refreshDevices();
+    };
+    navigator.mediaDevices?.addEventListener('devicechange', () => void this.refreshDevices(true));
+    this.deviceOptions();
     this.joinButton.onclick = () => void this.join();
     this.micButton.onclick = () => void this.microphone();
     this.soundButton.onclick = () => {
@@ -112,6 +141,235 @@ export class RoomVoice {
         ? 0
         : Number((this.panel.querySelector('#voice-volume') as HTMLInputElement).value) / 100;
   }
+  private saveDevice(kind: 'input' | 'output', id: string) {
+    try {
+      localStorage.setItem('vs-voice-' + kind, id);
+    } catch {
+      /* Private browsing may disallow storage. */
+    }
+  }
+  private notice(kind: 'input' | 'output', message: string) {
+    this.deviceNoticeKind = kind;
+    this.deviceNotice = message;
+    return message;
+  }
+  private clearNotice(kind: 'input' | 'output') {
+    if (this.deviceNoticeKind === kind) {
+      this.deviceNotice = '';
+      this.deviceNoticeKind = undefined;
+    }
+  }
+  private outputSupported() {
+    return typeof (globalThis.AudioContext?.prototype as any)?.setSinkId === 'function';
+  }
+  private deviceOptions() {
+    for (const [select, kind, id] of [
+      [this.inputSelect, 'audioinput', this.inputId],
+      [this.outputSelect, 'audiooutput', this.outputId],
+    ] as const) {
+      const options = [new Option('系统默认', '')];
+      let index = 0;
+      for (const device of this.devices)
+        if (
+          device.kind === kind &&
+          device.deviceId &&
+          device.deviceId !== 'default' &&
+          !options.some((o) => o.value === device.deviceId)
+        )
+          options.push(
+            new Option(
+              device.label || `${kind === 'audioinput' ? '麦克风' : '输出设备'} ${++index}`,
+              device.deviceId,
+            ),
+          );
+      if (id && !options.some((o) => o.value === id))
+        options.push(new Option('上次选择的设备（待授权或连接）', id));
+      if (
+        kind === 'audiooutput' &&
+        this.outputSupported() &&
+        typeof (navigator.mediaDevices as any)?.selectAudioOutput === 'function'
+      )
+        options.push(new Option('选择其他输出设备…', '@choose'));
+      select.replaceChildren(...options);
+      select.value = id;
+    }
+    this.outputSelect.disabled =
+      !this.outputSupported() || this.changingOutput || (this.busy && !this.joined);
+    if (!this.outputSupported()) {
+      this.outputSelect.replaceChildren(new Option('跟随系统默认输出', ''));
+      this.deviceNote.textContent = '当前浏览器不能单独指定语音输出，请在系统中切换扬声器或耳机。';
+    } else
+      this.deviceNote.textContent =
+        this.deviceNotice ||
+        (this.devices.some((d) => d.kind === 'audioinput' && d.label)
+          ? '只影响房间语音；视频声音仍使用播放器的输出。'
+          : '首次开麦授权后会显示更多设备名称；未列出的输出也可通过系统切换。');
+  }
+  private async refreshDevices(changed = false) {
+    if (!navigator.mediaDevices?.enumerateDevices) return;
+    const request = ++this.deviceRefresh;
+    try {
+      const next = await navigator.mediaDevices.enumerateDevices();
+      if (request !== this.deviceRefresh) return;
+      const removed = (kind: MediaDeviceKind, id: string) =>
+        changed &&
+        id &&
+        this.devices.some((d) => d.kind === kind && d.deviceId === id) &&
+        !next.some((d) => d.kind === kind && d.deviceId === id);
+      if (removed('audioinput', this.inputId)) {
+        this.inputId = '';
+        this.saveDevice('input', '');
+        this.stopMicrophone();
+        this.control({ type: 'mute', muted: true });
+        this.state = this.notice('input', '输入设备已断开，请重新选择并开麦');
+      }
+      if (removed('audiooutput', this.outputId)) {
+        this.outputMuted = true;
+        this.volume();
+        await this.chooseOutput('', true);
+        if (request !== this.deviceRefresh) return;
+        this.state = this.notice('output', '输出设备已断开，语音已静音；请确认设备后恢复接收');
+      }
+      this.devices = next;
+      this.deviceOptions();
+      this.render();
+    } catch {
+      if (request === this.deviceRefresh)
+        this.deviceNote.textContent = '无法读取设备列表，请检查浏览器权限后刷新。';
+    }
+  }
+  private async chooseInput(id: string) {
+    const previous = this.inputId;
+    if (id === previous) return;
+    if (!this.stream) {
+      this.inputId = id;
+      this.saveDevice('input', id);
+      this.clearNotice('input');
+      this.deviceOptions();
+      return;
+    }
+    const current = this.stream,
+      context = this.context,
+      generation = ++this.micGeneration;
+    this.busy = true;
+    this.render();
+    let replacement: MediaStream | undefined;
+    try {
+      replacement = await navigator.mediaDevices.getUserMedia({
+        video: false,
+        audio: this.inputConstraints(id),
+      });
+      if (
+        generation !== this.micGeneration ||
+        !this.ready ||
+        !context ||
+        this.context !== context ||
+        this.stream !== current ||
+        !this.capture
+      ) {
+        replacement.getTracks().forEach((t) => t.stop());
+        return;
+      }
+      if (!replacement.getAudioTracks().some((t) => t.readyState === 'live'))
+        throw new Error('Input unavailable');
+      const source = context.createMediaStreamSource(replacement);
+      source.connect(this.capture);
+      this.source?.disconnect();
+      this.source = source;
+      this.stream = replacement;
+      this.watchMicrophone(replacement);
+      current.getTracks().forEach((t) => t.stop());
+      this.inputId = id;
+      this.saveDevice('input', id);
+      this.clearNotice('input');
+      this.state = '已切换输入设备';
+      void this.refreshDevices();
+    } catch {
+      replacement?.getTracks().forEach((t) => t.stop());
+      if (generation === this.micGeneration) {
+        this.inputId = previous;
+        this.state = '输入切换失败，继续使用原麦克风';
+      }
+    } finally {
+      if (generation === this.micGeneration) this.busy = false;
+      this.deviceOptions();
+      this.render();
+    }
+  }
+  private inputConstraints(id = this.inputId): MediaTrackConstraints {
+    return {
+      channelCount: 1,
+      echoCancellation: true,
+      noiseSuppression: true,
+      autoGainControl: true,
+      ...(id ? { deviceId: { exact: id } } : {}),
+    };
+  }
+  private watchMicrophone(stream: MediaStream) {
+    stream.getAudioTracks()[0].onended = () => {
+      if (this.stream !== stream) return;
+      this.stopMicrophone();
+      this.control({ type: 'mute', muted: true });
+      this.state = this.notice('input', '麦克风已断开，请检查设备并重新开麦');
+      this.render();
+      void this.refreshDevices();
+    };
+  }
+  private async chooseOutput(id: string, keepMuted = false): Promise<boolean> {
+    const request = ++this.outputRequest,
+      generation = this.generation;
+    if (!this.outputSupported()) {
+      this.outputId = '';
+      this.deviceOptions();
+      return false;
+    }
+    this.changingOutput = true;
+    this.deviceOptions();
+    let applied = false;
+    try {
+      if (id === '@choose') {
+        // Keep the native picker in the user gesture. Never request microphone access here.
+        const device = await (navigator.mediaDevices as any).selectAudioOutput();
+        if (request !== this.outputRequest || generation !== this.generation) return false;
+        id = device.deviceId;
+        this.devices = [
+          ...this.devices.filter((d) => !(d.kind === 'audiooutput' && d.deviceId === id)),
+          device,
+        ];
+      }
+      this.outputTask = this.outputTask
+        .catch(() => {})
+        .then(async () => {
+          if (request !== this.outputRequest || generation !== this.generation) return;
+          const context = this.context;
+          if (context) await (context as any).setSinkId(id);
+          if (
+            request !== this.outputRequest ||
+            generation !== this.generation ||
+            this.context !== context
+          )
+            return;
+          this.outputId = id;
+          this.saveDevice('output', id);
+          this.clearNotice('output');
+          applied = true;
+          if (!keepMuted) this.state = this.joined ? '已切换语音输出' : '已选择语音输出';
+        });
+      await this.outputTask;
+      return applied;
+    } catch (e) {
+      if (request === this.outputRequest && generation === this.generation)
+        this.state =
+          e instanceof DOMException && e.name === 'NotAllowedError'
+            ? '未获得输出设备权限，保留原输出；可先开麦授权后重试'
+            : '输出切换失败，保留原输出设备';
+      return false;
+    } finally {
+      if (request === this.outputRequest) this.changingOutput = false;
+      this.deviceOptions();
+      this.render();
+    }
+  }
   private async join() {
     if (!this.room || this.busy || this.joined) return;
     const generation = ++this.generation;
@@ -126,6 +384,20 @@ export class RoomVoice {
         latencyHint: 'interactive',
       }));
       await context.resume();
+      if (generation !== this.generation) return;
+      if (this.outputSupported() && this.outputId) {
+        const request = this.outputRequest + 1;
+        const applied = await this.chooseOutput(this.outputId, true);
+        if (generation !== this.generation) return;
+        if (!applied && request === this.outputRequest) {
+          this.outputId = '';
+          this.saveDevice('output', '');
+          this.outputMuted = true;
+          await this.chooseOutput('', true);
+          if (generation !== this.generation) return;
+          this.notice('output', '上次输出设备不可用，已改用系统默认并静音；请重新选择。');
+        }
+      }
       const config = await fetch(new URL('/config', this.server), {
         signal: AbortSignal.timeout(8000),
       });
@@ -147,6 +419,7 @@ export class RoomVoice {
       };
       context.onstatechange = () => {
         if (!this.joined || this.context !== context) return;
+        if (this.changingOutput) return;
         if (context.state !== 'running') {
           this.stopMicrophone();
           this.control({ type: 'mute', muted: true });
@@ -173,6 +446,7 @@ export class RoomVoice {
       }
       if (generation !== this.generation) return;
       this.joined = true;
+      void this.refreshDevices();
       this.open();
       this.timer = setInterval(() => {
         if (!this.ready) return;
@@ -400,12 +674,7 @@ export class RoomVoice {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: false,
-        audio: {
-          channelCount: 1,
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-        },
+        audio: this.inputConstraints(),
       });
       if (generation !== this.micGeneration || !this.joined || !this.ready) {
         stream.getTracks().forEach((t) => t.stop());
@@ -464,11 +733,9 @@ export class RoomVoice {
           timestamp += 20000;
         }
       };
-      stream.getAudioTracks()[0].onended = () => {
-        this.stopMicrophone();
-        this.control({ type: 'mute', muted: true });
-        this.render();
-      };
+      this.watchMicrophone(stream);
+      this.clearNotice('input');
+      void this.refreshDevices();
       this.control({ type: 'mute', muted: false });
       this.state = '已连接';
     } catch (e) {
@@ -479,9 +746,12 @@ export class RoomVoice {
       this.state =
         e instanceof DOMException && e.name === 'NotAllowedError'
           ? '麦克风未获授权，可继续收听'
-          : '无法启用麦克风，可继续收听';
+          : e instanceof DOMException && ['NotFoundError', 'OverconstrainedError'].includes(e.name)
+            ? '所选麦克风不可用，请在音频设备中重选'
+            : '无法启用麦克风，可继续收听';
     } finally {
       if (generation === this.micGeneration) this.busy = false;
+      this.deviceOptions();
       this.render();
     }
   }
@@ -503,6 +773,9 @@ export class RoomVoice {
   leave() {
     this.generation++;
     this.micGeneration++;
+    this.outputRequest++;
+    this.outputTask = Promise.resolve();
+    this.changingOutput = false;
     this.joined = false;
     this.busy = false;
     this.ready = false;
@@ -527,7 +800,10 @@ export class RoomVoice {
     this.joinButton.hidden = this.joined;
     this.joinButton.disabled = !this.room || this.busy;
     this.micButton.hidden = this.soundButton.hidden = this.exitButton.hidden = !this.joined;
-    this.micButton.disabled = !this.ready || this.busy;
+    this.micButton.disabled = !this.ready || (this.busy && !this.stream);
+    this.inputSelect.disabled = this.busy;
+    this.outputSelect.disabled =
+      !this.outputSupported() || this.changingOutput || (this.busy && !this.joined);
     this.micButton.textContent = this.stream ? '关闭麦克风' : '开麦';
     this.micButton.classList.toggle('active', !!this.stream);
     this.soundButton.textContent =
