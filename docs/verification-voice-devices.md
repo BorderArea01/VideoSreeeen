@@ -43,3 +43,13 @@
 正式入口 HTML、主 JS 和样式与本机构建逐字节一致。上线前已再次核对原有授权账号、Pages 项目和 WATCH 绑定，没有新建计费资源。上线前 Worker `e69bdacc-6f9a-4cf5-8080-f52ff14c3fdb`、Pages `cffabbdc-0125-4932-852d-169bc1455148` 为回退检查点，未做数据库迁移。
 
 复验入口仍为 `npm run test:voice`；设置 `VS_PUBLIC_URL` 可测正式入口，代理可选 `VS_TEST_PROXY`。本机结果留在忽略目录 `.local/voice-devices-local-evidence.json`、`.local/voice-devices-public-evidence.json` 和 `.local/public-voice-devices-web-source-evidence.json`，不提交原始运行数据。
+
+## 后续语音 UI 统一
+
+用户指出新增语音区偏离原有界面。检查发现按钮使用了并不存在的 `soft-button` / `outline-button` 类，卡片又另写了颜色与圆角。本次改用现有 `members-card`、`button soft`、`button accent`、`icon-button`、`member` / `avatar` 与统一 SVG 图标；设备下拉框复用原有选择框规则。连接人数使用真实成员徽标，编码信息移到悬停说明，设备设置保持默认折叠。README 语音截图同步更新。
+
+桌面 1360px、平板 820px、手机宽度 390px 的真实浏览器截图已目视检查，无横向溢出；平板的固定高度聊天室位于成员与语音卡片右侧。手机宽度只是桌面视口，不冒充手机真机。测试截图与语音证据保留在 `.local/voice-room*.png`、`.local/voice-card*.png` 和 `.local/voice-ui-local-evidence.json`。
+
+成员按钮复用 DOM，避免实时说话状态刷新时丢失键盘焦点；已验证焦点保持及本机单人静音切换。另修正成员快照覆盖本机操作反馈的问题：仅首次语音连接成功设置“已连接”，后续成员刷新不再把麦克风权限拒绝、设备切换失败等提示覆盖掉。音频协议、缓存门槛、视频控制和服务配置未改。
+
+本地 TypeScript / 前端与 Node 构建、完整 `test:voice` 回归及上述截图检查通过。后续线上版本记录于下方。

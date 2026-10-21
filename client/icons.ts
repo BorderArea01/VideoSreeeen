@@ -7,6 +7,11 @@ const paths: Record<string, string> = {
   users:
     '<circle cx="9" cy="8" r="3"/><path d="M3 21v-3a6 6 0 0 1 12 0v3M16 5a3 3 0 0 1 0 6m3 10v-3a6 6 0 0 0-3-5"/>',
   signal: '<path d="M4 19v-3M9 19v-7M14 19V8M19 19V4"/>',
+  mic: '<rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10v2a7 7 0 0 0 14 0v-2M12 19v3M8 22h8"/>',
+  'mic-off':
+    '<path d="m3 3 18 18M9 9v2a3 3 0 0 0 5 2M9 5a3 3 0 0 1 6 0v4M5 10v2a7 7 0 0 0 12 5M19 10v2M12 19v3M8 22h8"/>',
+  info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7h.01"/>',
+  chevron: '<path d="m6 9 6 6 6-6"/>',
   download: '<path d="M12 3v12m-5-5 5 5 5-5M4 16v5h16v-5"/>',
   play: '<path d="m8 4 13 8-13 8Z"/>',
   pause: '<path d="M8 4v16M16 4v16"/>',

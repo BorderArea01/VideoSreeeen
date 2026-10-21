@@ -350,6 +350,32 @@ try {
   );
   await host.screenshot({ path: '.local/voice-room.png', fullPage: true });
   await host.locator('#voice-panel').screenshot({ path: '.local/voice-card.png' });
+  // Repeated speaking updates must preserve focus on the member mute control.
+  const peerControl = host.locator('.voice-peer:not(:disabled)').first();
+  await peerControl.focus();
+  await new Promise((resolve) => setTimeout(resolve, 600));
+  assert.equal(await peerControl.evaluate((e) => document.activeElement === e), true);
+  await peerControl.click();
+  assert.equal(await peerControl.getAttribute('aria-pressed'), 'true');
+  await peerControl.click();
+  for (const width of [820, 390]) {
+    await host.setViewportSize({ width, height: 950 });
+    await host.locator('#voice-panel').screenshot({ path: `.local/voice-card-${width}.png` });
+    await host.screenshot({ path: `.local/voice-room-${width}.png`, fullPage: true });
+    assert.ok(
+      await host.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
+      `No horizontal overflow at ${width}px`,
+    );
+    if (width === 820) {
+      const voice = await host.locator('#voice-panel').boundingBox(),
+        chat = await host.locator('#chat-panel').boundingBox();
+      assert.ok(
+        voice && chat && chat.x >= voice.x + voice.width,
+        'Tablet keeps chat beside the members and voice cards',
+      );
+    }
+  }
+  await host.setViewportSize({ width: 1360, height: 1000 });
   // Receive mute is local, never a playback operation.
   await guest.locator('#voice-sound').click();
   await guest.locator('#voice-sound').click();

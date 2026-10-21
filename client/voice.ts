@@ -1,6 +1,7 @@
 /// <reference types="vite/client" />
 import workletUrl from './voice-worklet.ts?worker&url';
 import type { Snapshot } from '../shared/protocol';
+import { icon } from './icons';
 import {
   bytesUuid,
   decodeVoicePcm,
@@ -79,9 +80,9 @@ export class RoomVoice {
   private deviceNoticeKind?: 'input' | 'output';
   constructor(before: HTMLElement) {
     this.panel = document.createElement('section');
-    this.panel.className = 'voice-card';
+    this.panel.className = 'members-card voice-card';
     this.panel.id = 'voice-panel';
-    this.panel.innerHTML = `<div class="section-heading"><span>房间语音</span><span title="独立语音通道，不保存录音。使用耳机可减少回声；短时抖动会增加本机缓冲，严重断网仍会中断。服务器可处理语音数据，非端到端加密。">ⓘ</span></div><div id="voice-status" class="voice-status" role="status"></div><div class="voice-actions"><button id="voice-join" class="soft-button">加入语音</button><button id="voice-mic" class="soft-button" hidden>开麦</button><button id="voice-sound" class="outline-button" hidden>静音接收</button><button id="voice-leave" class="outline-button" hidden>退出</button></div><div id="voice-members" class="voice-members"></div><label id="voice-volume-label" class="voice-volume" hidden>语音音量<input id="voice-volume" type="range" min="0" max="100" value="80" aria-label="语音音量"></label><details id="voice-devices" class="voice-devices"><summary>音频设备</summary><label>输入 · 麦克风<select id="voice-input" aria-label="语音输入设备"></select></label><label>输出 · 扬声器 / 耳机<select id="voice-output" aria-label="语音输出设备"></select></label><button id="voice-devices-refresh" class="text-button" type="button">刷新设备</button><p id="voice-device-note" role="status"></p></details>`;
+    this.panel.innerHTML = `<div class="section-heading"><span>${icon('mic', 18)} 房间语音 <b id="voice-count" hidden></b></span><span class="voice-help" tabindex="0" title="独立语音通道，不保存录音。使用耳机可减少回声；短时抖动会增加本机缓冲，严重断网仍会中断。服务器可处理语音数据，非端到端加密。" aria-label="语音说明：不保存录音，使用耳机可减少回声。服务器可处理语音数据，非端到端加密。">${icon('info', 15)}</span></div><div id="voice-status" class="voice-status" role="status"></div><div class="voice-actions"><button id="voice-join" class="button accent" type="button">${icon('mic', 16)} 加入语音</button><button id="voice-mic" class="button soft" type="button" hidden>开麦</button><button id="voice-sound" class="icon-button" type="button" hidden></button><button id="voice-leave" class="icon-button" type="button" title="退出语音" aria-label="退出语音" hidden>${icon('exit', 17)}</button></div><div id="voice-members" class="voice-members"></div><label id="voice-volume-label" class="voice-volume" hidden><span>语音音量</span><input id="voice-volume" type="range" min="0" max="100" value="80" aria-label="语音音量"></label><details id="voice-devices" class="advanced voice-devices"><summary><span>${icon('settings', 15)} 音频设备</span>${icon('chevron', 14)}</summary><div class="voice-device-fields"><label>麦克风<select id="voice-input" aria-label="语音输入设备"></select></label><label>扬声器 / 耳机<select id="voice-output" aria-label="语音输出设备"></select></label></div><button id="voice-devices-refresh" class="text-button" type="button">${icon('signal', 12)} 刷新设备</button><p id="voice-device-note" role="status"></p></details>`;
     before.before(this.panel);
     const get = <T extends HTMLElement>(id: string) => this.panel.querySelector<T>('#' + id)!;
     this.joinButton = get('voice-join');
@@ -115,7 +116,11 @@ export class RoomVoice {
           this.state = '已连接';
           this.render();
         });
-      } else this.outputMuted = !this.outputMuted;
+      } else {
+        this.outputMuted = !this.outputMuted;
+        this.state = this.outputMuted ? '接收已静音' : '已连接';
+        if (!this.outputMuted) this.clearNotice('output');
+      }
       this.volume();
       this.render();
     };
@@ -513,6 +518,7 @@ export class RoomVoice {
           const msg = JSON.parse(data);
           if (msg.type === 'pong') this.lastPong = Date.now();
           if (msg.type === 'roster') {
+            const firstRoster = !this.ready;
             this.ready = true;
             this.lastPong = Date.now();
             this.peers = msg.peers;
@@ -530,7 +536,9 @@ export class RoomVoice {
               }
             this.playout?.port.postMessage({ type: 'roster', ids: [...active] });
             // Reconnection begins listen-only. Mic is never reopened without a click.
-            this.state = this.context?.state === 'running' ? '已连接' : '声音已暂停，点击恢复声音';
+            if (firstRoster)
+              this.state =
+                this.context?.state === 'running' ? '已连接' : '声音已暂停，点击恢复声音';
             this.render();
           }
           return;
@@ -662,6 +670,7 @@ export class RoomVoice {
     if (this.stream) {
       this.stopMicrophone();
       this.control({ type: 'mute', muted: true });
+      this.state = '麦克风已关闭';
       this.render();
       return;
     }
@@ -804,15 +813,28 @@ export class RoomVoice {
     this.inputSelect.disabled = this.busy;
     this.outputSelect.disabled =
       !this.outputSupported() || this.changingOutput || (this.busy && !this.joined);
-    this.micButton.textContent = this.stream ? '关闭麦克风' : '开麦';
+    this.action(
+      this.micButton,
+      this.stream ? '关闭麦克风' : '开麦',
+      this.stream ? 'mic' : 'mic-off',
+    );
+    this.micButton.setAttribute('aria-pressed', String(!!this.stream));
     this.micButton.classList.toggle('active', !!this.stream);
-    this.soundButton.textContent =
-      this.context?.state === 'suspended' ? '恢复声音' : this.outputMuted ? '恢复接收' : '静音接收';
-    this.status.textContent =
-      this.state +
-      (this.ready
-        ? ` · ${this.peers.length}/8 人 · ${this.codec === 'opus' ? 'Opus' : '兼容音频'}`
-        : '');
+    this.action(
+      this.soundButton,
+      this.context?.state === 'suspended' ? '恢复声音' : this.outputMuted ? '恢复接收' : '静音接收',
+      this.outputMuted ? 'volume-off' : 'volume',
+      true,
+    );
+    this.soundButton.setAttribute('aria-pressed', String(this.outputMuted));
+    this.soundButton.classList.toggle('is-muted', this.outputMuted);
+    if (this.status.textContent !== this.state) this.status.textContent = this.state;
+    this.status.title = this.ready
+      ? `${this.peers.length}/8 人 · ${this.codec === 'opus' ? 'Opus' : '兼容音频'}`
+      : '';
+    const count = this.panel.querySelector<HTMLElement>('#voice-count')!;
+    count.hidden = !this.ready;
+    count.textContent = String(this.peers.length);
     this.panel.querySelector<HTMLElement>('#voice-volume-label')!.hidden = !this.joined;
     this.panel.dataset.voice = JSON.stringify({
       joined: this.joined,
@@ -824,27 +846,79 @@ export class RoomVoice {
       peers: this.peers.length,
       metrics: this.metrics,
     });
-    this.list.replaceChildren(
-      ...this.peers.map((peer) => {
-        const row = document.createElement('button');
-        row.className = 'voice-peer';
-        const metric = this.metrics.find((m) => m.id === peer.id + ':' + peer.session);
-        const name = this.room?.members.find((m) => m.id === peer.id)?.name ?? '成员';
-        row.textContent = `${peer.id === this.me ? '我' : name} · ${peer.muted ? '未开麦' : metric?.level > 0.012 ? '正在说话' : '已开麦'}${this.mutedPeers.has(peer.id) ? ' · 本机已静音' : ''}`;
-        row.disabled = peer.id === this.me;
-        row.title = '点击只在本机静音此成员';
-        row.onclick = () => {
-          if (this.mutedPeers.has(peer.id)) this.mutedPeers.delete(peer.id);
-          else this.mutedPeers.add(peer.id);
-          this.playout?.port.postMessage({
-            type: 'mute',
-            id: peer.id + ':' + peer.session,
-            muted: this.mutedPeers.has(peer.id),
-          });
-          this.render();
-        };
-        return row;
-      }),
+    const existing = new Map(
+      [...this.list.querySelectorAll<HTMLButtonElement>('.voice-peer')].map((row) => [
+        row.dataset.member!,
+        row,
+      ]),
     );
+    const rows = this.peers.map((peer) => {
+      const row = existing.get(peer.id) ?? document.createElement('button');
+      row.className = 'voice-peer member';
+      row.dataset.member = peer.id;
+      if (!row.firstChild)
+        row.innerHTML = `<span class="avatar"></span><span class="member-info"><strong></strong><small></small></span><span class="voice-member-state" aria-hidden="true"></span>`;
+      const metric = this.metrics.find((m) => m.id === peer.id + ':' + peer.session);
+      const name = this.room?.members.find((m) => m.id === peer.id)?.name ?? '成员';
+      const label = peer.id === this.me ? '我' : name;
+      const locallyMuted = this.mutedPeers.has(peer.id);
+      const speaking = !peer.muted && metric?.level > 0.012;
+      const state = locallyMuted
+        ? '本机已静音'
+        : peer.muted
+          ? '未开麦'
+          : speaking
+            ? '正在说话'
+            : '已开麦';
+      row.querySelector('.avatar')!.textContent = [...label][0];
+      row.querySelector('strong')!.textContent = label;
+      row.querySelector('small')!.textContent = state;
+      row.classList.toggle('voice-peer-speaking', speaking && !locallyMuted);
+      const mark = locallyMuted
+        ? 'volume-off'
+        : peer.muted
+          ? 'mic-off'
+          : speaking
+            ? 'signal'
+            : 'mic';
+      const indicator = row.querySelector<HTMLElement>('.voice-member-state')!;
+      if (indicator.dataset.icon !== mark) {
+        indicator.dataset.icon = mark;
+        indicator.innerHTML = icon(mark, 14);
+      }
+      row.setAttribute('aria-label', `${label}，${state}`);
+      row.setAttribute('aria-pressed', String(locallyMuted));
+      row.disabled = peer.id === this.me;
+      row.title =
+        peer.id === this.me
+          ? '使用上方按钮控制麦克风'
+          : locallyMuted
+            ? '恢复接收此成员的语音'
+            : '只在本机静音此成员';
+      row.onclick = () => {
+        if (this.mutedPeers.has(peer.id)) this.mutedPeers.delete(peer.id);
+        else this.mutedPeers.add(peer.id);
+        this.playout?.port.postMessage({
+          type: 'mute',
+          id: peer.id + ':' + peer.session,
+          muted: this.mutedPeers.has(peer.id),
+        });
+        this.render();
+      };
+      return row;
+    });
+    for (const [id, row] of existing) if (!this.peers.some((peer) => peer.id === id)) row.remove();
+    rows.forEach((row, index) => {
+      if (this.list.children[index] !== row)
+        this.list.insertBefore(row, this.list.children[index] ?? null);
+    });
+  }
+  private action(button: HTMLButtonElement, label: string, name: string, compact = false) {
+    if (button.dataset.label === label && button.dataset.icon === name) return;
+    button.dataset.label = label;
+    button.dataset.icon = name;
+    button.title = label;
+    button.setAttribute('aria-label', label);
+    button.innerHTML = icon(name, 16) + (compact ? '' : `<span>${label}</span>`);
   }
 }

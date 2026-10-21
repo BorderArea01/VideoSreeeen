@@ -1786,7 +1786,8 @@ button {
   align-items: center;
   margin-top: 14px;
 }
-.source-actions select {
+.source-actions select,
+.voice-devices select {
   background: var(--panel);
   color: inherit;
   border: 1px solid var(--line);
@@ -1838,82 +1839,173 @@ button {
   margin-left: auto;
   display: block;
 }
-:root .voice-card {
-  padding: 16px;
-  border: 1px solid var(--border, #34333d);
-  border-radius: 14px;
-  background: var(--surface, #19181f);
-}
 .voice-status {
-  font-size: 12px;
-  color: #aaa5b5;
-  margin: 10px 0;
+  font-size: 10px;
+  color: #887a8b;
+  line-height: 1.7;
+  margin: 10px 0 14px;
+}
+.voice-help {
+  color: var(--muted);
+  display: inline-flex;
+  cursor: help;
+}
+.voice-help:focus-visible {
+  outline: 2px solid var(--orange);
+  outline-offset: 4px;
 }
 .voice-actions {
   display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
 }
-.voice-actions button {
-  padding: 8px 10px;
-  font-size: 12px;
+.voice-actions .button {
+  flex: 1;
+  min-width: 0;
+  min-height: 36px;
+  padding: 9px 12px;
+  font-size: 11px;
+  gap: 7px;
 }
-.voice-actions .active {
-  color: #fac5a2;
-  border-color: #c08762;
+.voice-actions .icon-button {
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--line);
+}
+.voice-actions .active,
+.voice-actions .is-muted {
+  color: #ffd5bb;
+  background: #352a2b;
+  border: 1px solid #70503e;
 }
 .voice-members {
-  max-height: 140px;
+  max-height: 168px;
   overflow-y: auto;
-  margin-top: 8px;
+  margin-top: 14px;
 }
 .voice-peer {
-  display: block;
   width: 100%;
   text-align: left;
   background: transparent;
   color: inherit;
-  border: 0;
-  padding: 5px 0;
-  font-size: 12px;
+  border-radius: 8px;
+  padding: 7px 4px;
+}
+.voice-peer:disabled {
+  opacity: 1;
+}
+.voice-peer:not(:disabled):hover {
+  background: #ffffff06;
+}
+.voice-peer .avatar {
+  width: 27px;
+  height: 27px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  font-size: 10px;
+}
+.voice-member-state {
+  color: var(--muted);
+  margin-left: auto;
+}
+.voice-peer-speaking .avatar {
+  border-color: #ad795e;
+  color: #ffd5bb;
+}
+.voice-peer-speaking .voice-member-state {
+  color: var(--orange);
 }
 .voice-volume {
   display: flex;
   align-items: center;
-  gap: 10px;
-  font-size: 12px;
-  margin-top: 8px;
+  gap: 14px;
+  font-size: 10px;
+  color: #a797a6;
+  margin-top: 14px;
 }
 .voice-volume input {
-  width: 110px;
-  accent-color: #f4ac83;
+  width: 0;
+  margin: 0;
 }
 .voice-devices {
-  margin-top: 12px;
-  font-size: 12px;
+  margin-top: 16px;
+  border-color: var(--line);
+  padding: 14px 0 0;
 }
 .voice-devices summary {
-  cursor: pointer;
-  color: var(--muted);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  list-style: none;
+  font-size: 11px;
+  color: #a797a6;
+}
+.voice-devices summary::-webkit-details-marker {
+  display: none;
+}
+.voice-devices summary > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.voice-devices[open] summary > svg {
+  transform: rotate(180deg);
+}
+.voice-devices summary:hover {
+  color: var(--orange);
+}
+.voice-device-fields {
+  display: grid;
+  gap: 12px;
+  margin-top: 16px;
 }
 .voice-devices label {
   display: grid;
-  gap: 6px;
-  margin-top: 12px;
+  gap: 8px;
+  font-size: 10px;
+  color: #c7b3c6;
 }
 .voice-devices select {
   width: 100%;
   min-width: 0;
-  padding: 8px;
-  color: var(--text);
-  background: var(--bg);
-  border: 1px solid var(--line);
-  border-radius: 8px;
+  min-height: 36px;
+  font-size: 11px;
+}
+.voice-devices select:focus-visible {
+  outline: 2px solid var(--orange);
+  outline-offset: 2px;
 }
 .voice-devices button {
-  margin-top: 10px;
+  margin-top: 14px;
 }
 .voice-devices p {
   color: var(--muted);
-  line-height: 1.6;
+  font-size: 10px;
+  line-height: 1.8;
+  margin: 10px 0 0;
+}
+@media (min-width: 541px) and (max-width: 850px) {
+  .sidebar > .members-card:first-child {
+    grid-column: 1;
+    grid-row: 1;
+  }
+  .sidebar > .voice-card {
+    grid-column: 1;
+    grid-row: 2;
+  }
+  .sidebar > .chat-panel:not(.floating) {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    height: 450px;
+  }
+}
+@media (max-width: 540px) {
+  .voice-actions .button,
+  .voice-devices select {
+    min-height: 44px;
+  }
+  .voice-actions .icon-button {
+    width: 44px;
+    height: 44px;
+  }
 }
