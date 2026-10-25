@@ -1,4 +1,5 @@
 import { VoiceBuffer } from './voice-buffer';
+import { VoiceActivity } from './audio-mix';
 declare const AudioWorkletProcessor: { new (): { port: MessagePort } };
 declare function registerProcessor(name: string, processor: unknown): void;
 declare const currentTime: number;
@@ -38,10 +39,17 @@ class Capture extends AudioWorkletProcessor {
 class Playout extends AudioWorkletProcessor {
   private peers = new Map<string, VoiceBuffer>();
   private tick = 0;
+  private activity = new VoiceActivity();
+  private activitySamples = 0;
+  private activityEnergy = 0;
+  private speaking = false;
   constructor() {
     super();
     this.port.onmessage = ({ data }) => {
-      if (data.type === 'clear') this.peers.clear();
+      if (data.type === 'clear') {
+        this.peers.clear();
+        this.resetActivity();
+      }
       if (data.type === 'roster')
         for (const key of this.peers.keys()) if (!data.ids.includes(key)) this.peers.delete(key);
       if (data.type === 'frame') {
@@ -55,14 +63,35 @@ class Playout extends AudioWorkletProcessor {
       if (data.type === 'mute') {
         const peer = this.peers.get(data.id);
         if (peer) peer.muted = data.muted;
+        if (data.muted) this.resetActivity();
       }
     };
+  }
+  private resetActivity() {
+    this.activity.reset();
+    this.activityEnergy = this.activitySamples = 0;
+    this.speaking = false;
+    this.port.postMessage({ type: 'activity', active: false });
   }
   process(_inputs: Float32Array[][], outputs: Float32Array[][]) {
     const out = outputs[0]?.[0];
     if (!out) return true;
     for (const peer of this.peers.values()) peer.render(out);
-    for (let i = 0; i < out.length; i++) out[i] = Math.tanh(out[i]);
+    for (let i = 0; i < out.length; i++) {
+      out[i] = Math.tanh(out[i]);
+      this.activityEnergy += out[i] * out[i];
+      if (++this.activitySamples >= sampleRate / 50) {
+        const active = this.activity.update(
+          Math.sqrt(this.activityEnergy / this.activitySamples),
+          20,
+        );
+        this.activityEnergy = this.activitySamples = 0;
+        if (active !== this.speaking) {
+          this.speaking = active;
+          this.port.postMessage({ type: 'activity', active });
+        }
+      }
+    }
     this.tick += out.length;
     if (this.tick >= sampleRate / 4) {
       this.tick = 0;

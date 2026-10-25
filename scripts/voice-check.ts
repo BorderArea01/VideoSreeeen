@@ -88,7 +88,7 @@ async function makePage(index: number) {
       await nativeSink.call(this, '');
     };
     const nativeGain = AudioContext.prototype.createGain;
-    AudioContext.prototype.createGain = function() { const gain = nativeGain.call(this); if (this === window.__voiceContext && !window.__voiceGain) window.__voiceGain = gain; return gain; };
+    AudioContext.prototype.createGain = function() { const gain = nativeGain.call(this); if (this === window.__voiceContext && !window.__voiceGain) { window.__voiceGain = gain; const meter = this.createAnalyser(); meter.fftSize = 4096; meter.smoothingTimeConstant = 0; gain.connect(meter); window.__voiceOutputAnalyser = meter; } return gain; };
     const Socket = WebSocket;
     window.WebSocket = class extends Socket {
       constructor(url, protocols) { super(url, protocols); this.isVoice = new URL(url).pathname === '/voice'; if (this.isVoice) window.__voiceSockets.push(this); }
@@ -111,6 +111,7 @@ async function makePage(index: number) {
       const context = new AudioContext({ sampleRate: 48000 }); await context.resume();
       const oscillator = context.createOscillator(); oscillator.frequency.value = ${440 + index * 220} + (input === 'fixture-mic-b' ? 110 : 0);
       const gain = context.createGain(); gain.gain.value = .15;
+      window.__fixtureMicGain = gain;
       const destination = context.createMediaStreamDestination(); oscillator.connect(gain).connect(destination); oscillator.start();
       window.__tracks.push(...destination.stream.getTracks());
       if (window.__delayMic) await new Promise(resolve => setTimeout(resolve, 800));
@@ -157,6 +158,20 @@ async function audio(page: Page, speakers: number) {
     { timeout: 20000 },
   );
 }
+async function movieVolume(page: Page, value: number) {
+  await page.waitForFunction(
+    (expected) =>
+      Math.abs(document.querySelector<HTMLVideoElement>('#video')!.volume - expected) < 0.01,
+    value,
+    { timeout: 8000 },
+  );
+}
+async function setMovieVolume(page: Page, percent: number) {
+  await page.locator('#video-volume').evaluate((input, value) => {
+    (input as HTMLInputElement).value = String(value);
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  }, percent);
+}
 try {
   const host = await makePage(0),
     guest = await makePage(1),
@@ -189,6 +204,15 @@ try {
           .totalVideoFrames > 10,
     );
   controls.length = 0;
+  await setMovieVolume(host, 60);
+  await setMovieVolume(guest, 80);
+  await setMovieVolume(compatibility, 90);
+  await movieVolume(host, 0.6);
+  await movieVolume(guest, 0.8);
+  await host.locator('#live-sound').click();
+  assert.equal(await host.locator('#video').evaluate((v) => (v as HTMLVideoElement).muted), true);
+  await host.locator('#live-sound').click();
+  await movieVolume(host, 0.6);
   for (const page of [host, guest]) await page.locator('#voice-join').click();
   await ready(host, 2);
   await ready(guest, 2);
@@ -205,7 +229,47 @@ try {
     'Device refresh does not capture microphone',
   );
   assert.equal((await status(host)).codec, 'opus');
-  for (const page of [host, guest]) await page.locator('#voice-mic').click();
+  await movieVolume(host, 0.6);
+  await movieVolume(guest, 0.8);
+  await host.locator('#voice-mic').click();
+  await audio(guest, 1);
+  await movieVolume(host, 0.15);
+  await movieVolume(guest, 0.2);
+  assert.equal(await guest.locator('#video-volume').inputValue(), '80');
+  await guest.locator('#voice-priority').uncheck();
+  await movieVolume(guest, 0.8);
+  await movieVolume(host, 0.15);
+  await guest.locator('#voice-priority').check();
+  await movieVolume(guest, 0.2);
+  await guest.locator('#voice-sound').click();
+  await movieVolume(guest, 0.8);
+  await guest.locator('#voice-sound').click();
+  await movieVolume(guest, 0.2);
+  const onlySpeaker = guest.locator('.voice-peer:not(:disabled)').first();
+  await onlySpeaker.click();
+  await movieVolume(guest, 0.8);
+  await onlySpeaker.click();
+  await movieVolume(guest, 0.2);
+  await host.evaluate('window.__fixtureMicGain.gain.value = 0');
+  await movieVolume(host, 0.6);
+  await movieVolume(guest, 0.8);
+  await host.evaluate('window.__fixtureMicGain.gain.value = .15');
+  await movieVolume(guest, 0.2);
+  await setMovieVolume(host, 40);
+  await movieVolume(host, 0.1);
+  assert.equal(await host.locator('#video-volume').inputValue(), '40');
+  evidence.audioPriority = {
+    independentVolumes: true,
+    listenOnlyNoDucking: true,
+    localAndReceivedActivity: true,
+    manualChangeDuringDucking: true,
+    silentSamplesRestore: true,
+    mutedReceiveAndPeerRestore: true,
+    toggleRestores: true,
+    movieGainDuringSpeech: [0.1, 0.2],
+    userMovieLevels: [0.4, 0.8],
+  };
+  await guest.locator('#voice-mic').click();
   await audio(host, 1);
   await audio(guest, 1);
   evidence.opus = [await status(host), await status(guest)];
@@ -344,10 +408,65 @@ try {
     `(() => { const a = window.__analyser, v = new Float32Array(a.frequencyBinCount); a.getFloatFrequencyData(v); return [660,880].map(f => Math.max(...v.slice(Math.floor((f-35)*a.fftSize/48000), Math.ceil((f+35)*a.fftSize/48000)))); })()`,
   );
   evidence.mixedToneDb = spectrum;
+  const processedSpectrum = await host.evaluate<number[]>(
+    `(() => { const a = window.__voiceOutputAnalyser, v = new Float32Array(a.frequencyBinCount); a.getFloatFrequencyData(v); return [660,880].map(f => Math.max(...v.slice(Math.floor((f-35)*a.fftSize/48000), Math.ceil((f+35)*a.fftSize/48000)))); })()`,
+  );
+  evidence.processedVoiceToneDb = processedSpectrum;
+  evidence.processedVoiceLevel = await host.evaluate(
+    `(() => { const a = window.__voiceOutputAnalyser, v = new Float32Array(a.fftSize); a.getFloatTimeDomainData(v); return { rms: Math.sqrt(v.reduce((n,x)=>n+x*x,0)/v.length), peak: Math.max(...v.map(Math.abs)) }; })()`,
+  );
+  assert.ok(evidence.processedVoiceLevel.rms > 0.005);
+  assert.ok(evidence.processedVoiceLevel.peak < 0.95);
+  assert.ok(
+    processedSpectrum.every((db) => db > -35),
+    'Both speakers reach the processed voice output',
+  );
   assert.ok(
     spectrum.every((db: number) => db > -35),
     'Both simultaneous speakers must reach the actual mixed audio output',
   );
+  await host.evaluate('window.__originalVideo = document.querySelector("#video")');
+  await host.locator('#page-fullscreen').click();
+  assert.equal(await host.evaluate(() => document.fullscreenElement === null), true);
+  await host.waitForFunction(() => document.body.classList.contains('page-cinema'));
+  let bounds = await host.locator('#player-shell').boundingBox();
+  assert.ok(
+    bounds && bounds.x === 0 && bounds.y === 0 && bounds.width === 1360 && bounds.height === 1000,
+  );
+  assert.equal(await host.locator('#video-volume').isVisible(), true);
+  assert.equal(await host.locator('#sidebar').isVisible(), false);
+  await host.locator('#page-sidebar-toggle').click();
+  assert.equal(await host.locator('#voice-panel').isVisible(), true);
+  await host.locator('#chat-input').fill('网页全屏聊天验收');
+  await host.locator('#send-button').click();
+  await guest.locator('#chat-messages').filter({ hasText: '网页全屏聊天验收' }).waitFor();
+  await host.screenshot({ path: '.local/page-fullscreen-chat.png' });
+  await host.keyboard.press('Escape');
+  assert.equal(await host.locator('#page-fullscreen').getAttribute('aria-pressed'), 'false');
+  assert.equal(await host.locator('#sidebar').isVisible(), true);
+  await host.locator('#chat-toggle').click();
+  assert.equal(await host.locator('#sidebar').isVisible(), false);
+  await host.locator('#page-fullscreen').click();
+  await host.locator('#page-sidebar-toggle').click();
+  await host.locator('#page-fullscreen').click();
+  assert.equal(
+    await host.locator('#sidebar').isVisible(),
+    false,
+    'Restore the previous hidden sidebar',
+  );
+  await host.locator('#chat-toggle').click();
+  assert.equal(
+    await host.evaluate('document.querySelector("#video") === window.__originalVideo'),
+    true,
+  );
+  evidence.pageFullscreen = {
+    browserChromeRetained: true,
+    layoutFillsViewport: true,
+    chatAndVoiceAccessible: true,
+    sidebarRestored: true,
+    samePlayer: true,
+    escapeWorks: true,
+  };
   await host.screenshot({ path: '.local/voice-room.png', fullPage: true });
   await host.locator('#voice-panel').screenshot({ path: '.local/voice-card.png' });
   // Repeated speaking updates must preserve focus on the member mute control.
@@ -360,12 +479,37 @@ try {
   await peerControl.click();
   for (const width of [820, 390]) {
     await host.setViewportSize({ width, height: 950 });
-    await host.locator('#voice-panel').screenshot({ path: `.local/voice-card-${width}.png` });
+    await host.locator('#video').scrollIntoViewIfNeeded();
+    await host.waitForTimeout(150);
     await host.screenshot({ path: `.local/voice-room-${width}.png`, fullPage: true });
+    await host.locator('#voice-panel').screenshot({ path: `.local/voice-card-${width}.png` });
     assert.ok(
       await host.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
       `No horizontal overflow at ${width}px`,
     );
+    await host.locator('#page-fullscreen').click();
+    bounds = await host.locator('#player-shell').boundingBox();
+    assert.ok(bounds && bounds.width === width && bounds.height === 950);
+    assert.equal(await host.locator('#video-volume').isVisible(), true);
+    assert.ok(await host.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+    for (const id of [
+      'live-sound',
+      'video-volume',
+      'page-sidebar-toggle',
+      'page-fullscreen',
+      'fullscreen',
+    ]) {
+      const control = await host.locator('#' + id).boundingBox();
+      assert.ok(
+        control &&
+          control.x >= 0 &&
+          control.x + control.width <= width &&
+          control.y + control.height <= 950,
+        `${id} must fit inside the page fullscreen viewport at ${width}px`,
+      );
+    }
+    await host.screenshot({ path: `.local/page-fullscreen-${width}.png` });
+    await host.keyboard.press('Escape');
     if (width === 820) {
       const voice = await host.locator('#voice-panel').boundingBox(),
         chat = await host.locator('#chat-panel').boundingBox();
@@ -443,6 +587,10 @@ try {
   evidence.devices.lateOutputCanceled = true;
   evidence.devices.savedOutputRestored = true;
   evidence.devices.failedSavedOutputMuted = true;
+  await movieVolume(host, 0.4);
+  await movieVolume(guest, 0.8);
+  await movieVolume(compatibility, 0.9);
+  evidence.audioPriority.leaveRestoresLatestVolume = true;
   assert.equal(await host.evaluate('window.__tracks.every(t => t.readyState === "ended")'), true);
   assert.deepEqual(controls, []);
   assert.deepEqual(errors, []);

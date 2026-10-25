@@ -35,6 +35,11 @@ try {
         (window as any).__filePublisher = this;
         return capture.call(this);
       };
+    const createSource = AudioContext.prototype.createMediaElementSource;
+    AudioContext.prototype.createMediaElementSource = function (element) {
+      (window as any).__filePublisher = element;
+      return createSource.call(this, element);
+    };
   });
   if (process.env.VS_DENY_AUTOPLAY)
     await guest.addInitScript(() => {
@@ -76,7 +81,7 @@ try {
   await host.locator('#provide-dialog').waitFor();
   const choosing = host.waitForEvent('filechooser');
   await host.locator('#provide-local-video').click();
-  await (await choosing).setFiles(resolve('.local/flower.mp4'));
+  await (await choosing).setFiles(resolve('.local/sintel-trailer.mp4'));
   await guest.waitForFunction(
     () => {
       const video = document.querySelector<HTMLVideoElement>('#video');
@@ -94,7 +99,7 @@ try {
         true,
         'File playback keeps real controls',
       );
-    assert.equal(await page.locator('#live-sound').isVisible(), false);
+    assert.equal(await page.locator('#live-sound').isVisible(), true);
   }
   if (process.env.VS_DENY_AUTOPLAY) {
     await host.locator('#play-button').click();
@@ -115,6 +120,41 @@ try {
     {},
     { timeout: 20000 },
   );
+  await host.locator('#seek').evaluate((element) => {
+    (element as HTMLInputElement).value = '8';
+    element.dispatchEvent(new Event('change'));
+  });
+  await host.locator('#video-volume').evaluate((element) => {
+    (element as HTMLInputElement).value = '30';
+    element.dispatchEvent(new Event('input'));
+  });
+  await host.locator('#live-sound').click();
+  // Inspect only the public fixture's captured track, never a real mic or speaker.
+  await host.evaluate(async () => {
+    const context = new AudioContext();
+    await context.resume();
+    const meter = context.createAnalyser();
+    meter.fftSize = 2048;
+    context.createMediaStreamSource((window as any).__filePublisher.__stream).connect(meter);
+    (window as any).__captureMeter = { context, meter };
+  });
+  await host.waitForFunction(() => {
+    const meter = (window as any).__captureMeter.meter as AnalyserNode;
+    const samples = new Float32Array(meter.fftSize);
+    meter.getFloatTimeDomainData(samples);
+    return Math.sqrt(samples.reduce((n, x) => n + x * x, 0) / samples.length) > 0.001;
+  });
+  const captureRms = await host.evaluate(() => {
+    const { meter, context } = (window as any).__captureMeter;
+    const samples = new Float32Array(meter.fftSize);
+    meter.getFloatTimeDomainData(samples);
+    void context.close();
+    return Math.sqrt(samples.reduce((n, x) => n + x * x, 0) / samples.length);
+  });
+  assert.ok(captureRms > 0.001, 'Local movie mute must not silence the shared file track');
+  assert.equal(await host.locator('#video').evaluate((v) => (v as HTMLVideoElement).muted), true);
+  assert.equal(await guest.locator('#video').evaluate((v) => (v as HTMLVideoElement).muted), false);
+  await host.locator('#live-sound').click();
   await guest.locator('#seek').evaluate((element) => {
     (element as HTMLInputElement).value = '0.3';
     element.dispatchEvent(new Event('change'));
@@ -160,6 +200,11 @@ try {
       tracks: stream?.getTracks().map((t) => t.kind),
       audioBytes: (v as any).webkitAudioDecodedByteCount,
     };
+  });
+  Object.assign(sample, {
+    localMovieVolumeIsolated: true,
+    captureRmsWhilePublisherMuted: captureRms,
+    canvasFallback: !!process.env.VS_FORCE_CANVAS,
   });
   assert.ok(sample.frames > 10);
   if (sample.transport === 'websocket') assert.ok(sample.audioBytes > 0);

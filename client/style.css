@@ -401,6 +401,96 @@ h1 {
 .transport #fullscreen {
   margin-left: auto;
 }
+.transport #page-fullscreen[aria-pressed='true'] {
+  color: var(--orange);
+}
+body.page-cinema {
+  overflow: hidden;
+}
+.page-cinema .topbar,
+.page-cinema .app-foot,
+.page-cinema .screen-column > :not(.player-shell) {
+  display: none;
+}
+.page-cinema .player-shell {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  flex-direction: column;
+  background: #000;
+}
+.page-cinema .player-shell .stage {
+  flex: 1 1 0;
+  min-height: 0;
+  width: 100%;
+  height: auto;
+  aspect-ratio: auto;
+  border: 0;
+  border-radius: 0;
+}
+.page-cinema .transport {
+  flex-shrink: 0;
+  border: 0;
+  border-radius: 0;
+}
+.page-cinema #sidebar {
+  position: fixed;
+  z-index: 90;
+  top: 12px;
+  right: 12px;
+  bottom: 92px;
+  width: min(350px, calc(100vw - 24px));
+  height: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--bg);
+  box-shadow: 0 10px 40px #0009;
+}
+.page-cinema #sidebar > .members-card:not(.voice-card),
+.page-cinema .sidebar-foot {
+  display: none;
+}
+.page-cinema #sidebar .voice-card {
+  flex-shrink: 0;
+}
+.page-cinema #sidebar .chat-panel:not(.floating) {
+  height: auto;
+  min-height: 300px;
+  flex: 1 0 300px;
+}
+.player-volume {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex: 0 0 104px;
+}
+.player-volume .icon-button {
+  flex: 0 0 28px;
+}
+.player-volume input[type='range'] {
+  width: 64px;
+  min-width: 40px;
+  height: 24px;
+}
+.voice-priority {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 12px;
+  color: var(--muted);
+  font-size: 11px;
+  cursor: pointer;
+}
+.voice-priority input {
+  accent-color: var(--orange);
+}
 .time {
   font-size: 10px;
   font-variant-numeric: tabular-nums;
@@ -2007,5 +2097,32 @@ button {
   .voice-actions .icon-button {
     width: 44px;
     height: 44px;
+  }
+}
+@media (max-width: 600px) {
+  .transport {
+    flex-wrap: wrap;
+    height: auto;
+    min-height: 58px;
+    padding: 8px 10px;
+    gap: 6px;
+  }
+  .transport #seek:not([hidden]) {
+    order: -1;
+    flex: 1 0 100%;
+    height: 18px;
+  }
+  .transport .player-volume {
+    flex-basis: 82px;
+    margin-left: auto;
+  }
+  .transport #fullscreen {
+    margin-left: 0;
+  }
+  .player-volume input[type='range'] {
+    height: 32px;
+  }
+  .voice-priority {
+    min-height: 36px;
   }
 }

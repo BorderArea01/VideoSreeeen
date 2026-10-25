@@ -2,6 +2,7 @@
 import workletUrl from './voice-worklet.ts?worker&url';
 import type { Snapshot } from '../shared/protocol';
 import { icon } from './icons';
+import { VoiceActivity } from './audio-mix';
 import {
   bytesUuid,
   decodeVoicePcm,
@@ -30,6 +31,11 @@ export class RoomVoice {
   private context?: AudioContext;
   private playout?: AudioWorkletNode;
   private gain?: GainNode;
+  private filters: AudioNode[] = [];
+  private remoteSpeaking = false;
+  private localActivity = new VoiceActivity();
+  private priority = true;
+  private focused = false;
   private capture?: AudioWorkletNode;
   private source?: MediaStreamAudioSourceNode;
   private silent?: GainNode;
@@ -78,12 +84,21 @@ export class RoomVoice {
   private changingOutput = false;
   private deviceNotice = '';
   private deviceNoticeKind?: 'input' | 'output';
-  constructor(before: HTMLElement) {
+  constructor(
+    before: HTMLElement,
+    private activity: (active: boolean) => void = () => {},
+  ) {
     this.panel = document.createElement('section');
     this.panel.className = 'members-card voice-card';
     this.panel.id = 'voice-panel';
     this.panel.innerHTML = `<div class="section-heading"><span>${icon('mic', 18)} 房间语音 <b id="voice-count" hidden></b></span><span class="voice-help" tabindex="0" title="独立语音通道，不保存录音。使用耳机可减少回声；短时抖动会增加本机缓冲，严重断网仍会中断。服务器可处理语音数据，非端到端加密。" aria-label="语音说明：不保存录音，使用耳机可减少回声。服务器可处理语音数据，非端到端加密。">${icon('info', 15)}</span></div><div id="voice-status" class="voice-status" role="status"></div><div class="voice-actions"><button id="voice-join" class="button accent" type="button">${icon('mic', 16)} 加入语音</button><button id="voice-mic" class="button soft" type="button" hidden>开麦</button><button id="voice-sound" class="icon-button" type="button" hidden></button><button id="voice-leave" class="icon-button" type="button" title="退出语音" aria-label="退出语音" hidden>${icon('exit', 17)}</button></div><div id="voice-members" class="voice-members"></div><label id="voice-volume-label" class="voice-volume" hidden><span>语音音量</span><input id="voice-volume" type="range" min="0" max="100" value="80" aria-label="语音音量"></label><details id="voice-devices" class="advanced voice-devices"><summary><span>${icon('settings', 15)} 音频设备</span>${icon('chevron', 14)}</summary><div class="voice-device-fields"><label>麦克风<select id="voice-input" aria-label="语音输入设备"></select></label><label>扬声器 / 耳机<select id="voice-output" aria-label="语音输出设备"></select></label></div><button id="voice-devices-refresh" class="text-button" type="button">${icon('signal', 12)} 刷新设备</button><p id="voice-device-note" role="status"></p></details>`;
     before.before(this.panel);
+    this.panel
+      .querySelector('#voice-volume-label')!
+      .insertAdjacentHTML(
+        'afterend',
+        '<label id="voice-priority-label" class="voice-priority" hidden title="说话或听到成员语音时，平滑降低本机视频音量；停顿后恢复。只影响自己的收听。"><input id="voice-priority" type="checkbox" checked>人声优先</label>',
+      );
     const get = <T extends HTMLElement>(id: string) => this.panel.querySelector<T>('#' + id)!;
     this.joinButton = get('voice-join');
     this.micButton = get('voice-mic');
@@ -97,9 +112,18 @@ export class RoomVoice {
     try {
       this.inputId = localStorage.getItem('vs-voice-input') ?? '';
       this.outputId = localStorage.getItem('vs-voice-output') ?? '';
+      this.priority = localStorage.getItem('vs-voice-priority') !== 'off';
     } catch {
       /* Session-only choices still work. */
     }
+    get<HTMLInputElement>('voice-priority').checked = this.priority;
+    get<HTMLInputElement>('voice-priority').onchange = () => {
+      this.priority = get<HTMLInputElement>('voice-priority').checked;
+      try {
+        localStorage.setItem('vs-voice-priority', this.priority ? 'on' : 'off');
+      } catch {}
+      this.focus();
+    };
     this.inputSelect.onchange = () => void this.chooseInput(this.inputSelect.value);
     this.outputSelect.onchange = () => void this.chooseOutput(this.outputSelect.value);
     get('voice-devices-refresh').onclick = () => void this.refreshDevices();
@@ -145,6 +169,27 @@ export class RoomVoice {
       this.gain.gain.value = this.outputMuted
         ? 0
         : Number((this.panel.querySelector('#voice-volume') as HTMLInputElement).value) / 100;
+    this.focus();
+  }
+  private focus() {
+    const remoteAudible = this.peers.some(
+      (p) => p.id !== this.me && !p.muted && !this.mutedPeers.has(p.id),
+    );
+    const remote =
+      this.remoteSpeaking &&
+      remoteAudible &&
+      !this.outputMuted &&
+      Number((this.panel.querySelector('#voice-volume') as HTMLInputElement).value) > 0;
+    const active =
+      this.priority &&
+      this.joined &&
+      this.ready &&
+      this.context?.state === 'running' &&
+      (remote || (!!this.stream && this.localActivity.active));
+    if (active !== this.focused) {
+      this.focused = active;
+      this.activity(active);
+    }
   }
   private saveDevice(kind: 'input' | 'output', id: string) {
     try {
@@ -417,12 +462,39 @@ export class RoomVoice {
       });
       this.gain = context.createGain();
       this.volume();
-      this.playout.connect(this.gain).connect(context.destination);
+      const lowCut = context.createBiquadFilter();
+      lowCut.type = 'highpass';
+      lowCut.frequency.value = 100;
+      const presence = context.createBiquadFilter();
+      presence.type = 'peaking';
+      presence.frequency.value = 2000;
+      presence.Q.value = 0.8;
+      presence.gain.value = 2;
+      const compressor = context.createDynamicsCompressor();
+      compressor.threshold.value = -18;
+      compressor.knee.value = 12;
+      compressor.ratio.value = 3;
+      compressor.attack.value = 0.01;
+      compressor.release.value = 0.2;
+      this.filters = [lowCut, presence, compressor];
+      this.playout
+        .connect(lowCut)
+        .connect(presence)
+        .connect(compressor)
+        .connect(this.gain)
+        .connect(context.destination);
       this.playout.port.onmessage = ({ data }) => {
+        if (data?.type === 'activity') {
+          this.remoteSpeaking = data.active === true;
+          this.focus();
+          return;
+        }
+        if (!Array.isArray(data)) return;
         this.metrics = data;
         this.render();
       };
       context.onstatechange = () => {
+        this.focus();
         if (!this.joined || this.context !== context) return;
         if (this.changingOutput) return;
         if (context.state !== 'running') {
@@ -648,6 +720,8 @@ export class RoomVoice {
     this.decoders.clear();
     this.playout?.port.postMessage({ type: 'clear' });
     this.metrics = [];
+    this.remoteSpeaking = false;
+    this.focus();
   }
   private sendFrame(frame: Uint8Array) {
     if (!this.ready || !this.stream || this.socket?.readyState !== WebSocket.OPEN) return;
@@ -704,6 +778,10 @@ export class RoomVoice {
           return;
         }
         if (!this.ready || !this.stream) return;
+        let energy = 0;
+        for (const x of data) energy += x * x;
+        this.localActivity.update(Math.sqrt(energy / data.length), 20);
+        this.focus();
         if (this.codec === 'mulaw16') this.sendFrame(encodeVoicePcm(data));
         else {
           if (!this.encoder) {
@@ -765,10 +843,12 @@ export class RoomVoice {
     }
   }
   private stopMicrophone() {
+    this.localActivity.reset();
     this.busy = false;
     this.micGeneration++;
     this.stream?.getTracks().forEach((t) => t.stop());
     this.stream = undefined;
+    this.focus();
     this.capture?.disconnect();
     if (this.capture) this.capture.port.onmessage = null;
     this.capture = undefined;
@@ -799,6 +879,8 @@ export class RoomVoice {
     this.playout = undefined;
     this.gain?.disconnect();
     this.gain = undefined;
+    for (const filter of this.filters) filter.disconnect();
+    this.filters = [];
     void this.context?.close().catch(() => {});
     this.context = undefined;
     this.peers = [];
@@ -806,6 +888,7 @@ export class RoomVoice {
     this.render();
   }
   private render() {
+    this.focus();
     this.joinButton.hidden = this.joined;
     this.joinButton.disabled = !this.room || this.busy;
     this.micButton.hidden = this.soundButton.hidden = this.exitButton.hidden = !this.joined;
@@ -836,6 +919,7 @@ export class RoomVoice {
     count.hidden = !this.ready;
     count.textContent = String(this.peers.length);
     this.panel.querySelector<HTMLElement>('#voice-volume-label')!.hidden = !this.joined;
+    this.panel.querySelector<HTMLElement>('#voice-priority-label')!.hidden = !this.joined;
     this.panel.dataset.voice = JSON.stringify({
       joined: this.joined,
       ready: this.ready,

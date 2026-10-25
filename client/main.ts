@@ -23,6 +23,8 @@ import { setupUpdates } from './updates';
 import { BroadcastPeers } from './broadcast';
 import { BroadcastRelayClient } from './broadcast-relay';
 import { RoomVoice } from './voice';
+import { MovieSound } from './audio-mix';
+import { PageFullscreen } from './page-fullscreen';
 import { isNative, nativeCall, onNative, platform, type NativeCache, type Sample } from './native';
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -45,7 +47,7 @@ $('app').innerHTML = `
 <header class="topbar"><a class="brand" href="#" aria-label="VideoSreeeen 首页"><span class="brand-mark">${icon('film', 24)}</span><span>Video<span class="brand-light">Sreeeen</span><small>多人同步观影</small></span></a><div class="top-actions"><span id="connection" class="connection"><i></i>尚未连接</span><span id="platform" class="platform"></span><button id="web-entry" class="button soft small" hidden>打开网页版</button>${button('settings-button', '设置与帮助', 'settings')}<button id="room-button" class="button accent small">${icon('plus', 17)} 创建 / 加入房间</button></div></header>
 <main class="workspace"><section class="screen-column"><div class="room-heading"><div><div class="eyebrow">YOUR SHARED SCREEN</div><h1 id="room-title">多人观影<span class="orange-dot">.</span></h1><p id="room-subtitle">创建房间或通过邀请加入。</p></div><div class="heading-actions">${button('invite-button', '复制房间邀请', 'link')}${button('chat-toggle', '隐藏或显示聊天室', 'chat')}</div></div>
 <section id="stage" class="stage"><div id="welcome" class="welcome"><div class="scene-lines"></div><div class="scene-orb"></div><div class="frame-index">V / S <span>PRIVATE CINEMA</span></div><div class="welcome-text"><span class="tag">链接 · 画面 · 本地视频</span><h2>选择视频，<br>开始同步观看。</h2><p>支持视频链接、实时画面和本地文件。</p><div class="hero-actions"><button id="hero-create" class="button accent">${icon('plus', 18)} 创建房间 ${icon('arrow', 17)}</button><button id="hero-join" class="text-button">通过邀请加入 →</button></div></div><div class="scene-footer"><span>PLAY · SYNC · SHARE</span><span>01 — ∞</span></div></div><video id="video" playsinline preload="metadata" hidden></video><audio id="audio" preload="metadata"></audio><div id="native-stage" class="native-stage" hidden><div class="native-hint">正在客户端内打开原站…</div></div><div id="browser-hint" class="browser-hint" hidden>${icon('globe', 36)}<h3 id="browser-title">选择播放方式</h3><p id="browser-description"></p><div class="browser-actions"><button id="browser-provide" class="button accent">提供视频给房间</button><button id="browser-takeover" class="button outline" hidden>改由我提供视频</button><button id="browser-local-video" class="button soft" title="选择本机视频，实时传给房间成员">打开视频文件</button></div><div class="browser-secondary"><button id="browser-invite" class="text-button" title="客户端成员也可识别视频源，或共享原站画面">邀请成员提供视频</button><button id="browser-help" class="text-button">使用方法</button></div></div><div id="cache-overlay" class="cache-overlay" hidden><span class="cache-icon">${icon('download', 28)}</span><h3 id="cache-title">等待完整缓存</h3><p id="cache-description">每人完整缓存，等最慢的朋友准备好。</p><div class="cache-track"><i id="cache-progress"></i></div><button id="cache-button" class="button accent">开始本机缓存</button></div></section>
-<div class="transport"><button id="play-button" class="play-button" title="播放或暂停" aria-label="播放或暂停">${icon('play', 19)}</button><button id="live-sound" class="icon-button" title="静音" aria-label="静音" hidden>${icon('volume', 19)}</button><span id="position" class="time">00:00</span><input id="seek" aria-label="播放进度" type="range" min="0" max="100" step="0.1" value="0"><span id="duration" class="time muted">00:00</span><select id="rate" aria-label="播放速度"><option value="0.5">0.5×</option><option value="1" selected>1×</option><option value="1.25">1.25×</option><option value="1.5">1.5×</option><option value="2">2×</option></select>${button('fullscreen', '全屏', 'expand')}</div>
+<div class="transport"><button id="play-button" class="play-button" title="播放或暂停" aria-label="播放或暂停">${icon('play', 19)}</button><span id="position" class="time">00:00</span><input id="seek" aria-label="播放进度" type="range" min="0" max="100" step="0.1" value="0"><span id="duration" class="time muted">00:00</span><select id="rate" aria-label="播放速度"><option value="0.5">0.5×</option><option value="1" selected>1×</option><option value="1.25">1.25×</option><option value="1.5">1.5×</option><option value="2">2×</option></select><div id="video-sound" class="player-volume" hidden><button id="live-sound" class="icon-button" title="静音视频" aria-label="静音视频">${icon('volume', 19)}</button><input id="video-volume" type="range" min="0" max="100" step="1" value="100" aria-label="视频音量" title="仅调整本机视频音量"></div>${button('fullscreen', '全屏', 'expand')}</div>
 ${playbackPickerMarkup}
 <details id="cache-options" class="cache-options"><summary title="默认关闭。只有大家都卡时才考虑完整缓存；实时画面不使用此模式。">共同缓存</summary><section class="mode-card"><div class="mode-copy"><span class="mode-symbol">${icon('download', 22)}</span><div><h3>共同缓存模式 <span class="pill">手动启用</span></h3><p id="mode-description">仅在大家都卡时使用；默认边播边看。</p></div></div><button id="mode-toggle" class="switch" role="switch" aria-checked="false" aria-label="共同缓存模式"><i></i></button></section></details><div class="screen-foot"><span id="control-summary">${icon('shield', 14)} 多人可控 · 自动同步</span><span id="sync-status">等待加入房间</span></div>
 </section>
@@ -100,6 +102,22 @@ $('danmaku-toggle').onclick = () => {
   renderDanmakuToggle();
 };
 $('danmaku-native-toggle').onclick = $('danmaku-toggle').onclick;
+const transport = document.querySelector<HTMLElement>('.transport')!;
+$('fullscreen').insertAdjacentHTML(
+  'beforebegin',
+  button('page-sidebar-toggle', '聊天与语音', 'chat') +
+    button('page-fullscreen', '网页全屏', 'window'),
+);
+const pageFullscreen = new PageFullscreen(
+  $('stage'),
+  transport,
+  $('sidebar'),
+  $('page-fullscreen'),
+  $('page-sidebar-toggle'),
+  () => {
+    void resizeSite();
+  },
+);
 function renderDanmakuToggle() {
   $('danmaku-toggle').setAttribute('aria-pressed', String(danmakuEnabled));
   $('danmaku-toggle').textContent = danmakuEnabled ? '弹幕 开' : '弹幕 关';
@@ -240,7 +258,6 @@ let desiredSession = false,
   connected = false,
   retries = 0;
 const playbackClock = new PlaybackClock();
-const voice = new RoomVoice($('chat-panel'));
 const playbackKey = (snapshot: Snapshot) =>
   `${snapshot.code}:${snapshot.media?.id ?? ''}:${snapshot.epoch}:${snapshot.playback.revision}`;
 let mediaRelay = true;
@@ -250,7 +267,6 @@ let sourceTimedOut = false;
 let automaticSeeks = 0,
   explicitSeeks = 0;
 let playbackPermissionNeeded = false;
-let liveMuted = false;
 let autoSharedMedia = '';
 let requestedScreenPage = '';
 let sourceResolution: AbortController | null = null;
@@ -263,6 +279,7 @@ let providingMediaId = '',
 let provideError = '';
 let publisherUrl = '';
 let publisherCleanup: (() => void) | null = null;
+let publisherMonitor: GainNode | null = null;
 let pendingBroadcastUrl = '';
 let broadcastBusy = false;
 let stoppingBroadcast = false;
@@ -292,6 +309,26 @@ let renderedChat = '';
 let nextBusy = false;
 let nextAutoplay: { code: string; url: string } | null = null;
 const playbackHealth = new PlaybackHealth();
+const movieSound = new MovieSound(applyMovieSound);
+const voice = new RoomVoice($('chat-panel'), (active) => movieSound.voice(active));
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) movieSound.settle();
+});
+
+function applyMovieSound(gain: number, muted: boolean) {
+  video.volume = audio.volume = gain;
+  audio.muted = muted;
+  const preview = hasPendingPreview() || room?.media?.broadcast?.host === memberId;
+  video.muted = preview || !!audio.getAttribute('src') || muted;
+  if (publisher && (publisher as HTMLVideoElement & { __stream?: MediaStream }).__stream) {
+    if (publisherMonitor) publisherMonitor.gain.value = muted ? 0 : gain;
+    else {
+      publisher.volume = gain;
+      publisher.muted = muted;
+    }
+  }
+  renderLiveSound();
+}
 
 function toast(message: string) {
   $('toast').textContent = message;
@@ -745,6 +782,7 @@ function showPublisherPreview(stream: MediaStream) {
   $('browser-hint').hidden = true;
   $('native-stage').hidden = true;
   playElement(video);
+  movieSound.apply();
 }
 const playRequests = new WeakMap<
   HTMLMediaElement,
@@ -796,11 +834,16 @@ function playElement(element: HTMLMediaElement) {
 }
 function renderLiveSound() {
   const button = $('live-sound');
-  const label = playbackPermissionNeeded ? '启用声音' : liveMuted ? '取消静音' : '静音';
+  const muted = movieSound.muted || movieSound.level === 0;
+  const label = playbackPermissionNeeded ? '启用声音' : muted ? '取消视频静音' : '静音视频';
   button.title = label;
   button.setAttribute('aria-label', label);
-  button.setAttribute('aria-pressed', String(liveMuted));
-  button.innerHTML = icon(liveMuted || playbackPermissionNeeded ? 'volume-off' : 'volume', 19);
+  button.setAttribute('aria-pressed', String(muted));
+  button.innerHTML = icon(muted || playbackPermissionNeeded ? 'volume-off' : 'volume', 19);
+  const slider = $<HTMLInputElement>('video-volume');
+  slider.value = String(Math.round(movieSound.level * 100));
+  slider.title = `视频音量 ${slider.value}% · 仅本机`;
+  slider.setAttribute('aria-valuetext', slider.value + '%');
 }
 function renderLiveStatus() {
   const sharing = room?.media?.broadcast;
@@ -866,11 +909,18 @@ function render() {
   const joined = !!room;
   const preview = hasPendingPreview();
   const sourceNeeded = !isNative && !!room?.media && !room.media.source && !room.media.broadcast;
+  $<HTMLButtonElement>('page-fullscreen').disabled = !room?.media && !preview;
+  if (!room?.media && !preview) pageFullscreen.exit();
   const blocked = !preview && (sourceNeeded || sourceFailed || !!localRetry);
   const liveScreen = room?.media?.broadcast?.kind === 'screen' || preview;
   for (const id of ['play-button', 'position', 'seek', 'duration', 'rate'])
     $(id).hidden = liveScreen;
-  $('live-sound').hidden = !liveScreen || preview || room?.media?.broadcast?.host === memberId;
+  $('video-sound').hidden =
+    !room?.media ||
+    siteOpen ||
+    preview ||
+    (room.media.broadcast?.kind === 'screen' && room.media.broadcast.host === memberId);
+  $('live-sound').hidden = $('video-sound').hidden;
   renderLiveSound();
   const canShareTab = !isNative && !!navigator.mediaDevices?.getDisplayMedia;
   const media = room?.media;
@@ -1426,6 +1476,7 @@ async function setPlayer(src: string, audioSrc?: string, isHls = false) {
     } else video.src = src;
   } else video.src = src;
   if (!hls) video.load();
+  movieSound.apply();
   return true;
 }
 async function loadStream(media: NonNullable<Snapshot['media']>) {
@@ -1448,8 +1499,7 @@ async function loadStream(media: NonNullable<Snapshot['media']>) {
       siteOpen = false;
       video.hidden = false;
       $('native-stage').hidden = true;
-      video.muted =
-        media.broadcast.host === memberId || (media.broadcast.kind === 'screen' && liveMuted);
+      video.muted = media.broadcast.host === memberId || movieSound.muted;
     }
     if (!current()) return;
     configureBroadcast();
@@ -1653,9 +1703,8 @@ const broadcast = new BroadcastPeers(
     if (stream) {
       if (video.srcObject !== stream) video.srcObject = stream;
       video.hidden = false;
-      video.muted =
-        room?.media?.broadcast?.host === memberId ||
-        (room?.media?.broadcast?.kind === 'screen' && liveMuted);
+      video.muted = room?.media?.broadcast?.host === memberId || movieSound.muted;
+      movieSound.apply();
       playElement(video);
     } else if (video.srcObject) {
       // Transport reconfiguration must not detach the publisher's local preview.
@@ -1683,7 +1732,7 @@ const broadcastFallback = new BroadcastRelayClient(
       video.srcObject = null;
       video.src = url;
       video.hidden = false;
-      video.muted = room?.media?.broadcast?.kind === 'screen' && liveMuted;
+      movieSound.apply();
     } else if (previous && video.getAttribute('src') === previous) {
       video.removeAttribute('src');
       video.load();
@@ -1718,6 +1767,7 @@ function releasePublisher() {
   broadcast.release();
   publisherCleanup?.();
   publisherCleanup = null;
+  publisherMonitor = null;
   publisher?.pause();
   publisher?.removeAttribute('src');
   publisher?.load();
@@ -1814,8 +1864,10 @@ $<HTMLInputElement>('local-video-input').onchange = () => {
       const sound = new AudioContext();
       const audioSource = sound.createMediaElementSource(source);
       const output = sound.createMediaStreamDestination();
+      const monitor = sound.createGain();
+      publisherMonitor = monitor;
       audioSource.connect(output);
-      audioSource.connect(sound.destination);
+      audioSource.connect(monitor).connect(sound.destination);
       for (const track of output.stream.getAudioTracks()) stream.addTrack(track);
       publisherCleanup = () => {
         clearInterval(timer);
@@ -2475,12 +2527,13 @@ $('play-button').onclick = () => {
 };
 $('live-sound').onclick = () => {
   if ($('live-sound').hidden) return;
-  liveMuted = playbackPermissionNeeded ? false : !liveMuted;
-  video.muted = liveMuted;
+  movieSound.toggleMute(playbackPermissionNeeded);
   // A user gesture unlocks local playback; it must not pause the whole room.
   if (playbackPermissionNeeded) playElement(video);
   renderLiveSound();
 };
+$<HTMLInputElement>('video-volume').oninput = () =>
+  movieSound.setLevel(Number($<HTMLInputElement>('video-volume').value) / 100);
 video.onclick = () => {
   if (room?.media?.broadcast?.kind === 'screen' || hasPendingPreview()) {
     if (playbackPermissionNeeded) $('live-sound').click();
@@ -2610,6 +2663,7 @@ function playbackError(event: Event) {
 video.addEventListener('error', playbackError);
 audio.addEventListener('error', playbackError);
 $('leave-button').onclick = () => {
+  pageFullscreen.exit();
   voice.leave();
   voice.configure(null, '', '', '');
   nextAutoplay = null;
