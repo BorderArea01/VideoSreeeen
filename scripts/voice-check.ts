@@ -404,17 +404,26 @@ try {
     'Movie decoding must continue during simultaneous voice',
   );
   assert.ok(evidence.compatibility.every((s: any) => s.codec === 'mulaw16'));
-  const spectrum = await host.evaluate<number[]>(
-    `(() => { const a = window.__analyser, v = new Float32Array(a.frequencyBinCount); a.getFloatFrequencyData(v); return [660,880].map(f => Math.max(...v.slice(Math.floor((f-35)*a.fftSize/48000), Math.ceil((f+35)*a.fftSize/48000)))); })()`,
+  // Observe both tones in the same real output window after codec/buffer transitions.
+  // A single FFT snapshot can land on packet concealment; never lower the signal threshold.
+  await host.waitForFunction(
+    `(() => {
+      const tones = a => { const v = new Float32Array(a.frequencyBinCount); a.getFloatFrequencyData(v); return [660,880].map(f => Math.max(...v.slice(Math.floor((f-35)*a.fftSize/48000), Math.ceil((f+35)*a.fftSize/48000)))); };
+      const raw = tones(window.__analyser), processed = tones(window.__voiceOutputAnalyser);
+      if (![...raw, ...processed].every(db => db > -35)) return false;
+      const a = window.__voiceOutputAnalyser, v = new Float32Array(a.fftSize); a.getFloatTimeDomainData(v);
+      window.__mixEvidence = { raw, processed, level: { rms: Math.sqrt(v.reduce((n,x)=>n+x*x,0)/v.length), peak: Math.max(...v.map(Math.abs)) } };
+      return true;
+    })()`,
+    undefined,
+    { timeout: 8000, polling: 100 },
   );
+  const mixed = await host.evaluate('window.__mixEvidence');
+  const spectrum: number[] = mixed.raw;
   evidence.mixedToneDb = spectrum;
-  const processedSpectrum = await host.evaluate<number[]>(
-    `(() => { const a = window.__voiceOutputAnalyser, v = new Float32Array(a.frequencyBinCount); a.getFloatFrequencyData(v); return [660,880].map(f => Math.max(...v.slice(Math.floor((f-35)*a.fftSize/48000), Math.ceil((f+35)*a.fftSize/48000)))); })()`,
-  );
+  const processedSpectrum: number[] = mixed.processed;
   evidence.processedVoiceToneDb = processedSpectrum;
-  evidence.processedVoiceLevel = await host.evaluate(
-    `(() => { const a = window.__voiceOutputAnalyser, v = new Float32Array(a.fftSize); a.getFloatTimeDomainData(v); return { rms: Math.sqrt(v.reduce((n,x)=>n+x*x,0)/v.length), peak: Math.max(...v.map(Math.abs)) }; })()`,
-  );
+  evidence.processedVoiceLevel = mixed.level;
   assert.ok(evidence.processedVoiceLevel.rms > 0.005);
   assert.ok(evidence.processedVoiceLevel.peak < 0.95);
   assert.ok(

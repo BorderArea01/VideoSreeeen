@@ -39,3 +39,15 @@ $env:VS_FORCE_CANVAS='1'
 ```
 
 本机证据保存在忽略目录 `.local/audio-page-local-evidence.json`，截图为隔离浏览器和合成测试成员，不代表真实用户在线。手机视口只验证布局；没有完成 Android / iOS 真机、实体耳机、麦克风或真人听感验收。部分移动浏览器限制脚本设置媒体音量，不能据电脑测试承诺全平台避让。原站客户端与旧安装包不在本次网页版交付范围。
+
+## 部署核对
+
+2026-10-25 更新已授权的同一免费账号和原有资源，没有启用 TURN 或付费产品：
+
+- 网页入口：<https://videosreeeen.pages.dev>；运行时提交 `afa5c4ceb1e61419302b9a2dcae32f66e20d9f88`。
+- Worker：`11f1588c-e593-4cc5-9c2f-45a320ab93cf`；Pages：`9733bdb1-15aa-4b01-bea6-fda4be0a1ab9`。Pages 的 WATCH 继续绑定同一个房间 Worker。
+- 公网 HTML、JavaScript、CSS、语音 worklet 与本地构建逐字节一致。JS `index-wjhGl4gP.js` SHA-256：`c30ac5368f01776cdf936726cce09862c785f11bfc8fa705145cb810859c7920`；CSS `index-bOvvBkJW.css`：`48b55faec68dd0fd3bdb3363e5fb36efcd39a3c5fa16019a203a3de68a7539c8`；worklet `voice-worklet--rrRYmB6.js`：`4286ee2049abeb4919f1721c28ed34683b81b4ca9729e095a878348906a199f8`。
+
+第一次公网多人检查在切换兼容编码后，单次 FFT 的第二路频率为 -35.0399 dB，略低于 -35 dB 测试门限；原始数据保留于 `.local/audio-page-public-first-attempt.stderr.log`，该轮不记通过。检查改为最多 8 秒内等待同一采样窗口的两路频率同时在原始混音与处理后输出达到原门限，不放宽阈值、不修改运行时；它验证实际输出，不以收到的数据包替代音频测量。
+
+调整采样方式后，针对上述公网入口的三成员检查通过：Opus、180 ms 注入抖动、三人同时发声、兼容编码、重连只收听和麦克风释放；两路原始混音频率为 -30.6700 / -30.5175 dB。新增音量、人声优先、关闭 / 静音 / 停顿 / 离开恢复、三个视口网页全屏、聊天实际送达、Esc 与原侧栏恢复均通过，房间控制消息为 0。证据为 `.local/audio-page-public-evidence.json`；仍使用合成音源和静音物理输出，不代表真人听感或跨设备真机结论。
