@@ -1,5 +1,13 @@
 import type { Page } from 'playwright';
 
+export async function playbackSettings(page: Page, open = true) {
+  if (
+    (await page.locator('#player-settings').evaluate((e) => (e as HTMLDetailsElement).open)) !==
+    open
+  )
+    await page.locator('#player-settings > summary').click();
+}
+
 export async function configureRoomServer(page: Page, origin: string) {
   await page.locator('#settings-button').click();
   if (!(await page.locator('#connection-details').evaluate((e) => (e as HTMLDetailsElement).open)))

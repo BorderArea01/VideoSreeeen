@@ -17,6 +17,20 @@ class Socket {
   }
 }
 const socket = () => new Socket() as unknown as WebSocket;
+test('refresh resumes the original live seat; late close from the old socket cannot mark it offline', () => {
+  const rooms = new Rooms(),
+    oldSocket = socket(),
+    replacement = socket();
+  const { room, seat } = rooms.create('同名成员', oldSocket);
+  const returned = rooms.join(`${room.code}:${room.token}`, seat.name, replacement, seat.resume);
+  assert.equal(returned.seat.id, seat.id);
+  assert.equal(room.members.size, 1);
+  rooms.disconnect(room, seat, oldSocket);
+  assert.equal(seat.online, true);
+  assert.equal(seat.socket, replacement);
+  rooms.join(`${room.code}:${room.token}`, seat.name, socket());
+  assert.equal(room.members.size, 2, 'Same names alone do not authorize merging identities');
+});
 const direct = {
   url: 'https://example.com/movie.mp4',
   title: 'Movie',

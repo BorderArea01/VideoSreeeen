@@ -384,22 +384,95 @@ h1 {
   color: #95818e;
 }
 .transport {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  gap: 13px;
-  height: 58px;
+  gap: 2px 14px;
+  min-height: 66px;
   background: #1c1b22;
   border: 1px solid #303039;
   border-top: 0;
   border-radius: 0 0 10px 10px;
-  padding: 0 19px;
+  padding: 2px 14px 6px;
+}
+.transport-primary,
+.transport-tools {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+.transport-tools {
+  justify-content: flex-end;
+}
+.player-time {
+  color: var(--muted);
+  font-size: 10px;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+#player-settings {
+  position: relative;
+}
+#player-settings summary {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 30px;
+  cursor: pointer;
+  color: #b5adbb;
+  list-style: none;
+}
+#player-settings summary::-webkit-details-marker {
+  display: none;
+}
+#player-settings[open] summary {
+  color: var(--orange);
+}
+.player-settings-panel {
+  position: absolute;
+  bottom: calc(100% + 12px);
+  right: 0;
+  z-index: 70;
+  width: 252px;
+  max-width: calc(100vw - 24px);
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  box-shadow: 0 8px 25px #0007;
+}
+.player-settings-panel label {
+  display: grid;
+  grid-template-columns: 70px minmax(0, 1fr);
+  align-items: center;
+  gap: 14px;
+  min-height: 32px;
+  margin-bottom: 8px;
+  color: #c4bcc7;
+  font-size: 11px;
+}
+.player-settings-panel label:last-child {
+  margin-bottom: 0;
+}
+#player-settings select {
+  width: 100%;
+  padding: 5px 8px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: #24232c;
+  font-size: 11px;
+}
+#player-settings input {
+  width: 100%;
+  height: 24px;
 }
 .play-button {
   width: 27px;
   color: #d5c7c6;
 }
 .transport #fullscreen {
-  margin-left: auto;
+  margin-left: 0;
 }
 .transport #page-fullscreen[aria-pressed='true'] {
   color: var(--orange);
@@ -467,7 +540,8 @@ body.page-cinema {
   align-items: center;
   flex: 1;
   min-width: 55px;
-  height: 32px;
+  height: 20px;
+  grid-column: 1 / -1;
 }
 #seek {
   width: 100%;
@@ -528,9 +602,6 @@ body.page-cinema {
   width: 25px;
   font-size: 21px;
 }
-.transport #skip-step {
-  width: 52px;
-}
 .page-cinema #sidebar {
   position: fixed;
   z-index: 90;
@@ -566,7 +637,7 @@ body.page-cinema {
   display: flex;
   align-items: center;
   gap: 5px;
-  flex: 0 0 104px;
+  flex: 0 0 28px;
 }
 .player-volume .icon-button {
   flex: 0 0 28px;
@@ -1718,9 +1789,8 @@ button {
     font-size: 8px;
   }
   .transport {
-    height: 53px;
-    padding: 0 14px;
-    gap: 10px;
+    padding: 2px 12px 6px;
+    gap: 2px 8px;
   }
 }
 @media (max-width: 540px) {
@@ -2198,20 +2268,16 @@ button {
 }
 @media (max-width: 600px) {
   .transport {
-    flex-wrap: wrap;
     height: auto;
     min-height: 58px;
-    padding: 8px 10px;
-    gap: 6px;
+    padding: 2px 10px 6px;
+    gap: 0 6px;
   }
   .transport #seek-track:not([hidden]) {
-    order: -1;
-    flex: 1 0 100%;
     height: 18px;
   }
   .transport .player-volume {
-    flex-basis: 82px;
-    margin-left: auto;
+    flex-basis: 25px;
   }
   .transport #fullscreen {
     margin-left: 0;
@@ -2221,5 +2287,16 @@ button {
   }
   .voice-priority {
     min-height: 36px;
+  }
+  .transport-primary,
+  .transport-tools {
+    gap: 4px;
+  }
+  .transport .skip-controls .icon-button {
+    width: 25px;
+  }
+  .player-time,
+  .player-time .time {
+    font-size: 9px;
   }
 }

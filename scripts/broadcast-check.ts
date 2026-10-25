@@ -1,4 +1,4 @@
-import { choosePlayback, openRoom, closeInvitation } from './room-ui';
+import { choosePlayback, openRoom, closeInvitation, playbackSettings } from './room-ui';
 import assert from 'node:assert/strict';
 import { once } from 'node:events';
 import { mkdir, writeFile } from 'node:fs/promises';
@@ -181,7 +181,9 @@ try {
     e.dispatchEvent(new Event('change'));
   });
   await host.locator('#position').filter({ hasText: '00:02' }).waitFor();
+  await playbackSettings(guest);
   await guest.locator('#rate').selectOption('1.25');
+  await playbackSettings(guest, false);
   if (!process.env.VS_FORCE_CANVAS)
     await host.waitForFunction(() => {
       const source = (window as any).__filePublisher as HTMLVideoElement;

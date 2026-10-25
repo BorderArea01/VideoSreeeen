@@ -52,6 +52,7 @@ export class SeekControls {
   private visible = false;
   private failed = false;
   private step = 90;
+  private stepSelect: HTMLSelectElement;
   constructor(
     private input: HTMLInputElement,
     private state: () => SeekState,
@@ -106,6 +107,7 @@ export class SeekControls {
       if ([10, 30, 60, 90].includes(saved)) this.step = saved;
     } catch {}
     const select = skip.querySelector<HTMLSelectElement>('select')!;
+    this.stepSelect = select;
     select.value = String(this.step);
     select.onchange = () => {
       const step = Number(select.value);
@@ -147,7 +149,7 @@ export class SeekControls {
       button.title = `${direction} ${this.step} 秒`;
       button.setAttribute('aria-label', button.title);
     }
-    skip.querySelector<HTMLSelectElement>('select')!.disabled = !available;
+    this.stepSelect.disabled = !available;
     if (!available) this.reset();
   }
   private submit(value: number) {

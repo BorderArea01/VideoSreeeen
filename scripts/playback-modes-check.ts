@@ -3,7 +3,7 @@ import { once } from 'node:events';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { chromium } from 'playwright';
 import { createApp } from '../server/index';
-import { choosePlayback, closeInvitation, selectSource } from './room-ui';
+import { choosePlayback, closeInvitation, selectSource, playbackSettings } from './room-ui';
 
 const app = process.env.VS_PUBLIC_URL ? undefined : createApp();
 if (app) {
@@ -81,7 +81,9 @@ try {
     await page.waitForFunction(
       () => Math.abs(document.querySelector<HTMLVideoElement>('#video')!.currentTime - 1) < 0.2,
     );
+  await playbackSettings(host);
   await host.locator('#rate').selectOption('1.25');
+  await playbackSettings(host, false);
   for (const page of [host, guest])
     await page.waitForFunction(
       () => document.querySelector<HTMLVideoElement>('#video')!.playbackRate === 1.25,

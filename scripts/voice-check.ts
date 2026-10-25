@@ -4,7 +4,7 @@ import { mkdir, writeFile, readFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import { chromium, type Page } from 'playwright';
 import { createApp } from '../server/index';
-import { closeInvitation, selectSource } from './room-ui';
+import { closeInvitation, selectSource, playbackSettings } from './room-ui';
 
 // Only generated streams in isolated browser contexts; never opens a real microphone.
 let movie: Buffer;
@@ -446,7 +446,9 @@ try {
   assert.ok(
     bounds && bounds.x === 0 && bounds.y === 0 && bounds.width === 1360 && bounds.height === 1000,
   );
+  await playbackSettings(host);
   assert.equal(await host.locator('#video-volume').isVisible(), true);
+  await playbackSettings(host, false);
   assert.equal(await host.locator('#sidebar').isVisible(), false);
   await host.locator('#page-sidebar-toggle').click();
   assert.equal(await host.locator('#voice-panel').isVisible(), true);
@@ -503,6 +505,7 @@ try {
     await host.locator('#page-fullscreen').click();
     bounds = await host.locator('#player-shell').boundingBox();
     assert.ok(bounds && bounds.width === width && bounds.height === 950);
+    await playbackSettings(host);
     assert.equal(await host.locator('#video-volume').isVisible(), true);
     assert.ok(await host.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
     for (const id of [
@@ -521,6 +524,7 @@ try {
         `${id} must fit inside the page fullscreen viewport at ${width}px`,
       );
     }
+    await playbackSettings(host, false);
     await host.screenshot({ path: `.local/page-fullscreen-${width}.png` });
     await host.keyboard.press('Escape');
     if (width === 820) {

@@ -6,7 +6,7 @@ import { promisify } from 'node:util';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { chromium, type Page } from 'playwright';
 import { createApp } from '../server/index';
-import { closeInvitation, selectSource } from './room-ui';
+import { closeInvitation, selectSource, playbackSettings } from './room-ui';
 
 // Public test film, no physical audio output or user device access.
 const movie = await readFile('.local/sintel-trailer.mp4').catch(async () => {
@@ -211,14 +211,18 @@ try {
   await host.keyboard.press('Escape');
   await host.mouse.up();
   assert.equal(controls.length, count, 'Canceled gesture must not seek');
+  await playbackSettings(host);
   await host.locator('#skip-step').selectOption('30');
+  await playbackSettings(host, false);
   assert.equal(controls.length, count, 'Preset choice is local');
   await seekTo(5);
   await host.locator('#skip-forward').click();
   await atBoth(35);
   await host.locator('#skip-back').click();
   await atBoth(5);
+  await playbackSettings(host);
   await host.locator('#skip-step').selectOption('90');
+  await playbackSettings(host, false);
   await host.locator('#skip-back').click();
   await atBoth(0);
   await host.locator('#skip-forward').click();
@@ -234,12 +238,15 @@ try {
   await host.locator('#page-fullscreen').click();
   await host.locator('#play-button').click();
   await host.mouse.move(400, 300);
+  const hideStarted = Date.now();
   await host.waitForFunction(
     () => document.getElementById('player-shell')!.classList.contains('player-idle'),
     undefined,
     { timeout: 6000 },
   );
   assert.equal(await host.locator('#video').evaluate((v) => getComputedStyle(v).cursor), 'none');
+  const hideElapsedMs = Date.now() - hideStarted;
+  assert.ok(hideElapsedMs < 1900, 'Fullscreen controls hide promptly');
   assert.equal(
     await host.locator('.transport').evaluate((v) => getComputedStyle(v).pointerEvents),
     'none',
@@ -262,7 +269,7 @@ try {
   await host.waitForFunction(() => document.fullscreenElement?.id === 'player-shell');
   assert.equal(await host.locator('#skip-forward').isVisible(), true);
   await host.locator('#play-button').click();
-  await host.mouse.move(400, 300);
+  // Staying over the clicked control must no longer keep the whole bar visible forever.
   await host.waitForFunction(
     () => document.getElementById('player-shell')!.classList.contains('player-idle'),
     undefined,
@@ -280,6 +287,8 @@ try {
     movementRestores: true,
     pausedKeepsControls: true,
     controlsInsideSystemFullscreen: true,
+    hideElapsedMs,
+    stationaryOverControlHides: true,
   };
   await host.setViewportSize({ width: 390, height: 844 });
   await host.locator('#page-fullscreen').click();
@@ -287,8 +296,7 @@ try {
     'seek',
     'skip-forward',
     'skip-back',
-    'skip-step',
-    'video-volume',
+    'player-settings',
     'page-fullscreen',
     'fullscreen',
   ]) {
@@ -300,6 +308,13 @@ try {
   }
   await host.mouse.move(190, 810);
   await host.screenshot({ path: '.local/player-controls-mobile.png' });
+  await playbackSettings(host);
+  for (const id of ['video-volume', 'skip-step', 'rate']) {
+    const b = (await host.locator('#' + id).boundingBox())!;
+    assert.ok(b && b.x >= 0 && b.x + b.width <= 391 && b.y + b.height <= 845);
+  }
+  await host.screenshot({ path: '.local/player-settings-mobile.png' });
+  await playbackSettings(host, false);
   await host.keyboard.press('Escape');
   if (!(await host.locator('#video').evaluate((v) => (v as HTMLVideoElement).paused))) {
     await host.locator('#play-button').click();

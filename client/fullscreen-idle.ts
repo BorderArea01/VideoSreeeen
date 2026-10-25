@@ -1,23 +1,32 @@
 /** Fullscreen interaction is local; it never changes playback or room state. */
 export class FullscreenIdle {
   private timer = 0;
-  private overControls = false;
+  private pressed = false;
+  private keyboard = false;
   constructor(
     private shell: HTMLElement,
     private playing: () => boolean,
   ) {
     const wake = (event?: Event) => {
-      if (event instanceof PointerEvent)
-        this.overControls = !!(event.target as Element).closest('.transport');
+      if (event instanceof PointerEvent) this.keyboard = false;
+      if (event?.type === 'keydown') this.keyboard = true;
+      if (event?.type === 'pointerdown') this.pressed = true;
+      if (event?.type === 'pointerup' || event?.type === 'pointercancel') this.pressed = false;
       this.wake();
     };
     document.addEventListener('pointermove', wake);
     document.addEventListener('pointerdown', wake);
     document.addEventListener('pointerup', wake);
+    document.addEventListener('pointercancel', wake);
     document.addEventListener('keydown', wake);
     document.addEventListener('focusin', wake);
     document.addEventListener('fullscreenchange', wake);
     shell.addEventListener('cinemachange', wake);
+    window.addEventListener('blur', () => {
+      this.pressed = false;
+      this.keyboard = false;
+      this.wake();
+    });
   }
   private fullscreen() {
     return (
@@ -33,17 +42,17 @@ export class FullscreenIdle {
       if (
         !this.fullscreen() ||
         !this.playing() ||
-        this.overControls ||
+        this.pressed ||
         this.shell.classList.contains('seeking') ||
-        document.querySelector('dialog[open]') ||
-        (focused instanceof HTMLElement &&
+        document.querySelector('dialog[open], #player-settings[open]') ||
+        (this.keyboard &&
+          focused instanceof HTMLElement &&
           focused.matches(':focus-visible') &&
           this.shell.contains(focused)) ||
-        (document.body.classList.contains('page-cinema') &&
-          !document.getElementById('sidebar')!.hidden)
+        (focused instanceof HTMLElement && !!focused.closest('#sidebar'))
       )
         return;
       this.shell.classList.add('player-idle');
-    }, 2500);
+    }, 1000);
   }
 }

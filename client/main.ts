@@ -27,6 +27,8 @@ import { MovieSound } from './audio-mix';
 import { PageFullscreen } from './page-fullscreen';
 import { FullscreenIdle } from './fullscreen-idle';
 import { SeekControls, type SeekState } from './seek-controls';
+import { TabSessions, type TabSession } from './tab-session';
+import { PlayerToolbar } from './player-toolbar';
 import { isNative, nativeCall, onNative, platform, type NativeCache, type Sample } from './native';
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -259,6 +261,13 @@ let ws: WebSocket | null = null,
 let desiredSession = false,
   connected = false,
   retries = 0;
+const tabSessions = new TabSessions({
+  getItem: (key) => sessionStorage.getItem(key),
+  setItem: (key, value) => sessionStorage.setItem(key, value),
+  removeItem: (key) => sessionStorage.removeItem(key),
+});
+let restoring: TabSession | null = null;
+let connectionGeneration = 0;
 const playbackClock = new PlaybackClock();
 const playbackKey = (snapshot: Snapshot) =>
   `${snapshot.code}:${snapshot.media?.id ?? ''}:${snapshot.epoch}:${snapshot.playback.revision}`;
@@ -354,6 +363,7 @@ const fullscreenIdle = new FullscreenIdle(
     !sourceFailed &&
     (room.media.broadcast?.kind === 'screen' ? !video.paused : !room.playback.paused),
 );
+const playerToolbar = new PlayerToolbar(transport);
 for (const event of ['play', 'pause', 'ended'])
   video.addEventListener(event, () => fullscreenIdle.wake());
 document.addEventListener('visibilitychange', () => {
@@ -468,9 +478,12 @@ function closeDialog() {
   void resizeSite();
 }
 async function connect(kind: 'create' | 'join', reconnect = false) {
+  const generation = ++connectionGeneration;
   const name = reconnect ? sessionName : $<HTMLInputElement>('name-input').value.trim();
   if (!name) throw new Error('请填写昵称');
-  const invite = reconnect && room ? room.invite : $<HTMLInputElement>('invite-input').value.trim();
+  const invite = reconnect
+    ? (room?.invite ?? restoring?.invite ?? '')
+    : $<HTMLInputElement>('invite-input').value.trim();
   const server = new URL(
     reconnect
       ? activeServer
@@ -485,12 +498,15 @@ async function connect(kind: 'create' | 'join', reconnect = false) {
   save('name', name);
   desiredSession = true;
   if (!reconnect) {
+    restoring = null;
+    tabSessions.clear();
     releasePublisher();
     resume = '';
     room = null;
     memberId = '';
     await clearPlayback();
   }
+  if (generation !== connectionGeneration) return;
   clearTimeout(reconnectTimer);
   ws?.close();
   connected = false;
@@ -506,6 +522,7 @@ async function connect(kind: 'create' | 'join', reconnect = false) {
     const response = await fetch(activeServer + '/config', { signal: AbortSignal.timeout(8000) });
     if (response.ok) {
       const config = await response.json();
+      if (generation !== connectionGeneration) return;
       mediaRelay = config.mediaRelay !== false;
       roomRouting = config.roomRouting === true;
       broadcastRelayEnabled = config.broadcastRelay === true;
@@ -516,8 +533,10 @@ async function connect(kind: 'create' | 'join', reconnect = false) {
       broadcast.setIceServers(Array.isArray(config.iceServers) ? config.iceServers : []);
     }
   } catch {
+    if (generation !== connectionGeneration) return;
     mediaRelay = true;
   }
+  if (generation !== connectionGeneration) return;
   const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   const code =
     kind === 'join'
@@ -562,6 +581,13 @@ async function connect(kind: 'create' | 'join', reconnect = false) {
           retries = 0;
           memberId = message.memberId;
           resume = message.resume;
+          restoring = null;
+          tabSessions.save({
+            server: activeServer,
+            invite: message.room.invite,
+            name: sessionName,
+            resume,
+          });
           adopt(message.room);
           closeDialog();
           connectionView('同步连接正常', true);
@@ -583,6 +609,14 @@ async function connect(kind: 'create' | 'join', reconnect = false) {
           if (!welcomed) {
             clearTimeout(timeout);
             desiredSession = false;
+            if (restoring) {
+              restoring = null;
+              tabSessions.clear();
+              resume = '';
+              connectionView('无法恢复房间');
+              openDialog('join');
+              $('dialog-error').textContent = message.message;
+            }
             reject(new Error(message.message));
             socket.close();
           } else toast(message.message);
@@ -644,10 +678,15 @@ async function connect(kind: 'create' | 'join', reconnect = false) {
         reject(new Error('无法连接房间服务器，请检查地址和网络'));
       }
     };
-    socket.onclose = () => {
+    socket.onclose = (event) => {
       clearTimeout(timeout);
       if (ws !== socket) return;
       connected = false;
+      if (event.code === 4001) {
+        desiredSession = false;
+        restoring = null;
+        tabSessions.clear();
+      }
       voice.leave();
       voice.configure(null, '', '', '');
       danmakuFeed.reset();
@@ -670,11 +709,13 @@ async function connect(kind: 'create' | 'join', reconnect = false) {
       audio.pause();
       render();
       if (!welcomed) reject(new Error('服务器连接已关闭'));
-      if (desiredSession && room) {
-        if (room.mode === 'cache') void stopCachedPlayback().catch(error);
+      if (desiredSession && (room || restoring)) {
+        if (room?.mode === 'cache') void stopCachedPlayback().catch(error);
         const delay = Math.min(15000, 1000 * 2 ** Math.min(retries++, 4));
         reconnectTimer = setTimeout(() => {
-          void connect('join', true).catch(error);
+          void connect('join', true).catch((e) => {
+            if (!restoring && desiredSession) error(e);
+          });
         }, delay);
       }
     };
@@ -1104,6 +1145,7 @@ function render() {
   $<HTMLSelectElement>('rate').disabled =
     blocked || preview || room?.media?.broadcast?.kind === 'screen';
   seekControls.sync();
+  playerToolbar.sync();
   $('cache-options').classList.toggle('active', !!(room?.mode === 'cache'));
   if (!room?.media) {
     $('sync-status').textContent = '等待加入房间';
@@ -2714,6 +2756,9 @@ function playbackError(event: Event) {
 video.addEventListener('error', playbackError);
 audio.addEventListener('error', playbackError);
 $('leave-button').onclick = () => {
+  connectionGeneration++;
+  restoring = null;
+  tabSessions.clear();
   pageFullscreen.exit();
   voice.leave();
   voice.configure(null, '', '', '');
@@ -2897,8 +2942,15 @@ document.addEventListener('fullscreenchange', () => {
   void resizeSite();
 });
 window.addEventListener('beforeunload', () => {
+  connectionGeneration++;
   desiredSession = false;
   ws?.close();
+});
+window.addEventListener('pageshow', (event) => {
+  if (event.persisted && room && resume && !connected) {
+    desiredSession = true;
+    void connect('join', true).catch(error);
+  }
 });
 window.addEventListener('hashchange', () => {
   const value = inviteFromLocation();
@@ -2995,4 +3047,19 @@ setInterval(() => {
 void cache.sweep().catch(error);
 setupUpdates();
 render();
-if (initialInvite) openDialog('join');
+restoring = tabSessions.restore(
+  (performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming | undefined)
+    ?.type ?? 'navigate',
+  initialInvite,
+);
+if (restoring) {
+  activeServer = restoring.server;
+  sessionName = restoring.name;
+  resume = restoring.resume;
+  const restoredInvite = parseInvite(restoring.invite)!;
+  $<HTMLInputElement>('invite-input').value =
+    `${activeServer}/#${restoredInvite.code}:${restoredInvite.token}`;
+  void connect('join', true).catch(() => {
+    /* The close handler retries transport failures. */
+  });
+} else if (initialInvite) openDialog('join');
