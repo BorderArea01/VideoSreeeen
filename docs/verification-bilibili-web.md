@@ -38,4 +38,8 @@ Windows NSIS 与便携版已生成。使用实际 `win-unpacked/VideoSreeeen.exe
 
 Android release 构建与 `lintRelease` 通过，版本 0.4.4 / versionCode 9；APK SHA-256 `9ed9f6e5d83ef2cd36135740dae909d9a022b6d59986fd6ef9b64bfe828b6d1b`。本轮只生成 APK，不安装设备。
 
+APK 签名与 0.4.3 相同，内含 HTML / JS / CSS 与部署构建逐字节一致。`test:playback-modes` 直链双端同步、切换输入不换片、未知网站不替换影片、键盘与窄屏回归通过。
+
+GitHub Release `v0.4.4` 已由维护账号发布，标签提交 `f98acbe6e887be35dca8d34d8dc78a8e9f4ed94b`，含 7 个资产（Windows 安装版、便携版、blockmap、latest.yml、Android APK、update.json、SHA256SUMS）。上传前后逐项核对大小和 GitHub 返回的 SHA-256 digest；这不代表匿名下载已恢复。验证后的本机成品同时保留在 `artifacts/release/0.4.4/`。
+
 尚未以真实手机、Safari / iOS 或登录后高清验收；桌面浏览器证据不代替这些设备结论。普通公开接口可能因站点调整或请求限制失效，此时明确报错并保留手动共享画面。未启用付费服务。GitHub 仓库和最新安装包匿名 HEAD 请求仍返回 404，因此不能宣称公开下载或自动更新已经可用。
