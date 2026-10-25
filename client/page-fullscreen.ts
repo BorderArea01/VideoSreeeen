@@ -57,6 +57,7 @@ export class PageFullscreen {
       this.toggle.focus({ preventScroll: true });
     }
     this.resized();
+    document.getElementById('player-shell')!.dispatchEvent(new Event('cinemachange'));
   }
   private update() {
     const label = this.active ? '退出网页全屏' : '网页全屏';

@@ -25,6 +25,8 @@ import { BroadcastRelayClient } from './broadcast-relay';
 import { RoomVoice } from './voice';
 import { MovieSound } from './audio-mix';
 import { PageFullscreen } from './page-fullscreen';
+import { FullscreenIdle } from './fullscreen-idle';
+import { SeekControls, type SeekState } from './seek-controls';
 import { isNative, nativeCall, onNative, platform, type NativeCache, type Sample } from './native';
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -280,6 +282,7 @@ let provideError = '';
 let publisherUrl = '';
 let publisherCleanup: (() => void) | null = null;
 let publisherMonitor: GainNode | null = null;
+let previewSource: SeekState['source'];
 let pendingBroadcastUrl = '';
 let broadcastBusy = false;
 let stoppingBroadcast = false;
@@ -311,6 +314,48 @@ let nextAutoplay: { code: string; url: string } | null = null;
 const playbackHealth = new PlaybackHealth();
 const movieSound = new MovieSound(applyMovieSound);
 const voice = new RoomVoice($('chat-panel'), (active) => movieSound.voice(active));
+const seekControls = new SeekControls(
+  $<HTMLInputElement>('seek'),
+  () => ({
+    key: `${room?.media?.id ?? ''}:${room?.epoch ?? ''}:${playerGeneration}`,
+    duration:
+      room?.media?.duration ||
+      (Number.isFinite(video.duration) ? video.duration : siteSample?.duration) ||
+      0,
+    position:
+      room?.media?.source && !room.media.broadcast && !siteOpen && video.readyState >= 1
+        ? video.currentTime
+        : currentPosition(),
+    enabled:
+      !!room?.media &&
+      connected &&
+      !pendingControl &&
+      !sourceFailed &&
+      !localRetry &&
+      !hasPendingPreview() &&
+      room.media.broadcast?.kind !== 'screen' &&
+      (room.mode !== 'cache' || room.cacheReady),
+    source: siteOpen
+      ? undefined
+      : room?.media?.broadcast
+        ? room.media.broadcast.kind === 'file' &&
+          room.media.broadcast.host === memberId &&
+          publisherUrl
+          ? { src: publisherUrl, hls: false }
+          : undefined
+        : previewSource,
+  }),
+  (position) => control('seek', { position }),
+);
+const fullscreenIdle = new FullscreenIdle(
+  $('player-shell'),
+  () =>
+    !!room?.media &&
+    !sourceFailed &&
+    (room.media.broadcast?.kind === 'screen' ? !video.paused : !room.playback.paused),
+);
+for (const event of ['play', 'pause', 'ended'])
+  video.addEventListener(event, () => fullscreenIdle.wake());
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) movieSound.settle();
 });
@@ -1058,6 +1103,7 @@ function render() {
     blocked || preview || room?.media?.broadcast?.kind === 'screen';
   $<HTMLSelectElement>('rate').disabled =
     blocked || preview || room?.media?.broadcast?.kind === 'screen';
+  seekControls.sync();
   $('cache-options').classList.toggle('active', !!(room?.mode === 'cache'));
   if (!room?.media) {
     $('sync-status').textContent = '等待加入房间';
@@ -1304,6 +1350,8 @@ function renderChat() {
   messages.scrollTop = nearBottom ? messages.scrollHeight : previousTop;
 }
 async function clearPlayback(keepSite = false, keepPreview = false) {
+  previewSource = undefined;
+  seekControls.reset();
   automaticSeeks = explicitSeeks = 0;
   localRetry?.abort();
   localRetry = null;
@@ -1342,6 +1390,8 @@ async function clearPlayback(keepSite = false, keepPreview = false) {
 async function stopCachedPlayback() {
   cacheContext = null;
   if (loadedKind === 'cache') {
+    previewSource = undefined;
+    seekControls.reset();
     hls?.destroy();
     hls = null;
     video.pause();
@@ -1428,6 +1478,8 @@ async function retryLocalVideo() {
   }
 }
 async function setPlayer(src: string, audioSrc?: string, isHls = false) {
+  previewSource = undefined;
+  seekControls.reset();
   sourceFailed = false;
   const generation = ++playerGeneration;
   try {
@@ -1476,6 +1528,7 @@ async function setPlayer(src: string, audioSrc?: string, isHls = false) {
     } else video.src = src;
   } else video.src = src;
   if (!hls) video.load();
+  previewSource = { src, hls: isHls };
   movieSound.apply();
   return true;
 }
@@ -2539,13 +2592,11 @@ video.onclick = () => {
     if (playbackPermissionNeeded) $('live-sound').click();
   } else $('play-button').click();
 };
-$<HTMLInputElement>('seek').onchange = () =>
-  control('seek', { position: Number($<HTMLInputElement>('seek').value) });
 $<HTMLSelectElement>('rate').onchange = () =>
   control('rate', { rate: Number($<HTMLSelectElement>('rate').value) });
 $('fullscreen').onclick = () => {
   if (document.fullscreenElement) void document.exitFullscreen();
-  else void $('stage').requestFullscreen().catch(error);
+  else void $('player-shell').requestFullscreen().catch(error);
 };
 $('mode-toggle').onclick = () =>
   operation({ type: 'mode', mode: room?.mode === 'cache' ? 'stream' : 'cache' });
@@ -2857,6 +2908,7 @@ window.addEventListener('hashchange', () => {
   }
 });
 window.addEventListener('pagehide', () => {
+  seekControls.reset();
   voice.leave();
   cancelSourceResolution();
   releasePublisher();
@@ -2883,7 +2935,8 @@ setInterval(() => {
       $('duration').textContent = clock(duration);
       const seek = $<HTMLInputElement>('seek');
       seek.max = String(duration || 100);
-      if (document.activeElement !== seek) seek.value = String(position);
+      if (!seekControls.dragging) seek.value = String(position);
+      seekControls.sync();
     }
     renderLatencies();
   }

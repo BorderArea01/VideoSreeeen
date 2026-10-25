@@ -418,7 +418,11 @@ try {
     undefined,
     { timeout: 8000, polling: 100 },
   );
-  const mixed = await host.evaluate('window.__mixEvidence');
+  const mixed = await host.evaluate<{
+    raw: number[];
+    processed: number[];
+    level: { rms: number; peak: number };
+  }>('window.__mixEvidence');
   const spectrum: number[] = mixed.raw;
   evidence.mixedToneDb = spectrum;
   const processedSpectrum: number[] = mixed.processed;

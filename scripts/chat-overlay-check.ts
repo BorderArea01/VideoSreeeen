@@ -156,7 +156,11 @@ try {
     .locator('#chat-panel')
     .screenshot({ path: '.local/screenshots/chat-fixed-mobile.png' });
   await guest.setViewportSize({ width: 1440, height: 1080 });
-  assert.equal(await host.locator('#cache-options').isVisible(), false);
+  assert.equal(
+    await host.locator('#cache-options').evaluate((e) => (e as HTMLDetailsElement).open),
+    false,
+  );
+  assert.equal(await host.locator('#mode-toggle').isDisabled(), true);
   await selectSource(
     host,
     'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4',
@@ -234,7 +238,7 @@ try {
   await guest.locator('#danmaku-toggle').evaluate((el) => (el as HTMLButtonElement).click());
   assert.equal(await guest.locator('.danmaku-item').count(), 0);
   await guest.locator('#fullscreen').click();
-  await guest.waitForFunction(() => document.fullscreenElement?.id === 'stage');
+  await guest.waitForFunction(() => document.fullscreenElement?.id === 'player-shell');
   await send(host, '全屏弹幕 🎬');
   await guest.locator('.danmaku-item').filter({ hasText: '全屏弹幕 🎬' }).waitFor();
   await guest.waitForFunction(() => {

@@ -215,7 +215,7 @@ try {
     false,
   );
   await guest.locator('#fullscreen').click();
-  await guest.waitForFunction(() => document.fullscreenElement?.id === 'stage');
+  await guest.waitForFunction(() => document.fullscreenElement?.id === 'player-shell');
   await guest.evaluate(() => document.exitFullscreen());
   await guest.waitForFunction(() => !document.fullscreenElement);
   assert.deepEqual(

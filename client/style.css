@@ -412,7 +412,8 @@ body.page-cinema {
 .page-cinema .screen-column > :not(.player-shell) {
   display: none;
 }
-.page-cinema .player-shell {
+.page-cinema .player-shell,
+.player-shell:fullscreen {
   position: fixed;
   inset: 0;
   z-index: 80;
@@ -420,7 +421,8 @@ body.page-cinema {
   flex-direction: column;
   background: #000;
 }
-.page-cinema .player-shell .stage {
+.page-cinema .player-shell .stage,
+.player-shell:fullscreen .stage {
   flex: 1 1 0;
   min-height: 0;
   width: 100%;
@@ -429,10 +431,105 @@ body.page-cinema {
   border: 0;
   border-radius: 0;
 }
-.page-cinema .transport {
+.page-cinema .transport,
+.player-shell:fullscreen .transport {
   flex-shrink: 0;
   border: 0;
   border-radius: 0;
+  position: absolute;
+  z-index: 35;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  background: #1c1b22ed;
+}
+.player-shell {
+  position: relative;
+}
+.player-shell.player-idle,
+.player-shell.player-idle * {
+  cursor: none !important;
+}
+.player-shell.player-idle .transport,
+.player-shell.player-idle .stage-tools {
+  opacity: 0;
+  pointer-events: none;
+}
+.player-shell .transport {
+  transition: opacity 0.2s;
+}
+.seek-controls {
+  display: contents;
+}
+#seek-track {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: 1;
+  min-width: 55px;
+  height: 32px;
+}
+#seek {
+  width: 100%;
+  touch-action: none;
+  height: 24px;
+  margin: 0;
+}
+.seek-preview {
+  position: absolute;
+  z-index: 45;
+  bottom: 38px;
+  width: 192px;
+  max-width: 100%;
+  transform: translateX(-50%);
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  padding: 7px;
+  background: #1c1b22f5;
+  box-shadow: 0 4px 18px #0008;
+  pointer-events: none;
+  text-align: center;
+}
+.seek-preview video {
+  display: block;
+  width: 100%;
+  height: 100px;
+  object-fit: contain;
+  background: #000;
+}
+.seek-preview strong {
+  display: block;
+  margin-top: 5px;
+  color: var(--orange);
+  font: 12px monospace;
+}
+.seek-preview span {
+  display: block;
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 10px;
+}
+#seek-ruler {
+  margin-top: 8px;
+  padding-top: 13px;
+  color: var(--muted);
+  font: 9px monospace;
+  background: repeating-linear-gradient(90deg, var(--muted) 0 1px, transparent 1px 9px) top/100% 8px
+    no-repeat;
+  white-space: nowrap;
+}
+.skip-controls {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 1px;
+}
+.skip-controls .icon-button {
+  width: 25px;
+  font-size: 21px;
+}
+.transport #skip-step {
+  width: 52px;
 }
 .page-cinema #sidebar {
   position: fixed;
@@ -2107,7 +2204,7 @@ button {
     padding: 8px 10px;
     gap: 6px;
   }
-  .transport #seek:not([hidden]) {
+  .transport #seek-track:not([hidden]) {
     order: -1;
     flex: 1 0 100%;
     height: 18px;
