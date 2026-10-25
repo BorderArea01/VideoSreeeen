@@ -2,6 +2,7 @@ const { contextBridge, ipcRenderer } = require('electron');
 const allowed = new Set([
   'serverInfo',
   'siteAccount',
+  'publicBilibili',
   'danmaku',
   'openBrowser',
   'openSite',

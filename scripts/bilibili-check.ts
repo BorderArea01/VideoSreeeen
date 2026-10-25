@@ -1,4 +1,10 @@
-import { choosePlayback, configureRoomServer, openRoom, closeInvitation } from './room-ui';
+import {
+  choosePlayback,
+  configureRoomServer,
+  openRoom,
+  closeInvitation,
+  useOriginalBilibili,
+} from './room-ui';
 import assert from 'node:assert/strict';
 import { once } from 'node:events';
 import { mkdir, writeFile } from 'node:fs/promises';
@@ -62,6 +68,7 @@ try {
   await receiver.locator('#connection.online').waitFor();
   await seed.locator('#member-count').filter({ hasText: '2' }).waitFor();
   await choosePlayback(seed, 'link');
+  await useOriginalBilibili(seed);
   await seed.locator('#source-url').fill(source);
   await seed.locator('#source-form button').click();
   // No click on the extraction button: the real native player must attach its source automatically.

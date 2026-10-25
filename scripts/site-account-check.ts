@@ -4,7 +4,7 @@ import { mkdir, mkdtemp, writeFile } from 'node:fs/promises';
 import { resolve, join } from 'node:path';
 import { _electron as electron } from 'playwright';
 import { createApp } from '../server/index';
-import { openRoom, closeInvitation, selectSource } from './room-ui';
+import { openRoom, closeInvitation, selectSource, useOriginalBilibili } from './room-ui';
 
 // Synthetic credentials only, in a fresh application profile. Never inspect the
 // user's browser or real Bilibili cookies.
@@ -103,6 +103,7 @@ try {
       await main.locator('#name-input').fill('本机登录入口验收');
       await main.locator('#create-button').click();
       await closeInvitation(main);
+      await useOriginalBilibili(main);
       await selectSource(main, 'https://www.bilibili.com/video/BV13Aa66LEAW/');
       await main.locator('#bili-login-button').waitFor();
       const quickOpened = app.waitForEvent('window');

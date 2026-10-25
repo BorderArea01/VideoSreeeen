@@ -1,13 +1,22 @@
 import assert from 'node:assert/strict';
 import { once } from 'node:events';
-import { mkdir, writeFile } from 'node:fs/promises';
-import { chromium, type Route } from 'playwright';
+import { mkdir, writeFile, mkdtemp } from 'node:fs/promises';
+import { resolve, join } from 'node:path';
+import { chromium, _electron as electron, type Route } from 'playwright';
 import { createApp } from '../server/index';
-import { closeInvitation, selectSource, choosePlayback, playbackSettings } from './room-ui';
+import {
+  closeInvitation,
+  selectSource,
+  choosePlayback,
+  playbackSettings,
+  configureRoomServer,
+} from './room-ui';
 
 const site = process.argv[2] || 'https://www.mgnacg.com/bangumi/193-3-17/';
 const xifan = new URL(site).hostname === 'next.xifanacg.com';
 const bilibili = new URL(site).hostname === 'www.bilibili.com';
+const nativeBili = process.env.VS_NATIVE_BILI === '1';
+assert.ok(!nativeBili || bilibili, 'Native public source mode is only for Bilibili');
 const provider = xifan ? 'xifan' : bilibili ? 'bilibili' : 'mgn';
 const sourceCode = new URL(site).searchParams.get('source');
 const xifanSourceId = new Map([
@@ -59,9 +68,32 @@ const proof: Record<string, any> = {
   localConfigUsesDirectCdn: !!app && directMedia,
   network: process.env.VS_TEST_PROXY ? 'explicit-test-proxy' : 'system-default',
   isolatedViewerStorage: true,
+  nativeBili,
 };
+let desktop: Awaited<ReturnType<typeof electron.launch>> | undefined;
 try {
-  const context = await browser.newContext({ viewport: { width: 1440, height: 1080 } });
+  if (nativeBili) {
+    await mkdir('.local', { recursive: true });
+    const profile = await mkdtemp(resolve('.local/bili-web-native-'));
+    const entry = join(profile, 'entry.cjs');
+    await writeFile(
+      entry,
+      `const {app}=require('electron');app.setPath('userData',${JSON.stringify(profile)});require(${JSON.stringify(resolve('desktop/main.cjs'))});`,
+    );
+    desktop = await electron.launch({
+      ...(process.env.VS_PACKAGED_EXE ? { executablePath: process.env.VS_PACKAGED_EXE } : {}),
+      args: [
+        ...(process.env.VS_PACKAGED_EXE ? [] : [entry]),
+        '--user-data-dir=' + profile,
+        '--mute-audio',
+        ...(process.env.VS_TEST_PROXY ? ['--proxy-server=' + process.env.VS_TEST_PROXY] : []),
+      ],
+      env: { ...process.env, VS_DEV_URL: process.env.VS_PACKAGED_EXE ? '' : origin },
+    });
+  }
+  const context = desktop
+    ? desktop.context()
+    : await browser.newContext({ viewport: { width: 1440, height: 1080 } });
   const guestContext = await browser.newContext({ viewport: { width: 1440, height: 1080 } });
   if (app && directMedia)
     for (const currentContext of [context, guestContext])
@@ -69,7 +101,7 @@ try {
         const response = await route.fetch();
         await route.fulfill({ response, json: { ...(await response.json()), mediaRelay: false } });
       });
-  const host = await context.newPage(),
+  const host = desktop ? await desktop.firstWindow() : await context.newPage(),
     guest = await guestContext.newPage();
   const errors: string[] = [],
     commands: string[] = [],
@@ -157,9 +189,15 @@ try {
     if (response.url().includes(xifan ? '/functions/v1/issue-web-playback' : '/resolve-source/'))
       metadataStatus = response.status();
   });
-  await host.goto(origin);
+  if (!desktop) await host.goto(origin);
+  else {
+    await host.locator('#hero-create').waitFor();
+    await configureRoomServer(host, origin);
+  }
   await host.locator('#hero-create').click();
-  await host.locator('#name-input').fill(`${xifan ? '稀饭' : '蜜柑'}共同播放验证`);
+  await host
+    .locator('#name-input')
+    .fill(`${xifan ? '稀饭' : bilibili ? 'B站' : '蜜柑'}共同播放验证`);
   await host.locator('#create-button').click();
   await host.locator('#invite-dialog').waitFor();
   const invite = await host.locator('#invite-link').inputValue();
@@ -188,7 +226,15 @@ try {
       );
     proof.publicVideoWorkerControlsBothClients = true;
   }
-  assert.equal(metadataStatus, 200);
+  if (!nativeBili) assert.equal(metadataStatus, 200);
+  else {
+    assert.equal(metadataStatus, 0, 'Windows must resolve on this PC, not on Cloudflare');
+    assert.equal(await host.locator('#native-stage').isVisible(), false);
+    assert.equal(await host.locator('#bili-login-button').isVisible(), false);
+    assert.equal(await host.locator('#extract-button').isVisible(), false);
+    assert.equal(latest.media.source.bilibiliHtml5, true);
+    proof.hostLocalMetadata = true;
+  }
   assert.equal(latest.media.url, site);
   assert.equal(latest.media.provider, provider);
   assert.ok(latest.media.source);
@@ -391,72 +437,109 @@ try {
     release = resolve;
   });
   const before = commands.length;
-  const reply = (video = latest.media.source.video) =>
-    xifan
+  // Browser metadata failure/cancellation is checked separately. The native
+  // path uses cancellable privileged IPC, never this HTTP metadata endpoint.
+  if (!nativeBili) {
+    const reply = (video = latest.media.source.video) =>
+      xifan
+        ? {
+            ok: true,
+            anime_id: Number(new URL(site).pathname.split('/')[2]),
+            episode_id: Number(new URL(site).pathname.split('/')[4]),
+            expires_at: Date.now() / 1000 + 60,
+            candidates: [
+              {
+                source_id: xifanSourceId,
+                source_code: sourceCode,
+                url: video,
+              },
+            ],
+          }
+        : {
+            media: { ...latest.media, title: '迟到结果不应发布', source: { kind: 'file', video } },
+          };
+    const cors: Record<string, string> = xifan
       ? {
-          ok: true,
-          anime_id: Number(new URL(site).pathname.split('/')[2]),
-          episode_id: Number(new URL(site).pathname.split('/')[4]),
-          expires_at: Date.now() / 1000 + 60,
-          candidates: [
-            {
-              source_id: xifanSourceId,
-              source_code: sourceCode,
-              url: video,
-            },
-          ],
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Headers': 'apikey,content-type',
+          'Access-Control-Allow-Methods': 'POST,OPTIONS',
         }
-      : { media: { ...latest.media, title: '迟到结果不应发布', source: { kind: 'file', video } } };
-  const cors: Record<string, string> = xifan
-    ? {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Headers': 'apikey,content-type',
-        'Access-Control-Allow-Methods': 'POST,OPTIONS',
-      }
-    : {};
-  const intercept = (handler: (route: Route) => Promise<unknown>) =>
-    host.route(metadataRoute, (route) =>
-      xifan && route.request().method() === 'OPTIONS'
-        ? route.fulfill({ status: 204, headers: cors })
-        : handler(route),
+      : {};
+    const intercept = (handler: (route: Route) => Promise<unknown>) =>
+      host.route(metadataRoute, (route) =>
+        xifan && route.request().method() === 'OPTIONS'
+          ? route.fulfill({ status: 204, headers: cors })
+          : handler(route),
+      );
+    await intercept(async (route) => {
+      await gate;
+      await route.fulfill({ headers: cors, json: reply() }).catch(() => {});
+    });
+    await selectSource(host, site);
+    await host.locator('#source-form[aria-busy="true"]').waitFor();
+    await choosePlayback(host, 'file');
+    release();
+    await host.unroute(metadataRoute);
+    await choosePlayback(host, 'link');
+    await intercept((route) =>
+      route.fulfill({ status: 422, headers: cors, json: { error: '此线路暂未识别' } }),
     );
-  await intercept(async (route) => {
-    await gate;
-    await route.fulfill({ headers: cors, json: reply() }).catch(() => {});
-  });
-  await selectSource(host, site);
-  await host.locator('#source-form[aria-busy="true"]').waitFor();
-  await choosePlayback(host, 'file');
-  release();
-  await host.unroute(metadataRoute);
-  await choosePlayback(host, 'link');
-  await intercept((route) =>
-    route.fulfill({ status: 422, headers: cors, json: { error: '此线路暂未识别' } }),
-  );
-  await selectSource(host, site);
-  await host
-    .locator('#link-error')
-    .filter({ hasText: xifan ? 'HTTP 422' : '此线路暂未识别' })
-    .waitFor();
-  assert.equal(commands.length, before);
-  assert.notEqual(latest.media.title, '迟到结果不应发布');
-  proof.cancellationAndFailureKeepMedia = true;
-  await host.unroute(metadataRoute);
-  const broken = `https://${expectedCdn}/verification-unavailable.mp4`;
-  await context.route(broken, (route) => route.abort());
-  await intercept((route) => route.fulfill({ headers: cors, json: reply(broken) }));
-  await selectSource(host, site);
-  await host
-    .locator('#link-error')
-    .filter({ hasText: '已识别视频地址，但当前浏览器加载失败' })
-    .waitFor();
-  assert.equal(
-    commands.length,
-    before,
-    'An HTTP 200 metadata reply with unplayable video must not replace the movie',
-  );
-  proof.unplayableResultNotPublished = true;
-  await host.unroute(metadataRoute);
+    await selectSource(host, site);
+    await host
+      .locator('#link-error')
+      .filter({ hasText: xifan ? 'HTTP 422' : '此线路暂未识别' })
+      .waitFor();
+    assert.equal(commands.length, before);
+    assert.notEqual(latest.media.title, '迟到结果不应发布');
+    proof.cancellationAndFailureKeepMedia = true;
+    await host.unroute(metadataRoute);
+    const broken = `https://${expectedCdn}/verification-unavailable.mp4`;
+    await context.route(broken, (route) => route.abort());
+    await intercept((route) => route.fulfill({ headers: cors, json: reply(broken) }));
+    await selectSource(host, site);
+    await host
+      .locator('#link-error')
+      .filter({ hasText: '已识别视频地址，但当前浏览器加载失败' })
+      .waitFor();
+    assert.equal(
+      commands.length,
+      before,
+      'An HTTP 200 metadata reply with unplayable video must not replace the movie',
+    );
+    proof.unplayableResultNotPublished = true;
+    await host.unroute(metadataRoute);
+  } else {
+    const cancelled = await host.evaluate(async (url) => {
+      const id = crypto.randomUUID();
+      const request = window.desktop!.call('publicBilibili', { action: 'resolve', id, url }).then(
+        () => false,
+        () => true,
+      );
+      await window.desktop!.call('publicBilibili', { action: 'cancel', id });
+      return request;
+    }, site);
+    assert.equal(cancelled, true);
+    await assert.rejects(
+      host.evaluate(() =>
+        window.desktop!.call('publicBilibili', {
+          action: 'resolve',
+          id: crypto.randomUUID(),
+          url: 'https://127.0.0.1/private',
+        }),
+      ),
+    );
+    assert.equal(commands.length, before);
+    proof.nativeCancellationAndRestrictedUrls = true;
+    const previous = latest.media.id;
+    await selectSource(host, site);
+    await host.locator('#source-form[aria-busy="true"]').waitFor();
+    await choosePlayback(host, 'file');
+    await host.waitForTimeout(1000);
+    assert.equal(latest.media.id, previous);
+    assert.equal(commands.length, before);
+    proof.nativeCancelledUiKeepsMedia = true;
+    await choosePlayback(host, 'link');
+  }
   if (process.env.VS_TEST_NEXT) {
     const unchanged = latest.media.id,
       mediaCommands = commands.length;
@@ -563,9 +646,14 @@ try {
   console.log(JSON.stringify(proof));
   throw cause;
 } finally {
+  await desktop?.close();
   await browser.close();
   await app?.close();
   await mkdir('.local', { recursive: true });
-  const evidenceName = xifan ? `xifan-${sourceCode}` : provider;
+  const evidenceName = nativeBili
+    ? 'bilibili-native-web'
+    : xifan
+      ? `xifan-${sourceCode}`
+      : provider;
   await writeFile(`.local/${evidenceName}-playback-evidence.json`, JSON.stringify(proof, null, 2));
 }

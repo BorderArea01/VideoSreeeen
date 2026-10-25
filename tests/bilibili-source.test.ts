@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { allowedSiteMetadata, RoomSources } from '../server/site-source';
-import { bilibiliPage, resolveBilibiliPage } from '../server/bilibili-source';
+import { bilibiliPage, resolveBilibiliPage, nextBilibiliPage } from '../server/bilibili-source';
 import { Rooms } from '../server/rooms';
 
 const page = 'https://www.bilibili.com/video/BV1TuHM6REHk/';
@@ -40,13 +40,25 @@ function fixture() {
   return { info, play, read, requests };
 }
 
+test('B 站本机下一分 P 只使用官方同 BV 剧集列表，末 P 不猜地址', async () => {
+  const f = fixture();
+  assert.equal((await nextBilibiliPage(page, f.read))?.url, page + '?p=2');
+  assert.equal(await nextBilibiliPage(page + '?p=2', f.read), null);
+  assert.equal(f.requests.length, 2);
+  assert.ok(f.requests.every((url) => url.includes('/x/web-interface/view?')));
+});
+
 test('B 站游客 HTML5 只取公开元数据，保留原 CDN 签名与所选分 P', async () => {
   const f = fixture();
   const media = await resolveBilibiliPage(page + '?p=2', f.read);
   assert.equal(media.url, page + '?p=2');
   assert.equal(media.provider, 'bilibili');
   assert.equal(media.title, '公开片名 · P2');
-  assert.deepEqual(media.source, { kind: 'file', video: f.play.data.durl[0]!.url });
+  assert.deepEqual(media.source, {
+    kind: 'file',
+    video: f.play.data.durl[0]!.url,
+    bilibiliHtml5: true,
+  });
   assert.equal(media.duration, 120);
   assert.equal(f.requests.length, 2);
   assert.match(f.requests[1]!, /cid=456&qn=32&platform=html5$/);

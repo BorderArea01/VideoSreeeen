@@ -18,6 +18,7 @@ let blocks;
 let danmaku;
 let captureUntil = 0;
 let update;
+let publicSource;
 protocol.registerSchemesAsPrivileged([
   {
     scheme: 'vs-cache',
@@ -247,6 +248,42 @@ app.whenReady().then(async () => {
     if (e.sender !== win.webContents || e.senderFrame !== win.webContents.mainFrame)
       throw new Error('不允许的调用');
     switch (method) {
+      case 'publicBilibili': {
+        if (typeof data.id !== 'string' || !/^[a-f0-9-]{36}$/.test(data.id))
+          throw new Error('识别请求无效');
+        if (data.action === 'cancel') {
+          if (publicSource?.id === data.id) publicSource.abort.abort();
+          return {};
+        }
+        if (
+          !['resolve', 'next'].includes(data.action) ||
+          typeof data.url !== 'string' ||
+          data.url.length > 2048
+        )
+          throw new Error('识别请求无效');
+        publicSource?.abort.abort();
+        const pending = { id: data.id, abort: new AbortController() };
+        publicSource = pending;
+        try {
+          const { resolvePublicBilibili, nextPublicBilibili } = await import(
+            pathToFileURL(path.join(__dirname, '../dist-server/index.mjs')).href
+          );
+          return await (data.action === 'next' ? nextPublicBilibili : resolvePublicBilibili)(
+            data.url,
+            AbortSignal.any([pending.abort.signal, AbortSignal.timeout(12000)]),
+          );
+        } catch (cause) {
+          throw new Error(
+            pending.abort.signal.aborted
+              ? '已取消识别'
+              : cause instanceof Error && cause.message.startsWith('B 站')
+                ? cause.message
+                : '本机暂时无法获取 B 站公开视频，请重试或使用原站播放',
+          );
+        } finally {
+          if (publicSource === pending) publicSource = null;
+        }
+      }
       case 'danmaku':
         if (site) await danmaku.push(data);
         return {};
@@ -359,6 +396,7 @@ app.on('second-instance', () => {
   }
 });
 app.on('window-all-closed', () => {
+  publicSource?.abort.abort();
   void (async () => {
     try {
       await cache?.stop();

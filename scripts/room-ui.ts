@@ -1,5 +1,12 @@
 import type { Page } from 'playwright';
 
+export async function useOriginalBilibili(page: Page) {
+  await page
+    .locator('#site-source-options')
+    .evaluate((e) => ((e as HTMLDetailsElement).open = true));
+  await page.locator('#bili-web-compatible').uncheck();
+}
+
 export async function playbackSettings(page: Page, open = true) {
   if (
     (await page.locator('#player-settings').evaluate((e) => (e as HTMLDetailsElement).open)) !==

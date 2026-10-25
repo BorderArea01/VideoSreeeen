@@ -1,4 +1,5 @@
 import type { MediaInput } from '../shared/protocol';
+import { nextEpisode } from '../shared/episodes';
 
 // Public UGC HTML5 playback only: no account cookies, app credentials, trial
 // flags, video relay or modification of the CDN's signed URLs.
@@ -24,10 +25,7 @@ export function allowedBilibiliMetadata(url: URL) {
   );
 }
 
-export async function resolveBilibiliPage(
-  raw: string,
-  read: (url: string) => Promise<string>,
-): Promise<MediaInput> {
+async function publicInfo(raw: string, read: (url: string) => Promise<string>) {
   const page = bilibiliPage(raw);
   const bvid = page.pathname.split('/')[2]!;
   const part = Number(page.searchParams.get('p') || 1);
@@ -35,6 +33,22 @@ export async function resolveBilibiliPage(
   const data = info.data;
   if (info.code !== 0 || data?.bvid !== bvid || data?.rights?.pay === 1)
     throw new Error('B 站未向游客提供此视频；请使用客户端登录或选择共享画面');
+  return { page, bvid, part, data };
+}
+
+export async function nextBilibiliPage(raw: string, read: (url: string) => Promise<string>) {
+  const { page, part, data } = await publicInfo(raw, read);
+  const next = Array.isArray(data.pages) ? data.pages.find((p: any) => p.page === part + 1) : null;
+  return next
+    ? nextEpisode(page.href, `${page.pathname}?p=${next.page}`, String(next.part || '下一分 P'))
+    : null;
+}
+
+export async function resolveBilibiliPage(
+  raw: string,
+  read: (url: string) => Promise<string>,
+): Promise<MediaInput> {
+  const { page, bvid, part, data } = await publicInfo(raw, read);
   const selected = Array.isArray(data.pages) ? data.pages.find((p: any) => p.page === part) : null;
   if (
     !selected ||
@@ -85,7 +99,7 @@ export async function resolveBilibiliPage(
       0,
       200,
     ),
-    source: { kind: 'file', video: video.href },
+    source: { kind: 'file', video: video.href, bilibiliHtml5: true },
     duration: selected.duration,
   };
 }
