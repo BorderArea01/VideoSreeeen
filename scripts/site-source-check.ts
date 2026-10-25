@@ -90,6 +90,9 @@ try {
       ],
       env: { ...process.env, VS_DEV_URL: process.env.VS_PACKAGED_EXE ? '' : origin },
     });
+    desktop.process().on('exit', (code, signal) => {
+      proof.nativeExit = { code, signal };
+    });
   }
   const context = desktop
     ? desktop.context()
@@ -103,6 +106,13 @@ try {
       });
   const host = desktop ? await desktop.firstWindow() : await context.newPage(),
     guest = await guestContext.newPage();
+  if (desktop)
+    await desktop.evaluate(({ BrowserWindow }) => {
+      for (const win of BrowserWindow.getAllWindows()) {
+        win.webContents.setBackgroundThrottling(false);
+        win.hide();
+      }
+    });
   const errors: string[] = [],
     commands: string[] = [],
     serverErrors: string[] = [];
@@ -423,6 +433,10 @@ try {
     }
   }
   await mkdir('.local/screenshots', { recursive: true });
+  if (desktop)
+    await desktop.evaluate(({ BrowserWindow }) => {
+      for (const win of BrowserWindow.getAllWindows()) win.showInactive();
+    });
   await host
     .locator('#playback-picker')
     .screenshot({ path: `.local/screenshots/${provider}-common-picker.png` });

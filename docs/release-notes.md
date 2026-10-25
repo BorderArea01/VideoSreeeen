@@ -4,6 +4,7 @@
 - 已实播验证 640×360 与音频，不承诺游客 1080p。高级“原站与视频源”可取消游客兼容模式，保留原客户端登录与原站播放。
 - 首帧通过后才换片；取消、失败不影响当前影片。Windows 本机取源可取消、有超时与响应大小限制，不读取或上传账号 Cookie。
 - 现有 Cloudflare 出口被 B 站返回 HTTP 412，因此公共服务尚不支持全员纯网页发起 B 站播放；由 Windows 房主取源后，网页观众可以直接观看。
+- 安装包包含此前已上线网页版的房间语音、音量与人声优先、网页全屏、进度预览与精细定位、刷新恢复成员身份等改进。
 
 Windows 安装版 VideoSreeeen-Setup.exe；便携版 VideoSreeeen-Portable-0.4.4.exe。Android 使用同一签名的 VideoSreeeen-Android.apk，更新需系统确认；本轮只生成 APK，不安装设备。Android 真机与 Safari/iOS 尚未验收。
 
