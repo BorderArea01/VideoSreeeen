@@ -31,3 +31,13 @@
 & ./scripts/controlled.ps1 -File npm.cmd -Arguments @('run','test:player-controls') -AllowGameThisRun -MinFreeMiB 0
 & ./scripts/controlled.ps1 -File npm.cmd -Arguments @('run','test:voice') -AllowGameThisRun -MinFreeMiB 0
 ```
+
+## 部署核对
+
+2026-10-25 更新到已确认账号的原有免费资源，入口 <https://videosreeeen.pages.dev>，未启用付费服务。运行时提交 `61e1aef93179a291681b2e1a334280173272e5e6`；Worker `68b01c53-3a79-4448-97c8-26e01a2760a2`；Pages `06c6bebd-f8d8-483a-bd6d-aeedc8d99f7b`。WATCH 仍绑定同一房间 Worker。
+
+公网 HTML / 主脚本 / 样式与本地构建逐字节一致。`index-DY_hPnpr.js` SHA-256 `b3c732dd5450b37b5a35925f6fc3774c3c83edb31f943a7e4a69234e5453461b`；`index-BPnS-lO4.css` SHA-256 `374d682f4773193d0e22809b5835f3ce04fadb1a61fd4ea4b5ec4b66c61561b2`。证据 `.local/public-refresh-toolbar-web-source-evidence.json`。
+
+正式入口的 `test:session-refresh` 通过：房主 / 观众刷新保持身份且不新增成员，首次恢复连接失败后重试成功；新标签页独立身份、主动退出清除、失效房间不新建、修改下次使用的服务器偏好不影响恢复原房间。没有页面错误；证据 `.local/session-refresh-public-evidence.json`。这些为线上 Worker 的合成用户实测，不冒充用户真机或真人验收。
+
+正式入口 `test:player-controls` 通过 MP4 / HLS 实际预览、精细拖动、触屏仿真、松手单次同步、取消和跳转边界，以及菜单与窄屏范围；两种全屏的隐藏 / 恢复通过，实测首次隐藏 **1008 ms**，鼠标静止在控件上也隐藏。没有页面错误；证据 `.local/player-controls-public-evidence.json`。视频来自回环测试源，不能扩大为所有第三方源或真机均已验收。
