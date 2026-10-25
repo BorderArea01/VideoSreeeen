@@ -127,7 +127,7 @@ try {
   await host.keyboard.press('End');
   assert.equal(await host.locator('#choose-file').getAttribute('aria-selected'), 'true');
   await choosePlayback(host, 'link');
-  await host.locator('#source-url').fill('https://www.bilibili.com/video/BV13Aa66LEAW/');
+  await host.locator('#source-url').fill('https://unsupported.example/video/1');
   await host.locator('#source-form button').click();
   await host.locator('#link-error').filter({ hasText: '原站页面' }).waitFor();
   assert.equal(

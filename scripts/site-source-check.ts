@@ -3,11 +3,12 @@ import { once } from 'node:events';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { chromium, type Route } from 'playwright';
 import { createApp } from '../server/index';
-import { closeInvitation, selectSource, choosePlayback } from './room-ui';
+import { closeInvitation, selectSource, choosePlayback, playbackSettings } from './room-ui';
 
 const site = process.argv[2] || 'https://www.mgnacg.com/bangumi/193-3-17/';
 const xifan = new URL(site).hostname === 'next.xifanacg.com';
-const provider = xifan ? 'xifan' : 'mgn';
+const bilibili = new URL(site).hostname === 'www.bilibili.com';
+const provider = xifan ? 'xifan' : bilibili ? 'bilibili' : 'mgn';
 const sourceCode = new URL(site).searchParams.get('source');
 const xifanSourceId = new Map([
   ['AL', 1],
@@ -248,7 +249,7 @@ try {
     );
   }
   proof.playingSeekContinuesDecoding = true;
-  if (sourceCode === 'xfxf1') {
+  if (sourceCode === 'xfxf1' || bilibili) {
     const sample = async () => {
       const samples = [];
       for (const page of [host, guest])
@@ -313,7 +314,9 @@ try {
     await page.waitForFunction(
       () => Math.abs(document.querySelector<HTMLVideoElement>('#video')!.currentTime - 5) < 0.25,
     );
+  await playbackSettings(host);
   await host.locator('#rate').selectOption('1.25');
+  await playbackSettings(host, false);
   for (const page of [host, guest])
     await page.waitForFunction(
       () => document.querySelector<HTMLVideoElement>('#video')!.playbackRate === 1.25,
@@ -322,6 +325,28 @@ try {
   assert.equal(latest.playback.position, 5);
   assert.equal(latest.playback.rate, 1.25);
   proof.authoritativeControls = { paused: true, position: 5, rate: 1.25 };
+  if (bilibili) {
+    const mediaId = latest.media.id,
+      epoch = latest.epoch,
+      before = commands.length,
+      controlCount = controls.length;
+    await guest.locator('#video').evaluate((v) => {
+      Object.defineProperty(v, 'error', { configurable: true, value: { code: 2 } });
+      v.dispatchEvent(new Event('error'));
+      delete (v as any).error;
+    });
+    await guest.locator('#retry-video').click();
+    await guest.locator('#retry-video').waitFor({ state: 'hidden' });
+    assert.equal(latest.media.id, mediaId);
+    assert.equal(latest.epoch, epoch);
+    assert.equal(commands.length, before);
+    assert.equal(controls.length, controlCount);
+    proof.localRetryDoesNotChangeRoom = true;
+    proof.hasAccountSession = [];
+    for (const ctx of [context, guestContext])
+      proof.hasAccountSession.push((await ctx.cookies()).some((c) => c.name === 'SESSDATA'));
+    assert.deepEqual(proof.hasAccountSession, [false, false]);
+  }
   proof.players = [];
   for (const page of [host, guest])
     proof.players.push(
@@ -342,10 +367,14 @@ try {
       }),
     );
   for (const player of proof.players) {
-    assert.equal(player.width, 1920);
+    if (bilibili) assert.ok(player.width > 0 && player.height > 0);
+    else assert.equal(player.width, 1920);
     assert.equal(player.stream, false);
     assert.ok(player.audioBytes > 0);
-    if (process.env.VS_PUBLIC_URL || directMedia) assert.equal(player.host, expectedCdn);
+    if (process.env.VS_PUBLIC_URL || directMedia) {
+      if (bilibili) assert.match(player.host, /^[a-z0-9-]+\.bilivideo\.com$/);
+      else assert.equal(player.host, expectedCdn);
+    }
   }
   await mkdir('.local/screenshots', { recursive: true });
   await host

@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import type { MediaInput } from '../shared/protocol';
 import type { Rooms } from './rooms';
 import { nextEpisode, pageString } from '../shared/episodes';
+import { allowedBilibiliMetadata, bilibiliPage, resolveBilibiliPage } from './bilibili-source';
 
 class SiteSourceError extends Error {}
 
@@ -28,6 +29,7 @@ export function mgnPage(raw: string) {
 export function allowedSiteMetadata(raw: string) {
   const url = new URL(raw);
   return (
+    allowedBilibiliMetadata(url) ||
     (!url.username &&
       !url.password &&
       url.protocol === 'https:' &&
@@ -297,10 +299,26 @@ export class RoomSources {
           return reply({ error: '已离开房间' }, 401);
         return reply({ next });
       }
-      const url = mgnPage(body.url);
+      const bili = new URL(body.url).hostname === 'www.bilibili.com';
+      const url = bili ? bilibiliPage(body.url) : mgnPage(body.url);
       this.attempts.set(identity, Date.now());
       if (this.attempts.size > 256) this.attempts.delete(this.attempts.keys().next().value!);
-      const media = await resolveMgnPage(url.href, this.fetchText, signal);
+      const media = bili
+        ? await resolveBilibiliPage(url.href, async (address) => {
+            const response = await this.fetchText(address, signal);
+            if (!response.ok) {
+              await response.body?.cancel();
+              throw new SiteSourceError(
+                `B 站公开接口暂不可用（HTTP ${response.status}），请稍后重试`,
+              );
+            }
+            return smallText(response.body, 512 * 1024, signal);
+          }).catch((cause) => {
+            if (cause instanceof Error && cause.message.startsWith('B 站'))
+              throw new SiteSourceError(cause.message);
+            throw cause;
+          })
+        : await resolveMgnPage(url.href, this.fetchText, signal);
       if (!this.rooms.memberAccess(code, member, secret))
         return reply({ error: '已离开房间，识别结果未使用' }, 401);
       return reply({ media });
