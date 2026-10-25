@@ -36,3 +36,11 @@ $env:VS_TEST_PROXY='http://127.0.0.1:7897' # 本机按需配置，可省略
 - `test:broadcast-relay` 通过实际 1280×720 画面和音频解码、预览静音、本机声音开关、新全屏容器、连续解码、重连、质量切换、迟到加入和停止清理；实时共享控制产生的房间操作为 0。
 
 证据为忽略目录 `.local/player-controls-local-evidence.json`；截图 `.local/player-preview.png`、`.local/player-fine-seek.png`、`.local/player-controls-mobile.png` 已目视。未以手机视口或触摸仿真冒充真机结论，也未把这两个公共测试视频的结果扩大为所有原站的可用性承诺。
+
+## 部署
+
+2026-10-25 更新到已确认账号的原有免费资源，不启用收费服务。入口 <https://videosreeeen.pages.dev>，运行时提交 `9b9547656f617cad7760a9c981c8b92485e06e96`；Worker `c68a994a-cd0b-40c6-b8d2-91709c0bc64d`，Pages `abc7d778-1c0e-49f6-97d4-e8a7c1cba28a`。WATCH 继续连接同一个房间 Worker。
+
+公网 HTML、主脚本和样式与本地构建逐字节一致。`index-B4zNlYAU.js` SHA-256：`e5d4e9668a9e5775a9b8e6c8f44cb5aed36655e98a8ca6cd129d2b427a3aed63`；`index-DIY1iCcW.css`：`a7d85423ff9fcc0389e1e7e9180d2ac8f123f89d8b2cbf8c1f8b008bd052d911`。核对证据：`.local/public-player-controls-web-source-evidence.json`。
+
+针对正式入口运行 `VS_PUBLIC_URL=https://videosreeeen.pages.dev` 的 `test:player-controls` 通过：实际无 CORS MP4 与 HLS 预览、预览不改变主时间线、鼠标及触屏仿真精细定位只在松手发送一次、取消不发送、预设前后跳转和边界、网页 / 系统全屏隐藏与恢复、窄屏控件范围均与本地结果一致；页面错误为 0。两个合成成员使用线上房间 Worker 和真实 WebSocket；测试视频由本机回环测试源提供，不能据此宣称各原站或真人跨网环境均已验收。证据：`.local/player-controls-public-evidence.json`。
