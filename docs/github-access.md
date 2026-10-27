@@ -1,4 +1,18 @@
-# GitHub 公开访问验收阻碍
+# GitHub 公开访问与恢复记录
+
+## 当前状态：已恢复（2026-10-27）
+
+用户反馈账号恢复后重新验证：未登录的仓库网页与 `v0.4.4` Release 页面均返回 HTTP 200；`releases/latest/download/` 的 7 个发行资产均可以匿名下载，实际完整读取并核对 GitHub 资产摘要和 `SHA256SUMS.txt`。Windows 安装包、便携版、Android APK 均与既有发布文件一致，无需重传或重建版本。
+
+Windows 更新源 `releases.atom`、`latest.yml` 与 Android `update.json` 可匿名读取，版本均对应 0.4.4；Windows 安装包 SHA-512、大小以及 Android APK SHA-256、大小均与更新元数据一致。这证明公开分发和更新源恢复，不代表已替用户执行安装、覆盖更新或真机验收。
+
+另使用实际打包的 Windows 0.4.4、隔离测试资料调用应用的“检查更新”，GitHub 公共更新源读取成功，返回 `current`（当前为最新版）。没有下载到用户更新目录，也没有执行安装；旧版升级至新版仍需独立验证。
+
+本轮检查显式经过本机 Clash 入口，仅用于请求，没有修改系统代理、路由、设备网络或 EasyTier。匿名 GitHub REST API 因该代理出口的共享限额返回 403，响应为 `API rate limit exceeded`、剩余额度 0；与此前账号可见性造成的 404 区分。发行资产的参考大小和 GitHub 摘要由维护账号 API 读取，文件下载、网页和更新元数据验证均不发送认证信息。脱敏证据保存在忽略目录 `.local/github-recovery-evidence.json`。
+
+以下保留此前的调查过程，不再代表当前下载状态。
+
+## 历史：2026-10-18 的公开访问阻碍
 
 2026-10-18 实测：仓库的 `private=false`、`visibility=public`，当前维护账号有管理权限，能读取源码并维护 Release；但不带任何登录凭证时，以下 API 全部返回 404：
 

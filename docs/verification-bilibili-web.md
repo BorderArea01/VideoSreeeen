@@ -43,3 +43,5 @@ APK 签名与 0.4.3 相同，内含 HTML / JS / CSS 与部署构建逐字节一�
 GitHub Release `v0.4.4` 已由维护账号发布，标签提交 `f98acbe6e887be35dca8d34d8dc78a8e9f4ed94b`，含 7 个资产（Windows 安装版、便携版、blockmap、latest.yml、Android APK、update.json、SHA256SUMS）。上传前后逐项核对大小和 GitHub 返回的 SHA-256 digest；这不代表匿名下载已恢复。验证后的本机成品同时保留在 `artifacts/release/0.4.4/`。
 
 尚未以真实手机、Safari / iOS 或登录后高清验收；桌面浏览器证据不代替这些设备结论。普通公开接口可能因站点调整或请求限制失效，此时明确报错并保留手动共享画面。未启用付费服务。GitHub 仓库和最新安装包匿名 HEAD 请求仍返回 404，因此不能宣称公开下载或自动更新已经可用。
+
+2026-10-27 补充：上述 GitHub 404 为发布时的历史状态，现已恢复。全部 7 个资产已完成匿名下载和摘要核对，实际 Windows 成品也已成功检查 GitHub 更新源；详见 [公开访问恢复记录](github-access.md)。本轮只更新文档与 Release 正文，没有重新打包或替换发行资产。
