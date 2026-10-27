@@ -25,6 +25,30 @@ export function allowedBilibiliMetadata(url: URL) {
   );
 }
 
+/** The only CDN shape the guest HTML5 path is allowed to publish to a room. */
+export function bilibiliVideoHref(raw: unknown) {
+  if (typeof raw !== 'string' || raw.length > 8192) throw new Error('B 站播放地址无效');
+  let video: URL;
+  try {
+    video = new URL(raw);
+  } catch {
+    throw new Error('B 站播放地址无效');
+  }
+  const deadline = Number(video.searchParams.get('deadline'));
+  if (
+    video.protocol !== 'https:' ||
+    video.port ||
+    video.username ||
+    video.password ||
+    !/^[a-z0-9-]+\.bilivideo\.com$/.test(video.hostname) ||
+    !/\.mp4$/i.test(video.pathname) ||
+    !Number.isFinite(deadline) ||
+    deadline * 1000 <= Date.now() + 30000
+  )
+    throw new Error('B 站公开视频地址已过期或来源暂不支持，请重试');
+  return video.href;
+}
+
 async function publicInfo(raw: string, read: (url: string) => Promise<string>) {
   const page = bilibiliPage(raw);
   const bvid = page.pathname.split('/')[2]!;
@@ -78,20 +102,7 @@ export async function resolveBilibiliPage(
   )
     throw new Error('B 站没有返回可供游客完整观看的 MP4；可使用客户端或共享画面');
   const address = stream.durl[0]?.url;
-  if (typeof address !== 'string' || address.length > 8192) throw new Error('B 站播放地址无效');
-  const video = new URL(address);
-  const deadline = Number(video.searchParams.get('deadline'));
-  if (
-    video.protocol !== 'https:' ||
-    video.port ||
-    video.username ||
-    video.password ||
-    !/^[a-z0-9-]+\.bilivideo\.com$/.test(video.hostname) ||
-    !/\.mp4$/i.test(video.pathname) ||
-    !Number.isFinite(deadline) ||
-    deadline * 1000 <= Date.now() + 30000
-  )
-    throw new Error('B 站公开视频地址已过期或来源暂不支持，请重试');
+  const video = bilibiliVideoHref(address);
   return {
     url: page.href,
     provider: 'bilibili',
@@ -99,7 +110,7 @@ export async function resolveBilibiliPage(
       0,
       200,
     ),
-    source: { kind: 'file', video: video.href, bilibiliHtml5: true },
+    source: { kind: 'file', video, bilibiliHtml5: true },
     duration: selected.duration,
   };
 }

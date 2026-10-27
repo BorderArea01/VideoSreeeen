@@ -1,7 +1,8 @@
-import { createServer } from 'node:http';
+import { createServer, type IncomingMessage } from 'node:http';
 import { readFile, stat } from 'node:fs/promises';
 import { resolve, extname, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { timingSafeEqual } from 'node:crypto';
 import { WebSocketServer, type WebSocket } from 'ws';
 import { clientMessageSchema } from '../shared/protocol';
 import { RoomError, Rooms, type Room } from './rooms';
@@ -11,7 +12,12 @@ import { once } from 'node:events';
 import { MediaRelay } from './media';
 import { BroadcastRelay } from './broadcast-relay';
 import { VoiceRelay } from './voice';
-import { RoomSources, resolveBilibiliMetadata, nextBilibiliMetadata } from './site-source';
+import {
+  RoomSources,
+  resolveBilibiliMetadata,
+  nextBilibiliMetadata,
+  type TextFetch,
+} from './site-source';
 import { fetchSiteMetadata } from './site-fetch';
 import { startProbe, finishProbe, type ProbeState } from './latency';
 
@@ -22,8 +28,33 @@ export function nextPublicBilibili(url: string, signal: AbortSignal) {
   return nextBilibiliMetadata(url, fetchSiteMetadata, signal);
 }
 
+async function readSmallBody(request: IncomingMessage, maximum: number) {
+  const chunks: Buffer[] = [];
+  let size = 0;
+  for await (const chunk of request) {
+    size += chunk.length;
+    if (size > maximum) throw new Error('请求体超过大小限制');
+    chunks.push(Buffer.from(chunk));
+  }
+  return Buffer.concat(chunks).toString('utf8');
+}
+
+function bearerMatches(value: string | undefined, token: string) {
+  const match = /^Bearer (.+)$/.exec(value ?? '');
+  if (!match) return false;
+  const received = Buffer.from(match[1]!),
+    expected = Buffer.from(token);
+  return received.length === expected.length && timingSafeEqual(received, expected);
+}
+
 export function createApp(
-  options: { now?: () => number; origins?: string[]; broadcastRelay?: boolean } = {},
+  options: {
+    now?: () => number;
+    origins?: string[];
+    broadcastRelay?: boolean;
+    resolverToken?: string;
+    fetchText?: TextFetch;
+  } = {},
 ) {
   const rooms = new Rooms(options.now);
   const imageFiles = new ImageFiles(),
@@ -31,7 +62,9 @@ export function createApp(
   const relay = new MediaRelay(rooms);
   const broadcastRelay = new BroadcastRelay(rooms);
   const voice = new VoiceRelay(rooms);
-  const sources = new RoomSources(rooms, fetchSiteMetadata);
+  const fetchText = options.fetchText ?? fetchSiteMetadata;
+  const sources = new RoomSources(rooms, fetchText);
+  const resolverToken = options.resolverToken ?? process.env.BILIBILI_RESOLVER_TOKEN ?? '';
   const root = resolve(fileURLToPath(new URL('../dist/', import.meta.url)));
   const allowed =
     options.origins ??
@@ -65,7 +98,9 @@ export function createApp(
       !['GET', 'HEAD'].includes(req.method ?? '') &&
       !(
         req.method === 'POST' &&
-        (req.url?.startsWith('/images/') || req.url?.startsWith('/resolve-source/'))
+        (req.url?.startsWith('/images/') ||
+          req.url?.startsWith('/resolve-source/') ||
+          req.url?.startsWith('/internal/bilibili-resolve'))
       )
     ) {
       res.writeHead(405).end();
@@ -141,6 +176,50 @@ export function createApp(
             if (!res.write(chunk)) await once(res, 'drain');
         res.end();
         return;
+      }
+      if (url.pathname === '/internal/bilibili-resolve') {
+        const reply = (body: unknown, status = 200) => {
+          res.writeHead(status, {
+            'Content-Type': 'application/json; charset=utf-8',
+            'Cache-Control': 'no-store',
+          });
+          res.end(JSON.stringify(body));
+        };
+        if (!resolverToken) return reply({ error: '解析服务未配置' }, 404);
+        if (req.method !== 'POST') return reply({ error: 'Method not allowed' }, 405);
+        if (!bearerMatches(req.headers.authorization, resolverToken))
+          return reply({ error: '未授权的解析请求' }, 401);
+        if (Number(req.headers['content-length']) > 4096) {
+          req.resume();
+          return reply({ error: '解析请求过大' }, 413);
+        }
+        let body: any;
+        try {
+          body = JSON.parse(await readSmallBody(req, 4096));
+        } catch {
+          return reply({ error: '解析请求格式错误' }, 400);
+        }
+        if (
+          (body?.action !== undefined && !['resolve', 'next'].includes(body.action)) ||
+          typeof body?.url !== 'string' ||
+          body.url.length > 2048
+        )
+          return reply({ error: '解析请求格式错误' }, 400);
+        const signal = AbortSignal.timeout(12000);
+        try {
+          if (body.action === 'next') {
+            const next = await nextBilibiliMetadata(body.url, fetchText, signal);
+            return reply({ next });
+          }
+          const media = await resolveBilibiliMetadata(body.url, fetchText, signal);
+          return reply({ media });
+        } catch (cause) {
+          const message =
+            cause instanceof Error && /^(B 站|仅支持)/.test(cause.message)
+              ? cause.message
+              : 'B 站公开接口暂不可用，请稍后重试';
+          return reply({ error: message }, 422);
+        }
       }
       if (url.pathname === '/config') {
         res.setHeader('Content-Type', 'application/json');

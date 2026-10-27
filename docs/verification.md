@@ -42,6 +42,8 @@
 
 2026-10-25 的 B 站游客 HTML5 MP4、Windows 房主取源与网页观众共同播放见 [B 站网页共同播放验证](verification-bilibili-web.md)。
 
+2026-10-27 新增可选取源服务以支持网页房主发起公开 B 站视频；本机解析、Worker 转发和 Miniflare 验证通过，公网端到端仍待部署复验，见 [B 站网页取源服务](bilibili-resolver.md) 与 [验证记录](verification-bilibili-web.md)。
+
 ## 已实现与自动验证
 
 - 链接同步、Windows 原站画面、桌面浏览器标签页 / 屏幕、本地文件为可选方式；共同缓存默认关闭并折叠，未自动切换。原站画面自动放大播放器，保留播放器内部控件与弹幕，停止共享释放连接与轨道。

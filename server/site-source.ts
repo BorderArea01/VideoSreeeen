@@ -1,22 +1,38 @@
 import { createHash } from 'node:crypto';
-import type { MediaInput } from '../shared/protocol';
+import { mediaSchema, type MediaInput } from '../shared/protocol';
 import type { Rooms } from './rooms';
-import { nextEpisode, pageString } from '../shared/episodes';
+import { nextEpisode, pageString, type Episode } from '../shared/episodes';
 import {
   allowedBilibiliMetadata,
   bilibiliPage,
+  bilibiliVideoHref,
   resolveBilibiliPage,
   nextBilibiliPage,
 } from './bilibili-source';
 
-class SiteSourceError extends Error {}
+export class SiteSourceError extends Error {}
 
-type TextFetch = (url: string, signal: AbortSignal) => Promise<Response>;
+export type TextFetch = (
+  url: string,
+  signal: AbortSignal,
+  headers?: Record<string, string>,
+) => Promise<Response>;
+/** A deployment-level resolver with a Bilibili-accessible egress. */
+export type BilibiliResolver = (
+  action: 'resolve' | 'next',
+  page: string,
+  signal: AbortSignal,
+) => Promise<MediaInput | Episode | null>;
 const PAGE = /^\/bangumi\/(\d+)-(\d+)-(\d+)\/$/;
 const PARSER = 'https://play.mknacg.top:8585/cloudplay/ccxl.php';
 export const SITE_METADATA_HEADERS = {
   'User-Agent': 'Mozilla/5.0 VideoSreeeen/0.4',
   Accept: 'text/html,application/javascript;q=0.9,*/*;q=0.1',
+};
+const BILIBILI_METADATA_HEADERS = {
+  ...SITE_METADATA_HEADERS,
+  Referer: 'https://www.bilibili.com/',
+  'Accept-Language': 'zh-CN,zh;q=0.9',
 };
 export function mgnPage(raw: string) {
   const url = new URL(raw);
@@ -256,7 +272,7 @@ export async function resolveMgnPage(
 /** Authenticated metadata only. Video still loads directly from the original CDN. */
 function bilibiliReader(fetchText: TextFetch, signal: AbortSignal) {
   return async (address: string) => {
-    const response = await fetchText(address, signal);
+    const response = await fetchText(address, signal, BILIBILI_METADATA_HEADERS);
     if (!response.ok) {
       await response.body?.cancel();
       throw new SiteSourceError(`B 站公开接口暂不可用（HTTP ${response.status}），请稍后重试`);
@@ -280,13 +296,46 @@ export class RoomSources {
   private attempts = new Map<string, number>();
   constructor(
     private rooms: Rooms,
-    private fetchText: TextFetch = (url, signal) =>
+    private fetchText: TextFetch = (url, signal, headers = SITE_METADATA_HEADERS) =>
       fetch(url, {
         signal,
         redirect: 'manual',
-        headers: SITE_METADATA_HEADERS,
+        headers,
       }),
+    private bilibiliResolver?: BilibiliResolver,
   ) {}
+  private async resolveBilibiliViaService(url: URL, signal: AbortSignal): Promise<MediaInput> {
+    const result = await this.bilibiliResolver!('resolve', url.href, signal);
+    const parsed = mediaSchema.safeParse(result);
+    if (!parsed.success) throw new SiteSourceError('B 站解析服务返回了无效的播放信息');
+    const media = parsed.data,
+      source = media.source;
+    if (
+      media.url !== url.href ||
+      media.provider !== 'bilibili' ||
+      !source ||
+      source.kind !== 'file' ||
+      source.audio ||
+      source.bilibiliHtml5 !== true
+    )
+      throw new SiteSourceError('B 站解析服务返回的视频与当前链接不一致');
+    try {
+      bilibiliVideoHref(source.video);
+    } catch (cause) {
+      throw new SiteSourceError(
+        cause instanceof Error ? cause.message : 'B 站解析服务返回的视频地址无效',
+      );
+    }
+    return media;
+  }
+  private async nextBilibiliViaService(page: URL, signal: AbortSignal): Promise<Episode | null> {
+    const result = await this.bilibiliResolver!('next', page.href, signal);
+    if (result === null) return null;
+    const candidate = result as Episode;
+    const next = nextEpisode(page.href, candidate?.url, candidate?.title);
+    if (!next) throw new SiteSourceError('B 站解析服务返回了不匹配的下一分 P');
+    return next;
+  }
   async handle(request: Request) {
     const path = new URL(request.url).pathname;
     const code = /^\/resolve-source\/([A-HJ-NP-Z2-9]{6})$/.exec(path)?.[1] ?? '';
@@ -312,15 +361,21 @@ export class RoomSources {
           throw new SiteSourceError('此视频没有可识别的剧集列表');
         this.attempts.set(identity, Date.now());
         if (this.attempts.size > 256) this.attempts.delete(this.attempts.keys().next().value!);
-        const response = await this.fetchText(page.href, signal);
-        if (!response.ok) {
-          await response.body?.cancel();
-          throw new SiteSourceError(`暂时无法读取原站剧集信息（HTTP ${response.status}）`);
+        let next: Episode | null;
+        if (this.bilibiliResolver && page.hostname === 'www.bilibili.com') {
+          next = await this.nextBilibiliViaService(page, signal);
+        } else {
+          const response = await this.fetchText(
+            page.href,
+            signal,
+            page.hostname === 'www.bilibili.com' ? BILIBILI_METADATA_HEADERS : undefined,
+          );
+          if (!response.ok) {
+            await response.body?.cancel();
+            throw new SiteSourceError(`暂时无法读取原站剧集信息（HTTP ${response.status}）`);
+          }
+          next = readNextEpisode(page.href, await smallText(response.body, 1024 * 1024, signal));
         }
-        const next = readNextEpisode(
-          page.href,
-          await smallText(response.body, 1024 * 1024, signal),
-        );
         if (!this.rooms.memberAccess(code, member, secret))
           return reply({ error: '已离开房间' }, 401);
         return reply({ next });
@@ -330,7 +385,9 @@ export class RoomSources {
       this.attempts.set(identity, Date.now());
       if (this.attempts.size > 256) this.attempts.delete(this.attempts.keys().next().value!);
       const media = bili
-        ? await resolveBilibiliMetadata(url.href, this.fetchText, signal)
+        ? this.bilibiliResolver
+          ? await this.resolveBilibiliViaService(url, signal)
+          : await resolveBilibiliMetadata(url.href, this.fetchText, signal)
         : await resolveMgnPage(url.href, this.fetchText, signal);
       if (!this.rooms.memberAccess(code, member, secret))
         return reply({ error: '已离开房间，识别结果未使用' }, 401);

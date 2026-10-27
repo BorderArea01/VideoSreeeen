@@ -21,6 +21,7 @@
     "test:ui": "tsx scripts/ui-check.ts",
     "test:onboarding": "tsx scripts/onboarding-check.ts",
     "test:bilibili": "tsx scripts/bilibili-check.ts",
+    "test:bilibili-resolver": "tsx scripts/bilibili-resolver-check.ts",
     "format": "prettier --write \"**/*.{ts,mjs,cjs,js,json,css,html,yml,yaml,md,java}\"",
     "format:check": "prettier --check \"**/*.{ts,mjs,cjs,js,json,css,html,yml,yaml,md,java}\"",
     "check:worker": "tsc --noEmit -p worker/tsconfig.json",

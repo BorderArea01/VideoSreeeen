@@ -45,3 +45,13 @@ GitHub Release `v0.4.4` 已由维护账号发布，标签提交 `f98acbe6e887be3
 尚未以真实手机、Safari / iOS 或登录后高清验收；桌面浏览器证据不代替这些设备结论。普通公开接口可能因站点调整或请求限制失效，此时明确报错并保留手动共享画面。未启用付费服务。GitHub 仓库和最新安装包匿名 HEAD 请求仍返回 404，因此不能宣称公开下载或自动更新已经可用。
 
 2026-10-27 补充：上述 GitHub 404 为发布时的历史状态，现已恢复。全部 7 个资产已完成匿名下载和摘要核对，实际 Windows 成品也已成功检查 GitHub 更新源；详见 [公开访问恢复记录](github-access.md)。本轮只更新文档与 Release 正文，没有重新打包或替换发行资产。
+
+## 2026-10-27 可选取源服务（待公网复验）
+
+新增可选的部署级 B 站取源服务，用于解决公共 Cloudflare 出口 412：
+
+- Worker 读取 `BILIBILI_RESOLVER_URL` + `BILIBILI_RESOLVER_TOKEN`，把 `/resolve-source` 的 B 站请求转发给 Node 服务；Node 侧新增令牌保护的 `/internal/bilibili-resolve`。
+- Worker 对服务返回的媒体再次校验同一 BV、`bilibiliHtml5`、`file`、单视频地址、`*.bilivideo.com` 与 `deadline`；失败不写房间。
+- B 站元数据请求增加浏览器式 `Referer` / `Accept-Language`，但 412 是否因此缓解仍需云出口实测。
+- 本机自动化：`tests/bilibili-resolver.test.ts`（解析服务、越权地址、令牌/大小/请求头）通过；`npm run test:bilibili-resolver` 可在真实公开视频上验证本地 Node 端点。
+- **尚未验证**：真实 Cloudflare Worker + 公网 Node 取源服务的双端实播、目标网络出口的 412/地区行为、签名过期/迟到加入。部署方法见 [B 站网页取源服务](bilibili-resolver.md)。在完成公网实播前，不能宣称公共网页发起已经可用。

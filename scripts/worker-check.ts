@@ -38,6 +38,29 @@ const runtime = new Miniflare(
       {
         name: 'videosreeeen-test',
         outboundService: async (request) => {
+          if (new URL(request.url).pathname === '/internal/bilibili-resolve') {
+            assert.equal(request.headers.get('Authorization'), 'Bearer resolver-test-token');
+            assert.equal(request.method, 'POST');
+            assert.match(request.headers.get('Content-Type') ?? '', /application\/json/);
+            const body = (await request.json()) as any;
+            assert.equal(body.url, 'https://www.bilibili.com/video/BV1TuHM6REHk/');
+            return new MockResponse(
+              JSON.stringify({
+                media: {
+                  url: body.url,
+                  provider: 'bilibili',
+                  title: '解析服务公开片',
+                  source: {
+                    kind: 'file',
+                    video: `https://upos-sz-mirrorcoso1.bilivideo.com/public/example.mp4?deadline=${Math.floor(Date.now() / 1000) + 3600}&upsig=fixture`,
+                    bilibiliHtml5: true,
+                  },
+                  duration: 120,
+                },
+              }),
+              { status: 200, headers: { 'Content-Type': 'application/json' } },
+            );
+          }
           assert.match(request.headers.get('User-Agent') ?? '', /VideoSreeeen\//);
           const response = await sourceFixture.fetch(request.url);
           return new MockResponse(await response.text(), { status: response.status });
@@ -63,7 +86,11 @@ const runtime = new Miniflare(
             '/resolve-source/*',
           ],
         },
-        bindings: { ICE_SERVERS: '[]' },
+        bindings: {
+          ICE_SERVERS: '[]',
+          BILIBILI_RESOLVER_URL: 'https://www.mgnacg.com',
+          BILIBILI_RESOLVER_TOKEN: 'resolver-test-token',
+        },
       },
     ],
     port: 0,
@@ -132,10 +159,23 @@ try {
     'https://r2.jzacg.com/example/episode.mp4?Authorization=public-fixture-token',
   );
   assert.equal(sourceFixture.requests.length, 3);
+  assert.equal(config.bilibiliResolver, true);
+  await new Promise((resolve) => setTimeout(resolve, 4100));
+  const resolverResult = await fetch(origin + '/resolve-source/ABC234', {
+    method: 'POST',
+    headers: { Authorization: 'Bearer ' + welcome.resume, 'X-Member-Id': welcome.memberId },
+    body: JSON.stringify({ url: 'https://www.bilibili.com/video/BV1TuHM6REHk/' }),
+  });
+  assert.equal(resolverResult.status, 200, await resolverResult.clone().text());
+  const resolverMedia = ((await resolverResult.json()) as any).media;
+  assert.equal(resolverMedia.provider, 'bilibili');
+  assert.equal(resolverMedia.source.bilibiliHtml5, true);
+  assert.match(new URL(resolverMedia.source.video).hostname, /^[a-z0-9-]+\.bilivideo\.com$/);
   evidence.siteSource = {
     authenticated: true,
     publicMetadataDecoded: true,
     mediaBytesForwarded: false,
+    bilibiliResolver: true,
   };
   const b = await client('ABC234');
   b.send({ type: 'join', name: 'b', invite: welcome.room.invite, protocol: 1 });

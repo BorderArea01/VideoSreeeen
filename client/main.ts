@@ -282,6 +282,7 @@ const playbackClock = new PlaybackClock();
 const playbackKey = (snapshot: Snapshot) =>
   `${snapshot.code}:${snapshot.media?.id ?? ''}:${snapshot.epoch}:${snapshot.playback.revision}`;
 let mediaRelay = true;
+let bilibiliResolver = false;
 let sourceFailed = false;
 let localRetry: AbortController | null = null;
 let sourceTimedOut = false;
@@ -525,6 +526,7 @@ async function connect(kind: 'create' | 'join', reconnect = false) {
   latencies.clear();
   connectionView(reconnect ? '正在重新连接' : '正在连接');
   mediaRelay = true;
+  bilibiliResolver = false;
   peers.setIceServers([], false);
   broadcastRelayEnabled = false;
   let roomRouting = false;
@@ -534,6 +536,11 @@ async function connect(kind: 'create' | 'join', reconnect = false) {
       const config = await response.json();
       if (generation !== connectionGeneration) return;
       mediaRelay = config.mediaRelay !== false;
+      bilibiliResolver = config.bilibiliResolver === true;
+      if (!isNative)
+        $('link-capability').textContent = bilibiliResolver
+          ? '各自加载，同步进度。支持视频直链与稀饭 xfy2 / AL / xfxf1；B 站公开视频可由网页发起（游客画质），受限内容仍可共享画面。蜜柑为实验支持。'
+          : '各自加载，同步进度。支持视频直链与稀饭 xfy2 / AL / xfxf1；B 站由 Windows 房主提供游客源，网页直接观看。蜜柑为实验支持。';
       roomRouting = config.roomRouting === true;
       broadcastRelayEnabled = config.broadcastRelay === true;
       peers.setIceServers(
@@ -2557,7 +2564,9 @@ async function fetchResolvedSite(media: MediaInput, signal: AbortSignal): Promis
   if (!response.ok)
     throw new Error(
       media.provider === 'bilibili' && payload.error?.includes('412')
-        ? 'B 站暂不接受房间服务取源。请让房主在 Windows 客户端同步此链接，其他成员继续使用网页，无需登录。'
+        ? bilibiliResolver
+          ? 'B 站解析服务被原站拒绝（HTTP 412），请稍后重试或改用共享画面'
+          : 'B 站暂不接受房间服务取源。请让房主在 Windows 客户端同步此链接，其他成员继续使用网页，无需登录。'
         : payload.error || '原站视频源暂未识别',
     );
   const resolved = payload.media as MediaInput | undefined;

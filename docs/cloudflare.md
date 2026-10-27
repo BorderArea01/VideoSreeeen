@@ -30,6 +30,18 @@
 
 `ALLOWED_ORIGINS` 默认允许站点自身和现有本地客户端来源。若改用 GitHub Pages 或自定义前端域名，需要加入该 HTTPS origin。无需把邀请或成员恢复令牌放入环境变量。
 
+## B 站网页发起（可选）
+
+公共 Cloudflare 出口请求 B 站公开接口会被返回 HTTP 412，因此默认只能由 Windows 房主取源。若希望网页房主也能发起公开 B 站视频，需要额外部署一台可访问 B 站的 Node 取源服务，并配置 Worker 密钥：
+
+```bash
+npx wrangler secret put BILIBILI_RESOLVER_URL
+npx wrangler secret put BILIBILI_RESOLVER_TOKEN
+npx wrangler deploy
+```
+
+取源服务只返回公开游客 MP4 的签名地址，不代理视频、不接收 Cookie；视频仍由各端从 B 站 CDN 加载。未配置这两个值时行为不变。部署、安全边界和验证步骤见 [B 站网页取源服务](bilibili-resolver.md)。该出口是额外运维成本，不属于 Cloudflare 免费额度；不要把它描述为“纯网页零依赖”。
+
 ## 视频与 P2P
 
 - Worker 处理房间状态、聊天、延迟和 WebRTC 信令；原站视频文件代理 `/media` 仍返回明确的 501。

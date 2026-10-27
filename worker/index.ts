@@ -6,7 +6,7 @@ import { RoomImages, type ImageMeta } from '../server/images';
 import { BroadcastRelay } from '../server/broadcast-relay';
 import { VoiceRelay } from '../server/voice';
 import type { RelayHello } from '../shared/broadcast-relay';
-import { RoomSources } from '../server/site-source';
+import { RoomSources, SiteSourceError, type BilibiliResolver } from '../server/site-source';
 import { startProbe, finishProbe } from '../server/latency';
 
 interface Env {
@@ -14,6 +14,8 @@ interface Env {
   ASSETS: Fetcher;
   ALLOWED_ORIGINS?: string;
   ICE_SERVERS?: string;
+  BILIBILI_RESOLVER_URL?: string;
+  BILIBILI_RESOLVER_TOKEN?: string;
 }
 interface Connection {
   kind?: 'broadcast-relay' | 'voice';
@@ -29,6 +31,58 @@ interface Connection {
 }
 const json = (value: unknown, status = 200) =>
   Response.json(value, { status, headers: { 'Cache-Control': 'no-store' } });
+function resolverBase(env: Env) {
+  const raw = env.BILIBILI_RESOLVER_URL?.trim();
+  if (!raw) return '';
+  try {
+    const url = new URL(raw);
+    if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password) return '';
+    if (url.protocol === 'http:' && !['localhost', '127.0.0.1'].includes(url.hostname)) return '';
+    return url.href.replace(/\/+$/, '');
+  } catch {
+    return '';
+  }
+}
+function bilibiliResolver(env: Env): BilibiliResolver | undefined {
+  const base = resolverBase(env),
+    token = env.BILIBILI_RESOLVER_TOKEN?.trim();
+  if (!base || !token) return undefined;
+  return async (action, page, signal) => {
+    let response: Response;
+    try {
+      response = await fetch(base + '/internal/bilibili-resolve', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: 'Bearer ' + token,
+          Accept: 'application/json',
+        },
+        body: JSON.stringify({ action, url: page }),
+        signal,
+        redirect: 'manual',
+      });
+    } catch {
+      throw new SiteSourceError('B 站解析服务连接失败，请稍后重试');
+    }
+    if (response.status >= 300 && response.status < 400)
+      throw new SiteSourceError('B 站解析服务地址发生了重定向，请检查配置');
+    const text = await response.text();
+    if (text.length > 64 * 1024) throw new SiteSourceError('B 站解析服务返回内容过大');
+    let payload: any;
+    try {
+      payload = JSON.parse(text);
+    } catch {
+      throw new SiteSourceError('B 站解析服务返回格式错误');
+    }
+    if (!response.ok)
+      throw new SiteSourceError(
+        typeof payload?.error === 'string'
+          ? payload.error
+          : `B 站解析服务暂不可用（HTTP ${response.status}）`,
+      );
+    return action === 'next' ? (payload.next ?? null) : payload.media;
+  };
+}
 function originAllowed(request: Request, env: Env) {
   const origin = request.headers.get('Origin');
   return (
@@ -71,6 +125,7 @@ export default {
         roomRouting: true,
         voice: true,
         broadcastRelay: true,
+        bilibiliResolver: !!resolverBase(env) && !!env.BILIBILI_RESOLVER_TOKEN?.trim(),
         iceServers: JSON.parse(env.ICE_SERVERS ?? '[{"urls":"stun:stun.cloudflare.com:3478"}]'),
       });
     else if (['/ws', '/broadcast-relay', '/voice'].includes(url.pathname)) {
@@ -109,7 +164,7 @@ export class WatchRoom extends DurableObject<Env> {
   private rooms = new Rooms();
   private broadcastRelay = new BroadcastRelay(this.rooms);
   private voice = new VoiceRelay(this.rooms);
-  private sources = new RoomSources(this.rooms);
+  private sources: RoomSources;
   private chatIds: string[] = [];
   private images = new RoomImages(
     this.rooms,
@@ -134,6 +189,7 @@ export class WatchRoom extends DurableObject<Env> {
   );
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
+    this.sources = new RoomSources(this.rooms, undefined, bilibiliResolver(env));
     ctx.blockConcurrencyWhile(async () => {
       const saved = await ctx.storage.get<StoredRoom & { chatIds: string[] }>('room');
       if (!saved) return;

@@ -7,6 +7,9 @@ services:
     environment:
       # Replace with your HTTPS web origin and any additional local development origins.
       ALLOWED_ORIGINS: 'https://videosreeeen.local,http://localhost:5173,http://127.0.0.1:5173,null,file://'
+      # Optional: only when this Node service resolves B 站 for a Cloudflare room.
+      # Set the same value as the Worker secret; empty disables /internal/bilibili-resolve.
+      BILIBILI_RESOLVER_TOKEN: '${BILIBILI_RESOLVER_TOKEN:-}'
     mem_limit: 512m
     cpus: 1
     stop_grace_period: 15s
