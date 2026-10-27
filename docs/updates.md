@@ -4,7 +4,7 @@
 
 2026-10-27 已确认公开分发恢复：v0.4.4 的 7 个资产均经过匿名完整下载和摘要校验，`releases.atom`、Windows `latest.yml`、Android `update.json` 可公开读取且与发行包一致。入口为 [最新版本](https://github.com/BorderArea01/VideoSreeeen/releases/latest)；此前 404 的调查及恢复范围见 [公开访问记录](github-access.md)。
 
-实际 Windows 0.4.4 成品使用隔离资料检查 GitHub 公共更新源，已返回“当前为最新版”。此检查没有下载或安装更新，不能代替真实旧版本覆盖安装验收。
+2026-10-28 实际 Windows 0.4.5 成品使用隔离资料检查 GitHub 公共更新源，已返回“当前为最新版”；7 个公开发行文件已完整读取并核对摘要，详见 [0.4.5 发行验证](verification-bilibili-account.md)。更新器检查没有执行安装，不能代替真实旧版本覆盖安装验收。
 
 Windows 安装版使用 Electron Builder NSIS 与 electron-updater，生成 `latest.yml`、安装包及差分 blockmap。应用自动检查版本，下载和安装由使用者点击；安装时退出应用，保留用户设置。不在退出时悄悄安装。便携版继续提供，首次需安装安装版才能使用其后续应用内更新。
 
