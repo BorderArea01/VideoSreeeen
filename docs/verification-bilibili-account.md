@@ -35,4 +35,15 @@
 
 2026-10-28：Windows 安装版、便携版与 Android 发布 APK 构建通过，Android Release Lint 通过。Windows ASAR 的主程序、新取源模块、官方登录模块、前端 JS / CSS 与 Node 后端逐字节匹配工作区构建。Android 为 `versionName=0.4.5` / `versionCode=10`，沿用证书 SHA-256 `71d21f595ea8306871b55961ff965c4b72cabe80b9ec2915f6bee9f3290978ba`。设备均未安装本次 APK，未改变任何设备网络或 EasyTier。
 
-部署与公开发行核验将在下方按实际结果补充。
+Windows 安装包 SHA-256：`15ce90c7ea20ed8a0e717e323a9b2cb7e7744a0458e589f8aab70c07cd54523c`；Android APK：`f8a32a6daf776440489a59400372812dbfb84482cdf21fb479c870ee9a8a71a5`。便携版：`05d6b5ae1f6bc16d3c28a8ae41e4eb667197156b8a206f4cca23f44e736c6f40`。
+
+## 公网部署
+
+2026-10-28，Cloudflare 登录失效后由用户在官方页面重新授权，复核仍为原已授权账号。更新原有 Worker / Pages，没有启用收费产品。运行时代码提交 `5a8e8a0bb35b89a16c17b86c22f44275864d8184`：
+
+- Worker 版本 `b27dd88a-5a7b-4241-8ff8-1c1475cbe114`，仍使用同一 `ROOMS` Durable Object。
+- Pages 部署 [24e2279f](https://24e2279f.videosreeeen.pages.dev)，正式入口 [videosreeeen.pages.dev](https://videosreeeen.pages.dev)。Worker 与 Pages `/healthz` 均返回 0.4.5；服务仍关闭原站视频代理。
+- 线上 HTML / JS / CSS 与本机构建逐字节一致。`index-3rc7-xrP.js` SHA-256 为 `a485b58f4f7cef544494241c78f82c4f37bbd8747ff8c69a6395201450f5e6c3`；`index-CIXhGdog.css` 为 `2b8fe218eda01f0e0c48a2b1e720961f986bb5fb1c1aa49a742c06ce5dd35009`。
+- 实际打包的 Windows 与独立网页观众使用正式公网房间，通过上述合成登录 / 测试片流程。两端均解码 1920×1080，播放中跳到 30 秒后仍持续出帧、AAC 解码；暂停、坏音轨保片、观众重试不发布及取消识别均通过。这个检查验证公网协议与成品入口，不代表真实账号登录或跨地域 CDN 实播已覆盖。
+
+发行资产通过完整上传与服务端摘要核验后才公开；发行后的下载与更新检查另行追加结果。
