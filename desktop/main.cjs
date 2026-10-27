@@ -223,6 +223,7 @@ app.whenReady().then(async () => {
   win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   win.webContents.on('will-navigate', (e) => e.preventDefault());
   const openSiteAccount = require('./site-account.cjs')(win, () => {
+    event('site-account-closed', {});
     const url = site?.webContents.getURL() ?? '';
     if (/^https:\/\/(?:[^/]+\.)?bilibili\.com\//i.test(url)) {
       sample = { available: false };
@@ -257,6 +258,7 @@ app.whenReady().then(async () => {
         }
         if (
           !['resolve', 'next'].includes(data.action) ||
+          (data.mode !== undefined && !['hd', 'guest'].includes(data.mode)) ||
           typeof data.url !== 'string' ||
           data.url.length > 2048
         )
@@ -265,14 +267,24 @@ app.whenReady().then(async () => {
         const pending = { id: data.id, abort: new AbortController() };
         publicSource = pending;
         try {
-          const { resolvePublicBilibili, nextPublicBilibili } = await import(
-            pathToFileURL(path.join(__dirname, '../dist-server/index.mjs')).href
-          );
+          const {
+            resolvePublicBilibili,
+            nextPublicBilibili,
+            resolveAccountBilibiliPage,
+            allowedAccountBilibiliMetadata,
+          } = await import(pathToFileURL(path.join(__dirname, '../dist-server/index.mjs')).href);
+          const signal = AbortSignal.any([pending.abort.signal, AbortSignal.timeout(12000)]);
+          if (data.action === 'resolve' && data.mode !== 'guest')
+            return await resolveAccountBilibiliPage(data.url, (url) =>
+              require('./bilibili.cjs')(siteSession, allowedAccountBilibiliMetadata)(url, signal),
+            );
           return await (data.action === 'next' ? nextPublicBilibili : resolvePublicBilibili)(
             data.url,
-            AbortSignal.any([pending.abort.signal, AbortSignal.timeout(12000)]),
+            signal,
           );
         } catch (cause) {
+          if (cause?.code === 'BILIBILI_LOGIN_REQUIRED' && !pending.abort.signal.aborted)
+            return { needsLogin: true };
           throw new Error(
             pending.abort.signal.aborted
               ? '已取消识别'

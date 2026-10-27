@@ -1,39 +1,29 @@
-# 0.4.4 · B 站共同播放与网页观众支持
+# 0.4.5 · B 站本机账号高清取源
 
-**房主使用 Windows 客户端，朋友只打开网页，就能共同观看受支持的 B 站公开视频。** 不需要每位观众安装客户端或登录 B 站。
+**Windows 房主首次在 B 站官方窗口登录，此后仍只需粘贴视频页面链接；朋友打开邀请，用网页共同观看，无需安装或登录。**
 
-## 下载与开始使用
+## 这一版更新
 
-| 平台              | 下载                                                                                                            | 使用方式                                       |
-| ----------------- | --------------------------------------------------------------------------------------------------------------- | ---------------------------------------------- |
-| Windows x64       | [安装版](https://github.com/BorderArea01/VideoSreeeen/releases/download/v0.4.4/VideoSreeeen-Setup.exe)          | 安装后运行，支持应用内检查与下载更新           |
-| Windows x64       | [便携版](https://github.com/BorderArea01/VideoSreeeen/releases/download/v0.4.4/VideoSreeeen-Portable-0.4.4.exe) | 直接运行；后续更新请下载新版或切换安装版       |
-| Android 8.0+      | [Android APK](https://github.com/BorderArea01/VideoSreeeen/releases/download/v0.4.4/VideoSreeeen-Android.apk)   | 安装后运行；同签名正式版可覆盖更新，需系统确认 |
-| 浏览器 / 苹果设备 | [打开网页版](https://videosreeeen.pages.dev)                                                                    | 无需安装，打开完整邀请链接即可加入             |
+- **高清取源接入原有入口**：共同播放默认选择本机账号正常返回的 720p / 1080p AVC 与 AAC 轨道，独立从原 CDN 播放，不录屏、不重新编码、不经房间服务器代理。未返回高清时明确提示，不默默退回游客 360p。
+- **登录后继续刚才的链接**：缺少本机登录态时显示“登录 B 站并继续”；完成官方登录并关闭窗口后自动继续。客户端与系统浏览器的登录分开，不导入浏览器 Cookie，也不依赖扩展。
+- **完整检查音画后换片**：校验同 BV / 分 P、完整时长、正常权限与临时地址，音视频均可加载才发布。取消、超时、音轨失败或换片期间的旧响应不覆盖当前影片。
+- **保留选择**：“原站与视频源”中可手动选游客低画质，或切回各自客户端原站播放器。共享画面、本地视频、喜番各已适配线路继续保留。
+- **网页与旧功能兼容**：网页观众识别高清分离音视频；本机重试同步刷新两条轨道，不发布换片或暂停房间。显示实际解码分辨率，安装包包含同期网页功能。
 
-[文件校验和 SHA256SUMS.txt](https://github.com/BorderArea01/VideoSreeeen/releases/download/v0.4.4/SHA256SUMS.txt) · [使用说明](https://github.com/BorderArea01/VideoSreeeen#readme) · [反馈问题](https://github.com/BorderArea01/VideoSreeeen/issues/new/choose)
+## 下载
 
-## 这一版更新了什么
+| 平台              | 入口                                                                                                                                                                                                                     |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Windows x64       | [安装版](https://github.com/BorderArea01/VideoSreeeen/releases/download/v0.4.5/VideoSreeeen-Setup.exe) · [便携版](https://github.com/BorderArea01/VideoSreeeen/releases/download/v0.4.5/VideoSreeeen-Portable-0.4.5.exe) |
+| Android 8.0+      | [APK](https://github.com/BorderArea01/VideoSreeeen/releases/download/v0.4.5/VideoSreeeen-Android.apk)，同签名正式版可覆盖更新，需系统确认                                                                                |
+| 浏览器 / 苹果设备 | [打开网页版](https://videosreeeen.pages.dev)，通过完整邀请加入                                                                                                                                                           |
 
-- **B 站游客兼容共同播放**：Windows 房主在“共同播放”中粘贴公开 BV 页面，默认获取游客可看的 MP4。每位成员直接从原 CDN 加载视频，同步播放、暂停、进度与倍速，不需要共享屏幕或重新编码。
-- **保留原站播放方式**：展开“原站与视频源”，取消“B 站优先兼容网页观众”后，可继续使用客户端原站播放器和各自的本机登录态。
-- **换片先检查首帧**：识别成功且本机能够加载画面后才替换房间视频；取消、超时或加载失败保留当前影片，不读取或上传账号 Cookie。
-- **安装包跟进网页功能**：包含房间语音与设备选择、视频音量与人声优先、网页全屏、进度预览与精细定位、固定高度聊天室和粘贴截图、刷新恢复成员身份等改进。
+[文件校验和](https://github.com/BorderArea01/VideoSreeeen/releases/download/v0.4.5/SHA256SUMS.txt) · [使用说明](https://github.com/BorderArea01/VideoSreeeen#readme) · [反馈问题](https://github.com/BorderArea01/VideoSreeeen/issues/new/choose)
 
-## B 站怎么一起看
+## 验证与边界
 
-1. 房主使用 Windows 0.4.4 创建房间，选择“共同播放”，粘贴公开的 `bilibili.com/video/BV…` 链接。
-2. 保持默认的游客兼容选项，等待识别并加载首帧。
-3. 将完整邀请链接发给朋友，对方用浏览器加入即可观看，无需另行登录 B 站。
+同一真实 B 站视频已通过正常登录请求取得完整 AVC 1080p / AAC，在公网房间中双网页实际解码 1920×1080，播放、暂停和跳转通过。本版原生入口的登录继续、双端播放、失败保片和取消使用隔离登录状态与 1080p 测试片验证；这不等于真实账号在新客户端内完成登录后的端到端验收。两类证据分开记录于[高清取源接入验证](https://github.com/BorderArea01/VideoSreeeen/blob/main/docs/verification-bilibili-account.md)。
 
-**画质与兼容范围**：已实际验证游客 640×360 画面和音频，不承诺免登录 1080p，也不共享房主的登录或付费权限。现有公共服务尚不支持全员纯网页发起 B 站播放；请由 Windows 房主取源。喜番 xfy2 / AL / xfxf1、蜜柑实验线路及视频直链继续保留，具体范围见 README。
+现有 Cloudflare 出口仍不支持纯网页自动取得 B 站账号高清源，请由 Windows 房主发起。画质取决于原站返回、账号权限、视频与设备；不绕过付费、DRM 或其他访问限制，不共享账号凭据。手机真机、Safari、长片、跨运营商以及真实旧版本覆盖安装仍需分别验收。未启用收费服务。
 
-## 下载恢复与验证
-
-2026-10-27 已复验 GitHub 仓库、Release 页面和全部 7 个发行资产的匿名访问；Windows 安装包、便携版与 Android APK 均完成实际下载和 SHA-256 核对，Windows / Android 更新元数据也通过一致性检查。此前的公开访问 404 提示已撤下。
-
-实际打包的 Windows 0.4.4 已成功通过 GitHub 公共源检查更新，返回“当前为最新版”；本轮没有执行覆盖安装。
-
-Windows 打包客户端与网页观众的公网房间实播已验证播放、暂停、跳转、倍速和本机重试。Android 构建、Lint 和固定签名检查通过；Android 真机、Safari / iOS、登录后高清及真实旧版本覆盖安装仍待分别验收。没有启用收费产品。
-
-网页入口：[videosreeeen.pages.dev](https://videosreeeen.pages.dev) · 许可证：GPL-3.0-only。
+许可证：GPL-3.0-only。

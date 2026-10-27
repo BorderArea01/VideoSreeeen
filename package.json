@@ -1,6 +1,6 @@
 {
   "name": "videosreeeen",
-  "version": "0.4.4",
+  "version": "0.4.5",
   "private": true,
   "description": "多人观影：Windows、Android 和浏览器，共同缓存与 WebSocket 同步",
   "license": "GPL-3.0-only",

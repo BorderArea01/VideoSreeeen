@@ -784,6 +784,16 @@ input[type='range'] {
   font-size: 11px;
   color: #aaa0af;
 }
+#site-source-options > label {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 10px 0;
+}
+#source-bili-login {
+  margin-right: 8px;
+}
 .playback-copy {
   color: #aaa0af;
   font-size: 12px;
@@ -2044,6 +2054,7 @@ button {
   margin-top: 14px;
 }
 .source-actions select,
+#bili-source-quality,
 .voice-devices select {
   background: var(--panel);
   color: inherit;

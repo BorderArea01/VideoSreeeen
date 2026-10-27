@@ -16,6 +16,7 @@ export const sourceSchema = z.object({
   audio: webUrl.optional(),
   referer: webUrl.optional(),
   bilibiliHtml5: z.literal(true).optional(),
+  bilibiliDirect: z.literal(true).optional(),
 });
 export type Source = z.infer<typeof sourceSchema>;
 export const mediaSchema = z.object({

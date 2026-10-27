@@ -42,7 +42,7 @@
 
 2026-10-25 的 B 站游客 HTML5 MP4、Windows 房主取源与网页观众共同播放见 [B 站网页共同播放验证](verification-bilibili-web.md)。
 
-2026-10-27 对照 ZNote、复用已有浏览器登录会话的 720p / 1080p 真实取流与网页双端实播见 [B 站已登录会话取源复验](verification-bilibili-authorized-source.md)。这是验证结果，正式取源入口尚未接入，未发布新版本。
+2026-10-27 对照 ZNote、复用已有浏览器登录会话的 720p / 1080p 真实取流与网页双端实播见 [B 站已登录会话取源复验](verification-bilibili-authorized-source.md)。随后将高清取源接入 Windows 链接入口的实现与分层验证见 [0.4.5 高清取源接入](verification-bilibili-account.md)，两轮证据不能混同。
 
 ## 已实现与自动验证
 

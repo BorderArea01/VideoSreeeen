@@ -217,6 +217,13 @@ try {
   await guest.locator('#join-button').click();
   await host.locator('#member-count').filter({ hasText: '2' }).waitFor();
   const began = Date.now();
+  if (nativeBili) {
+    // This check retains explicit coverage of the older anonymous MP4 path.
+    await host
+      .locator('#site-source-options')
+      .evaluate((e) => ((e as HTMLDetailsElement).open = true));
+    await host.locator('#bili-source-quality').selectOption('guest');
+  }
   await selectSource(host, site);
   try {
     await host
@@ -525,10 +532,12 @@ try {
   } else {
     const cancelled = await host.evaluate(async (url) => {
       const id = crypto.randomUUID();
-      const request = window.desktop!.call('publicBilibili', { action: 'resolve', id, url }).then(
-        () => false,
-        () => true,
-      );
+      const request = window
+        .desktop!.call('publicBilibili', { action: 'resolve', id, url, mode: 'guest' })
+        .then(
+          () => false,
+          () => true,
+        );
       await window.desktop!.call('publicBilibili', { action: 'cancel', id });
       return request;
     }, site);

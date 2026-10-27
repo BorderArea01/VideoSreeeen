@@ -123,34 +123,60 @@ export async function resolveXifanPage(
 
 /** Verify actual first-frame loading on this network before replacing a movie. */
 export async function checkResolvedVideo(media: MediaInput, signal: AbortSignal) {
-  if (media.source?.kind !== 'file' || media.source.audio) return;
+  if (!media.source || !['file', 'dash'].includes(media.source.kind)) return;
   await preparePublicVideo(media.source.video, signal);
   const video = document.createElement('video');
   video.muted = true;
   video.playsInline = true;
   video.preload = 'auto';
+  const audio = media.source.audio ? document.createElement('audio') : null;
+  if (audio) {
+    audio.muted = true;
+    audio.preload = 'auto';
+  }
+  const cleanup = new AbortController();
+  const loading = AbortSignal.any([signal, cleanup.signal]);
   try {
-    await new Promise<void>((resolve, reject) => {
-      const stop = () => reject(signal.reason);
-      signal.addEventListener('abort', stop, { once: true });
-      const done = (error?: Error) => {
-        signal.removeEventListener('abort', stop);
-        error ? reject(error) : resolve();
-      };
-      video.onloadeddata = () => done();
-      video.onerror = () =>
-        done(new Error('已识别视频地址，但当前浏览器加载失败；当前视频未替换，可使用共享画面'));
-      if (signal.aborted) {
-        done(signal.reason);
-        return;
-      }
-      video.src = media.source!.video;
-      video.load();
-    });
+    const load = (element: HTMLMediaElement, src: string) =>
+      new Promise<void>((resolve, reject) => {
+        const stop = () => done(loading.reason);
+        loading.addEventListener('abort', stop, { once: true });
+        const done = (error?: Error) => {
+          loading.removeEventListener('abort', stop);
+          element.onloadeddata = element.onerror = null;
+          error ? reject(error) : resolve();
+        };
+        element.onloadeddata = () =>
+          done(
+            element === video && !video.videoWidth
+              ? new Error('视频未解码出画面，当前视频未替换')
+              : media.duration &&
+                  Number.isFinite(element.duration) &&
+                  Math.abs(element.duration - media.duration) > 2
+                ? new Error('音视频实际时长与原影片不符，当前视频未替换')
+                : undefined,
+          );
+        element.onerror = () =>
+          done(new Error('已识别视频地址，但当前浏览器加载失败；当前视频未替换，可使用共享画面'));
+        if (loading.aborted) {
+          done(loading.reason);
+          return;
+        }
+        element.src = src;
+        element.load();
+      });
+    await Promise.all([
+      load(video, media.source.video),
+      ...(audio ? [load(audio, media.source.audio!)] : []),
+    ]);
   } finally {
-    video.onloadeddata = null;
-    video.onerror = null;
-    video.removeAttribute('src');
-    video.load();
+    cleanup.abort(new DOMException('首帧检查已结束', 'AbortError'));
+    for (const element of [video, audio])
+      if (element) {
+        element.onloadeddata = null;
+        element.onerror = null;
+        element.removeAttribute('src');
+        element.load();
+      }
   }
 }

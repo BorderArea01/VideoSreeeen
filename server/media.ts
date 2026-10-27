@@ -136,6 +136,10 @@ export class MediaRelay {
       return true;
     }
     const source = room.media.source;
+    if (source.bilibiliDirect) {
+      res.writeHead(404).end('此视频由各端从原 CDN 加载');
+      return true;
+    }
     const raw =
       slot === 'video'
         ? source.video
@@ -193,6 +197,7 @@ export class MediaRelay {
   }
   async plan(room: Room): Promise<CachePlan> {
     const source = room.media!.source!;
+    if (source.bilibiliDirect) return directPlan(source);
     const plan =
       source.kind === 'hls'
         ? await buildHlsPlan(source, async (url) =>
