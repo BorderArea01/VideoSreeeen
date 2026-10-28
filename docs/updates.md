@@ -2,6 +2,8 @@
 
 发布入口为本仓库的 GitHub Releases。网页设置中的“版本与更新”提供 Windows 安装版和 Android APK；不要求使用者下载源码或查找 Actions 构建产物。
 
+当前正式版为 [v0.4.6](https://github.com/BorderArea01/VideoSreeeen/releases/tag/v0.4.6)。2026-10-28 已完成八个发行文件的匿名完整下载，大小和 SHA-256 均与本地产物一致；网页扩展下载与正式网页资源也已核对。Android 更新清单为 versionCode 11，正式网页健康版本为 0.4.6。B 站房主使用浏览器视频源助手，观众继续只用网页；详见 [本版验证记录](verification-browser-extension.md)。
+
 2026-10-27 已确认公开分发恢复：v0.4.4 的 7 个资产均经过匿名完整下载和摘要校验，`releases.atom`、Windows `latest.yml`、Android `update.json` 可公开读取且与发行包一致。入口为 [最新版本](https://github.com/BorderArea01/VideoSreeeen/releases/latest)；此前 404 的调查及恢复范围见 [公开访问记录](github-access.md)。
 
 2026-10-28 实际 Windows 0.4.5 成品使用隔离资料检查 GitHub 公共更新源，已返回“当前为最新版”；7 个公开发行文件已完整读取并核对摘要，详见 [0.4.5 发行验证](verification-bilibili-account.md)。更新器检查没有执行安装，不能代替真实旧版本覆盖安装验收。

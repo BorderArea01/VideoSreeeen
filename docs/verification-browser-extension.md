@@ -63,6 +63,6 @@ ZIP 的固定六个文件及 CRC 校验通过。代码提交 `7211752348b8cf516a
 
 公网实播证据仅在 `.local/extension-public-evidence.json`，不保存邀请、视频路径或账号信息。正式网页采用正常 no-referrer 策略，观众端没有临时修改请求头或载入其他扩展。网页主脚本 SHA-256 为 `5b470d780d8d8908a0770511998938db1900958fe86d0b288bdae5800f649c93`，CSS 为 `57f9001e5928bab25d1c81c8a04dfbccd21d6d56ab7650d24c32bb9869465963`；扩展公开下载 SHA-256 与上述产物一致。
 
-GitHub Release 的八个文件已核对上传后的大小与 GitHub 返回的 SHA-256；正式网页与 GitHub 的扩展 ZIP 均完成匿名下载并核对摘要。八个文件的完整匿名下载验收未完成：Node 下载器在第一个资产的 CDN TLS 连接被重置后停止，不能据此宣称全部下载通过，也不能据此判断账号被限制。
+GitHub Release 的八个文件均已完成匿名完整下载，大小及 SHA-256 与本地发行产物全部一致，包括 Windows 安装版、便携版、blockmap、Android APK、扩展 ZIP、两份更新元数据与校验和。正式网页 HTML、JS、CSS 和扩展 ZIP 的公开下载也与当前构建一致；`/healthz` 返回 0.4.6 / cloudflare，Android 更新清单为 0.4.6 / versionCode 11。下载检查没有使用 GitHub 凭据，证据位于 `.local/extension-download-evidence.json`。初次 Node 下载器的 CDN TLS 连接重置未复现于系统 curl 完整下载，不能据此判断账号被限制。
 
 发布之后，旧标签工作流又触发云端重复构建；Android 在 SDK 准备阶段找不到默认 `tools` 包，未进入应用编译。这不影响已发布并核对过的本地产物。已将客户端工作流改为只接受手动触发、只上传 Actions 产物，并修正 SDK 包列表；保留普通 Verify。没有重跑失败任务、覆盖发行包或移动 v0.4.6 标签。云端修正尚未通过实际云端构建验收，详见 [分发与更新](updates.md)。
