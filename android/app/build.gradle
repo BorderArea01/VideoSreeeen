@@ -2,7 +2,7 @@ plugins { id 'com.android.application' }
 android {
     namespace 'io.github.borderarea01.videosreeeen'
     compileSdk 35
-    defaultConfig { applicationId 'io.github.borderarea01.videosreeeen'; minSdk 26; targetSdk 35; versionCode 10; versionName '0.4.5' }
+    defaultConfig { applicationId 'io.github.borderarea01.videosreeeen'; minSdk 26; targetSdk 35; versionCode 11; versionName '0.4.6' }
     buildFeatures { buildConfig true }
     compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
     signingConfigs {
@@ -14,11 +14,16 @@ android {
     buildTypes { release { minifyEnabled false; signingConfig signingConfigs.release } }
     sourceSets { main { assets.srcDirs += [layout.buildDirectory.dir('generated/web-assets').get().asFile] } }
 }
-def copyWeb = tasks.register('copyWeb', Copy) {
+def copyWeb = tasks.register('copyWeb', Sync) {
     from(rootProject.file('../dist'))
     from(rootProject.file('../shared')) { include 'page-bridge.js', 'danmaku.js', 'danmaku.html' }
     into(layout.buildDirectory.dir('generated/web-assets'))
-    doFirst { if (!rootProject.file('../dist/index.html').exists()) throw new GradleException('请先构建共享界面 npm run build') }
+    doFirst {
+        def target = layout.buildDirectory.dir('generated/web-assets').get().asFile.canonicalFile
+        def expected = new File(project.projectDir, 'build/generated/web-assets').canonicalFile
+        if (target != expected) throw new GradleException('网页资源输出目录不在应用构建目录内')
+        if (!rootProject.file('../dist/index.html').exists()) throw new GradleException('请先构建共享界面 npm run build')
+    }
 }
 tasks.named('preBuild').configure { dependsOn(copyWeb) }
 dependencies { implementation 'androidx.webkit:webkit:1.12.1' }

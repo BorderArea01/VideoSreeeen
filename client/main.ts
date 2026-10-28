@@ -28,7 +28,7 @@ import { PageFullscreen } from './page-fullscreen';
 import { FullscreenIdle } from './fullscreen-idle';
 import { SeekControls, type SeekState } from './seek-controls';
 import { TabSessions, type TabSession } from './tab-session';
-import { BrowserBilibiliLogin, BrowserBilibiliLoginRequired } from './bilibili-web-login';
+import { BilibiliExtension, BilibiliExtensionError } from './bilibili-extension';
 import { PlayerToolbar } from './player-toolbar';
 import { isNative, nativeCall, onNative, platform, type NativeCache, type Sample } from './native';
 
@@ -57,10 +57,10 @@ ${playbackPickerMarkup}
 <details id="cache-options" class="cache-options"><summary title="默认关闭。只有大家都卡时才考虑完整缓存；实时画面不使用此模式。">共同缓存</summary><section class="mode-card"><div class="mode-copy"><span class="mode-symbol">${icon('download', 22)}</span><div><h3>共同缓存模式 <span class="pill">手动启用</span></h3><p id="mode-description">仅在大家都卡时使用；默认边播边看。</p></div></div><button id="mode-toggle" class="switch" role="switch" aria-checked="false" aria-label="共同缓存模式"><i></i></button></section></details><div class="screen-foot"><span id="control-summary">${icon('shield', 14)} 多人可控 · 自动同步</span><span id="sync-status">等待加入房间</span></div>
 </section>
 <aside id="sidebar" class="sidebar"><section class="members-card"><div class="section-heading"><span>${icon('users', 18)} 放映室成员 <b id="member-count">0</b></span><span class="live-label">${icon('signal', 14)} RTT</span></div><div id="members" class="members"><p class="empty-members">暂无成员</p></div><button id="sidebar-invite" class="invite-line">${icon('plus', 16)} 邀请成员</button></section><section id="chat-panel" class="chat-panel"><div id="chat-drag" class="chat-heading" title="拖拽可悬浮聊天室"><div>${icon('chat', 18)} 聊天室 <span class="tiny-dot"></span></div><div>${button('chat-dock', '停靠聊天室', 'expand')}</div></div><div id="chat-messages" class="chat-messages"><div id="chat-empty" class="chat-empty"><span>${icon('chat', 30)}</span><p>暂无消息</p><small>加入房间后，消息会出现在这里。</small></div></div><div id="emoji-picker" class="emoji-picker" hidden></div><div class="chat-compose"><textarea id="chat-input" title="Enter 发送，Shift + Enter 换行" aria-label="聊天消息" placeholder="发送消息…" rows="2" maxlength="2000"></textarea><div class="compose-actions"><div>${button('emoji-button', '选择表情', 'smile')}${button('image-button', '发送图片或 GIF 表情包', 'image')}<input id="image-input" type="file" accept="image/png,image/jpeg,image/gif,image/webp" hidden></div><button id="send-button" class="send-button" title="发送消息" aria-label="发送消息">${icon('send', 17)}</button></div></div></section><div class="sidebar-foot">VIDEOSREEEEN <span>✳</span></div></aside></main>
-<footer class="app-foot"><span>VideoSreeeen <b>0.4.5</b></span><span>GPL-3.0 · 开源</span><button id="leave-button" class="text-button" hidden>${icon('exit', 14)} 离开放映室</button></footer>
+<footer class="app-foot"><span>VideoSreeeen <b>0.4.6</b></span><span>GPL-3.0 · 开源</span><button id="leave-button" class="text-button" hidden>${icon('exit', 14)} 离开放映室</button></footer>
 <dialog id="room-dialog" aria-labelledby="room-dialog-title"><form id="room-form"><div class="dialog-heading"><div><div class="eyebrow">ROOM</div><h2 id="room-dialog-title">创建或加入房间</h2></div><button id="dialog-close" type="button" class="icon-button" aria-label="关闭">${icon('close')}</button></div><div class="room-tabs" role="group" aria-label="创建或加入"><button id="create-tab" type="button" aria-pressed="true">创建房间</button><button id="join-tab" type="button" aria-pressed="false">我有邀请</button></div><label>你的昵称<input id="name-input" maxlength="30" autocomplete="nickname" placeholder="输入昵称" required></label><div id="invite-field" hidden><label>朋友的邀请链接或完整邀请码<input id="invite-input" autocomplete="off" spellcheck="false" placeholder="粘贴朋友发来的邀请"></label><p id="invite-server-hint" class="dialog-note">推荐使用完整链接，可自动找到朋友的房间。</p></div><p id="create-note" hidden></p><div class="dialog-buttons"><button id="create-button" type="submit" class="button accent">创建房间并生成邀请</button><button id="join-button" type="submit" class="button accent" hidden>加入朋友的房间</button></div><p id="dialog-error" class="form-error" role="alert"></p></form></dialog>
 <dialog id="invite-dialog" aria-labelledby="invite-title"><div class="dialog-heading"><div><div class="eyebrow">INVITE</div><h2 id="invite-title">邀请成员</h2></div><button data-close="invite-dialog" class="icon-button" aria-label="关闭">${icon('close')}</button></div><p class="dialog-copy">朋友打开链接，填个昵称就能加入。苹果设备直接用浏览器。</p><label>邀请链接<input id="invite-link" readonly aria-label="邀请链接"></label><div class="dialog-buttons"><button id="copy-link" class="button accent">${icon('copy', 16)} 复制邀请链接</button><button id="share-invite" class="button outline" hidden>系统分享</button></div><details class="advanced"><summary>使用邀请码加入</summary><label>完整邀请码<input id="invite-code" readonly></label><button id="copy-code" class="text-button">复制邀请码</button><p class="dialog-note">邀请码只适用于相同服务器；跨服务器请发送完整邀请链接。不要只发送六位房间号。</p></details><p id="invite-feedback" class="form-error" role="status"></p><button data-close="invite-dialog" class="button soft dialog-wide">继续选片</button></dialog>
-<dialog id="settings-dialog" aria-labelledby="settings-title"><form id="settings-form"><div class="dialog-heading"><div><div class="eyebrow">SETTINGS</div><h2 id="settings-title">设置与帮助</h2></div><button type="button" data-close="settings-dialog" class="icon-button" aria-label="关闭">${icon('close')}</button></div><details class="advanced"><summary>版本与更新</summary><p class="dialog-note">Windows / Android 0.4.5</p><div class="dialog-buttons"><button id="update-action" type="button" class="button soft">检查更新</button><a class="button soft" href="https://github.com/BorderArea01/VideoSreeeen/releases/latest/download/VideoSreeeen-Setup.exe" target="_blank" rel="noopener noreferrer">Windows 安装版</a><a class="button soft" href="https://github.com/BorderArea01/VideoSreeeen/releases/latest/download/VideoSreeeen-Android.apk" target="_blank" rel="noopener noreferrer">Android APK</a></div><p id="update-status" class="dialog-note" role="status"></p></details><details id="connection-details" class="advanced"><summary>高级 · 房间服务器</summary><p class="dialog-note">仅自建或局域网用户需要修改。保存后用于下一次建房或邀请码加入，不会切换当前房间。</p><label>服务器地址<input id="server-input" type="url" placeholder="https://你的服务器" required></label><div class="dialog-buttons"><button type="submit" class="button accent">保存设置</button><button id="reset-server" type="button" class="button outline">恢复默认</button></div><p id="settings-error" class="form-error" role="alert"></p><p id="settings-status" class="dialog-note" role="status"></p></details><details id="watch-help" class="advanced"><summary>第一次使用 · 怎么一起看？</summary><ol class="help-steps"><li>创建房间，把邀请链接发给朋友；朋友打开后填写昵称即可加入。</li><li>优先选择共同播放：粘贴视频直链或已适配的原站页面，各自加载视频、同步暂停与进度；B站公开视频支持游客共同播放，画质由原站决定。</li><li>也可选择共享画面或本地视频，由一人提供音视频。电脑浏览器选择正在播放的标签页并勾选音频；仅打开原站不会开始共享。</li><li>默认边播边看。仅在大家都卡时，可手动开启共同缓存，完整下载后播放。</li></ol></details><details class="advanced"><summary>浏览器与客户端有什么区别？</summary><p class="dialog-note">浏览器可建房、聊天、看直链、共享本地文件和接收画面；支持屏幕共享的电脑浏览器还可提供视频标签页。网页不能自动读取第三方网站的播放器。浏览器完整缓存目前限总计 128 MiB；长视频缓存请用客户端。Windows / Android 可在应用内打开原站，苹果设备使用浏览器。</p></details><div class="help-links"><button id="project-link" type="button" class="text-button">开源项目与构建说明 ↗</button><button id="feedback-link" type="button" class="text-button">反馈问题 ↗</button></div><p class="dialog-note">GPL-3.0 · 无需注册。昵称会保存在本机；房间服务会处理昵称、聊天和同步信息。公共服务可能受免费额度或网络影响，也可以自行部署。</p><button data-close="settings-dialog" type="button" class="button soft dialog-wide">返回观影</button></form></dialog><div id="toast" class="toast" role="status" hidden></div>`;
+<dialog id="settings-dialog" aria-labelledby="settings-title"><form id="settings-form"><div class="dialog-heading"><div><div class="eyebrow">SETTINGS</div><h2 id="settings-title">设置与帮助</h2></div><button type="button" data-close="settings-dialog" class="icon-button" aria-label="关闭">${icon('close')}</button></div><details class="advanced"><summary>版本与更新</summary><p class="dialog-note">Windows / Android 0.4.6</p><div class="dialog-buttons"><button id="update-action" type="button" class="button soft">检查更新</button><a class="button soft" href="https://github.com/BorderArea01/VideoSreeeen/releases/latest/download/VideoSreeeen-Setup.exe" target="_blank" rel="noopener noreferrer">Windows 安装版</a><a class="button soft" href="https://github.com/BorderArea01/VideoSreeeen/releases/latest/download/VideoSreeeen-Android.apk" target="_blank" rel="noopener noreferrer">Android APK</a></div><p id="update-status" class="dialog-note" role="status"></p></details><details id="connection-details" class="advanced"><summary>高级 · 房间服务器</summary><p class="dialog-note">仅自建或局域网用户需要修改。保存后用于下一次建房或邀请码加入，不会切换当前房间。</p><label>服务器地址<input id="server-input" type="url" placeholder="https://你的服务器" required></label><div class="dialog-buttons"><button type="submit" class="button accent">保存设置</button><button id="reset-server" type="button" class="button outline">恢复默认</button></div><p id="settings-error" class="form-error" role="alert"></p><p id="settings-status" class="dialog-note" role="status"></p></details><details id="watch-help" class="advanced"><summary>第一次使用 · 怎么一起看？</summary><ol class="help-steps"><li>创建房间，把邀请链接发给朋友；朋友打开后填写昵称即可加入。</li><li>优先选择共同播放：粘贴视频直链或已适配的原站页面，各自加载视频、同步暂停与进度；B 站由电脑浏览器的视频源助手取源，复用浏览器登录，观众无需安装。</li><li>也可选择共享画面或本地视频，由一人提供音视频。电脑浏览器选择正在播放的标签页并勾选音频；仅打开原站不会开始共享。</li><li>默认边播边看。仅在大家都卡时，可手动开启共同缓存，完整下载后播放。</li></ol></details><details class="advanced"><summary>浏览器与客户端有什么区别？</summary><p class="dialog-note">浏览器可建房、聊天、看直链、共享本地文件和接收画面；支持屏幕共享的电脑浏览器还可提供视频标签页。网页不能自动读取第三方网站的播放器。浏览器完整缓存目前限总计 128 MiB；长视频缓存请用客户端。Windows / Android 可在应用内打开原站，苹果设备使用浏览器。</p></details><div class="help-links"><button id="project-link" type="button" class="text-button">开源项目与构建说明 ↗</button><button id="feedback-link" type="button" class="text-button">反馈问题 ↗</button></div><p class="dialog-note">GPL-3.0 · 无需注册。昵称会保存在本机；房间服务会处理昵称、聊天和同步信息。公共服务可能受免费额度或网络影响，也可以自行部署。</p><button data-close="settings-dialog" type="button" class="button soft dialog-wide">返回观影</button></form></dialog><div id="toast" class="toast" role="status" hidden></div>`;
 
 $('platform').textContent = platform;
 const playbackPicker = new PlaybackPicker((choice) => {
@@ -68,27 +68,28 @@ const playbackPicker = new PlaybackPicker((choice) => {
 });
 $('link-capability').textContent = isNative
   ? '每人独立加载视频，只同步进度，画质不经转码。支持视频直链和客户端内的原站播放器；原站需要各自登录。'
-  : '各自加载，同步进度。支持视频直链与稀饭 xfy2 / AL / xfxf1；B 站由 Windows 房主取源，观众直接用网页观看。蜜柑为实验支持。';
+  : '各自加载，同步进度。支持视频直链与稀饭 xfy2 / AL / xfxf1；B 站由房主浏览器的视频源助手取源，观众无需安装。蜜柑为实验支持。';
 if (!isNative)
   $<HTMLInputElement>('source-url').placeholder = '粘贴 B 站、稀饭、蜜柑页面或视频直链';
 $('site-source-options').hidden = !isNative;
-if (window.desktop) {
+if (isNative) {
   $('site-source-options').insertAdjacentHTML(
     'afterbegin',
-    '<label class="dialog-note" title="本机取源后，朋友用网页观看；取消后使用原站播放器。账号凭据始终留在本机。"><input id="bili-web-compatible" type="checkbox" checked> B 站取源后共同播放</label><label class="dialog-note">B 站视频源<select id="bili-source-quality" aria-label="B 站视频源"><option value="hd">高清 · 本机登录</option><option value="guest">游客兼容 · 较低画质</option></select></label>',
+    '<label class="dialog-note"><input id="native-site-mode" type="checkbox"> 直接使用客户端原站播放器</label>',
   );
-  $('link-capability').textContent =
-    '粘贴链接即可同步。B 站由房主本机登录后取高清源，朋友用网页观看，无需登录；其他来源保持各自加载。';
-  $('bili-web-compatible').onchange = cancelSourceResolution;
-  $('bili-source-quality').onchange = () => cancelSourceResolution();
+  $('native-site-mode').onchange = () => cancelSourceResolution();
 }
-$('link-error').insertAdjacentHTML(
-  'afterend',
-  '<button id="source-bili-login" type="button" class="button accent" hidden>登录 B 站并继续</button>',
+$('link-unavailable').insertAdjacentHTML(
+  'beforeend',
+  '<a id="bili-extension-help" class="button outline" href="https://github.com/BorderArea01/VideoSreeeen/blob/main/docs/browser-extension.md" target="_blank" rel="noopener noreferrer" hidden>安装视频源助手</a><a id="bili-browser-login" class="button outline" href="https://www.bilibili.com/" target="_blank" rel="noopener noreferrer" hidden>去 B 站登录</a>',
 );
-$('source-bili-login').onclick = () =>
-  isNative ? $('site-account-login').click() : browserBiliLogin.open();
-const defaultLinkCapability = $('link-capability').textContent;
+$('link-unavailable').insertAdjacentHTML(
+  'beforeend',
+  '<button id="bili-open-browser" type="button" class="button outline" hidden>在浏览器打开当前房间</button>',
+);
+$('bili-open-browser').onclick = () => {
+  if (room) openExternal(`${activeServer}/#${room.invite}`);
+};
 $('link-choice').append($('cache-options'));
 $('cache-options').querySelector('summary')!.textContent = '网络卡顿时：先完整缓存';
 $('cache-options').querySelector('summary')!.title =
@@ -156,23 +157,6 @@ function presentDanmaku(snapshot: Snapshot) {
     void nativeCall('danmaku', { enabled: true, messages: fresh }).catch(error);
   } else window.__VS_Danmaku.push(fresh, $('stage'));
 }
-$('watch-help').insertAdjacentHTML(
-  'beforebegin',
-  `<details id="site-account-settings" class="advanced"><summary>原站账号 · B 站登录</summary>
-<p class="dialog-note">登录态保存在本机。Windows 房主取源后，网页观众无需登录；原站播放模式仍使用各自账号。</p>
-<button id="site-account-login" type="button" class="button soft" title="打开 B 站官方登录窗口，可用 B 站 App 扫码或使用原站其他登录方式">登录 B 站</button>
-<p id="site-account-status" class="dialog-note" role="status"></p></details>`,
-);
-$('site-account-settings').hidden = !isNative;
-$('site-account-login').onclick = () => {
-  void nativeCall('siteAccount')
-    .then(() => {
-      $('site-account-status').textContent =
-        '请在原站完成登录，关闭登录窗口后继续本次取源。退出账号也请在原站操作。';
-    })
-    .catch(error);
-};
-$('bili-login-button').onclick = $('site-account-login').onclick;
 $('browser-provide').insertAdjacentHTML(
   'beforebegin',
   '<button id="retry-video" type="button" class="button accent" title="只重新加载本机视频，不暂停房间或更换视频" hidden>重试本机视频</button><button id="copy-playback-diagnostics" type="button" class="button soft" hidden>复制诊断</button>',
@@ -291,7 +275,7 @@ const playbackClock = new PlaybackClock();
 const playbackKey = (snapshot: Snapshot) =>
   `${snapshot.code}:${snapshot.media?.id ?? ''}:${snapshot.epoch}:${snapshot.playback.revision}`;
 let mediaRelay = true;
-let bilibiliWebTrial = false;
+const biliExtension = new BilibiliExtension();
 let sourceFailed = false;
 let localRetry: AbortController | null = null;
 let sourceTimedOut = false;
@@ -301,30 +285,6 @@ let playbackPermissionNeeded = false;
 let autoSharedMedia = '';
 let requestedScreenPage = '';
 let sourceResolution: AbortController | null = null;
-let sourceLogin: {
-  media: MediaInput;
-  code: string;
-  member: string;
-  previous?: string;
-  autoplay: boolean;
-  title?: string;
-  retry?: boolean;
-} | null = null;
-const browserBiliLogin = new BrowserBilibiliLogin(
-  () =>
-    bilibiliWebTrial && connected && room
-      ? { server: activeServer, code: room.code, member: memberId, secret: resume }
-      : null,
-  resumeBilibiliSource,
-);
-$('site-account-settings').insertAdjacentHTML(
-  'afterend',
-  '<details id="bili-web-settings" class="advanced" hidden><summary>B 站取源验证 · 临时登录</summary><p class="dialog-note">验证会话由当前取源服务短时处理，最长 15 分钟；不交给观众。</p><button id="bili-web-forget" type="button" class="button soft">删除本次取源登录</button></details>',
-);
-$('bili-web-forget').onclick = () => {
-  browserBiliLogin.forget();
-  toast('已请求删除本次取源登录');
-};
 let nextResolution: AbortController | null = null;
 let publisher: HTMLVideoElement | null = null;
 let publisherStream: MediaStream | null = null;
@@ -559,8 +519,6 @@ async function connect(kind: 'create' | 'join', reconnect = false) {
   latencies.clear();
   connectionView(reconnect ? '正在重新连接' : '正在连接');
   mediaRelay = true;
-  bilibiliWebTrial = false;
-  $('bili-web-settings').hidden = true;
   peers.setIceServers([], false);
   broadcastRelayEnabled = false;
   let roomRouting = false;
@@ -570,13 +528,6 @@ async function connect(kind: 'create' | 'join', reconnect = false) {
       const config = await response.json();
       if (generation !== connectionGeneration) return;
       mediaRelay = config.mediaRelay !== false;
-      bilibiliWebTrial = !isNative && config.bilibiliWebTrial === true;
-      $('bili-web-settings').hidden = !bilibiliWebTrial;
-      if (!isNative) $('source-bili-login').textContent = '扫码登录并继续';
-      if (!isNative)
-        $('link-capability').textContent = bilibiliWebTrial
-          ? '本页支持 B 站扫码取源验证；会话由取源服务短时使用，观众无需登录。'
-          : defaultLinkCapability;
       roomRouting = config.roomRouting === true;
       broadcastRelayEnabled = config.broadcastRelay === true;
       peers.setIceServers(
@@ -1090,11 +1041,6 @@ function render() {
               ? '当前：共同播放 · 共同缓存'
               : '当前：共同播放';
   $('active-source').hidden = !media;
-  $('bili-login-button').hidden =
-    !isNative ||
-    media?.provider !== 'bilibili' ||
-    !!media.broadcast ||
-    !!(media.source?.bilibiliHtml5 || media.source?.bilibiliDirect);
   const nextButton = $<HTMLButtonElement>('next-episode');
   nextButton.hidden =
     !media || !!media.broadcast || !['bilibili', 'xifan', 'mgn'].includes(media.provider);
@@ -1341,7 +1287,7 @@ function render() {
     !isNative ||
     !room?.media ||
     room.media.provider === 'direct' ||
-    !!(room.media.source?.bilibiliHtml5 || room.media.source?.bilibiliDirect) ||
+    !!room.media.source?.bilibiliDirect ||
     caching;
   $('welcome').hidden = !!room?.media || preview;
   $('stage').classList.toggle('lobby-stage', !room?.media && !preview);
@@ -1530,8 +1476,6 @@ async function retryLocalVideo() {
     return;
   const request = new AbortController();
   localRetry = request;
-  sourceLogin = null;
-  $('source-bili-login').hidden = true;
   sourceTimedOut = false;
   const current = () =>
     !request.signal.aborted &&
@@ -1551,10 +1495,7 @@ async function retryLocalVideo() {
     // and the authoritative timeline remain unchanged; no room command is sent.
     const resolved =
       direct &&
-      (media.provider === 'xifan' ||
-        (media.provider === 'bilibili' &&
-          !!window.desktop &&
-          (!media.source.bilibiliDirect || media.sharedBy === memberId)))
+      (media.provider === 'xifan' || (media.provider === 'bilibili' && media.sharedBy === memberId))
         ? await fetchResolvedSite(media, request.signal)
         : media;
     if (!current()) return;
@@ -1577,23 +1518,6 @@ async function retryLocalVideo() {
     lastRevision = -1;
   } catch (cause) {
     if (localRetry !== request) return;
-    if (
-      (cause instanceof BilibiliLoginRequired || cause instanceof BrowserBilibiliLoginRequired) &&
-      current()
-    ) {
-      sourceLogin = {
-        media,
-        code: room.code,
-        member: memberId,
-        previous: media.id,
-        autoplay: false,
-        retry: true,
-      };
-      $('source-bili-login').hidden = false;
-      $('link-error').textContent = cause.message;
-      $('link-unavailable').hidden = false;
-      return;
-    }
     sourceFailed = true;
     sourceTimedOut = cause instanceof DOMException && cause.name === 'TimeoutError';
     video.hidden = true;
@@ -1695,12 +1619,7 @@ async function loadStream(media: NonNullable<Snapshot['media']>) {
     }
     return;
   }
-  if (
-    isNative &&
-    media.provider !== 'direct' &&
-    !media.source?.bilibiliHtml5 &&
-    !media.source?.bilibiliDirect
-  ) {
+  if (isNative && media.provider !== 'direct' && !media.source?.bilibiliDirect) {
     const alreadyOpen = siteOpen;
     video.hidden = true;
     siteOpen = true;
@@ -2252,25 +2171,9 @@ function cacheProgress(event: NativeCache) {
     );
   }
 }
-function resumeBilibiliSource() {
-  const pending = sourceLogin;
-  if (
-    pending &&
-    connected &&
-    room?.code === pending.code &&
-    memberId === pending.member &&
-    room.media?.id === pending.previous
-  )
-    void (pending.retry
-      ? retryLocalVideo()
-      : resolveSiteSource(pending.media, pending.autoplay, pending.title));
-}
 onNative((type, data) => {
   if (type === 'cache') cacheProgress(data as NativeCache);
   if (type === 'site-error') error(data.message);
-  if (type === 'site-account-closed') {
-    resumeBilibiliSource();
-  }
 });
 
 $('room-button').onclick = () => {
@@ -2476,8 +2379,8 @@ $('source-form').onsubmit = (event) => {
   try {
     const media = describeUrl($<HTMLInputElement>('source-url').value);
     if (
-      (!isNative && !media.source && ['mgn', 'xifan', 'bilibili'].includes(media.provider)) ||
-      useBilibiliCompatibility(media)
+      (media.provider === 'bilibili' && !media.source && !useNativeSite()) ||
+      (!isNative && !media.source && ['mgn', 'xifan'].includes(media.provider))
     ) {
       void resolveSiteSource(media);
       return;
@@ -2505,11 +2408,9 @@ $('next-episode').onclick = () => {
   void (async () => {
     let candidate: unknown;
     let episodeTitle = '下一集';
-    if (
-      window.desktop &&
-      (room?.media?.source?.bilibiliHtml5 || room?.media?.source?.bilibiliDirect)
-    ) {
-      const next = await requestDesktopBilibili('next', scope.url, controller.signal);
+    if (room?.media?.provider === 'bilibili' && room.media.source?.bilibiliDirect) {
+      await biliExtension.call('ping', undefined, controller.signal);
+      const next = (await biliExtension.call('next', scope.url, controller.signal)).next;
       candidate = next?.url;
       if (next?.title) episodeTitle = next.title;
     } else if (isNative && siteOpen) {
@@ -2550,8 +2451,8 @@ $('next-episode').onclick = () => {
     $<HTMLInputElement>('source-url').value = next.url;
     playbackPicker.select('link');
     if (
-      (!isNative && !media.source && ['mgn', 'xifan', 'bilibili'].includes(media.provider)) ||
-      useBilibiliCompatibility(media)
+      (media.provider === 'bilibili' && !media.source && !useNativeSite()) ||
+      (!isNative && !media.source && ['mgn', 'xifan'].includes(media.provider))
     )
       await resolveSiteSource(media, autoplay, next.title);
     else if (isNative || media.source) {
@@ -2574,9 +2475,9 @@ $('source-url').oninput = () => {
 };
 function cancelSourceResolution(clearLogin: unknown = true) {
   if (clearLogin !== false) {
-    browserBiliLogin.cancel();
-    sourceLogin = null;
-    $('source-bili-login').hidden = true;
+    $('bili-extension-help').hidden = true;
+    $('bili-browser-login').hidden = true;
+    $('bili-open-browser').hidden = true;
   }
   nextResolution?.abort();
   nextResolution = null;
@@ -2586,6 +2487,9 @@ function cancelSourceResolution(clearLogin: unknown = true) {
   button.disabled = false;
   button.textContent = '同步此链接';
   $('source-form').setAttribute('aria-busy', 'false');
+}
+function useNativeSite() {
+  return isNative && $<HTMLInputElement>('native-site-mode').checked;
 }
 async function resolveSiteSource(media: MediaInput, autoplay = false, episodeTitle?: string) {
   if (!room || !connected) {
@@ -2622,9 +2526,10 @@ async function resolveSiteSource(media: MediaInput, autoplay = false, episodeTit
     operation({ type: 'media', media: resolved });
   } catch (cause) {
     if (controller.signal.aborted || sourceResolution !== controller) return;
-    if (cause instanceof BilibiliLoginRequired || cause instanceof BrowserBilibiliLoginRequired) {
-      sourceLogin = { media, code, member, previous, autoplay, title: episodeTitle };
-      $('source-bili-login').hidden = false;
+    if (cause instanceof BilibiliExtensionError) {
+      $('bili-extension-help').hidden = cause.code !== 'MISSING' && cause.code !== 'UNAVAILABLE';
+      $('bili-browser-login').hidden = cause.code !== 'LOGIN_REQUIRED';
+      $('bili-open-browser').hidden = cause.code !== 'BROWSER';
     }
     $('link-error').textContent =
       cause instanceof Error &&
@@ -2638,19 +2543,13 @@ async function resolveSiteSource(media: MediaInput, autoplay = false, episodeTit
 }
 async function fetchResolvedSite(media: MediaInput, signal: AbortSignal): Promise<MediaInput> {
   if (media.provider === 'xifan') return resolveXifanPage(media, signal);
-  if (bilibiliWebTrial && !isNative && media.provider === 'bilibili')
-    return browserBiliLogin.resolve(media, signal);
-  if (window.desktop && media.provider === 'bilibili') {
-    const resolved = (await requestDesktopBilibili(
-      'resolve',
-      media.url,
-      signal,
-      media.source?.bilibiliDirect ? 'hd' : media.source?.bilibiliHtml5 ? 'guest' : undefined,
-    )) as MediaInput;
-    if ((resolved as any)?.needsLogin) throw new BilibiliLoginRequired();
-    if (resolved.url !== media.url || resolved.provider !== 'bilibili' || !resolved.source)
-      throw new Error('B 站未返回当前视频的播放信息');
-    return resolved;
+  if (media.provider === 'bilibili') {
+    if (isNative)
+      throw new BilibiliExtensionError(
+        'BROWSER',
+        'B 站取源请在已安装视频源助手的电脑浏览器打开房间；观众可继续使用客户端。',
+      );
+    return biliExtension.resolve(media, signal);
   }
   const response = await fetch(`${activeServer}/resolve-source/${room!.code}`, {
     method: 'POST',
@@ -2663,55 +2562,11 @@ async function fetchResolvedSite(media: MediaInput, signal: AbortSignal): Promis
     signal,
   });
   const payload = await response.json();
-  if (!response.ok)
-    throw new Error(
-      media.provider === 'bilibili' && payload.error?.includes('412')
-        ? 'B 站暂不接受房间服务取源。请让房主在 Windows 客户端同步此链接，其他成员继续使用网页，无需登录。'
-        : payload.error || '原站视频源暂未识别',
-    );
+  if (!response.ok) throw new Error(payload.error || '原站视频源暂未识别');
   const resolved = payload.media as MediaInput | undefined;
   if (!resolved?.source || resolved.provider !== media.provider || resolved.url !== media.url)
     throw new Error('原站没有提供与当前视频一致的播放信息');
   return resolved;
-}
-async function requestDesktopBilibili(
-  action: 'resolve' | 'next',
-  url: string,
-  signal: AbortSignal,
-  mode?: 'hd' | 'guest',
-) {
-  const id = crypto.randomUUID();
-  const cancel = () => {
-    void nativeCall('publicBilibili', { action: 'cancel', id }).catch(() => {});
-  };
-  signal.throwIfAborted();
-  signal.addEventListener('abort', cancel, { once: true });
-  try {
-    const value = await nativeCall('publicBilibili', {
-      action,
-      id,
-      url,
-      mode:
-        mode ?? ($<HTMLSelectElement>('bili-source-quality').value === 'guest' ? 'guest' : 'hd'),
-    });
-    signal.throwIfAborted();
-    return value;
-  } finally {
-    signal.removeEventListener('abort', cancel);
-  }
-}
-class BilibiliLoginRequired extends Error {
-  constructor() {
-    super('房主在本机登录 B 站后即可取高清源，观众无需登录。');
-  }
-}
-function useBilibiliCompatibility(media: MediaInput) {
-  return (
-    !!window.desktop &&
-    media.provider === 'bilibili' &&
-    !media.source &&
-    $<HTMLInputElement>('bili-web-compatible').checked
-  );
 }
 $('link-use-screen').onclick = () => {
   try {
@@ -2945,7 +2800,6 @@ function playbackError(event: Event) {
 video.addEventListener('error', playbackError);
 audio.addEventListener('error', playbackError);
 $('leave-button').onclick = () => {
-  browserBiliLogin.forget();
   connectionGeneration++;
   restoring = null;
   tabSessions.clear();
@@ -3150,7 +3004,6 @@ window.addEventListener('hashchange', () => {
   }
 });
 window.addEventListener('pagehide', () => {
-  browserBiliLogin.forget(false);
   seekControls.reset();
   voice.leave();
   cancelSourceResolution();

@@ -9,6 +9,10 @@ const target = `artifacts/release/${pkg.version}`;
 await mkdir(target, { recursive: true });
 const names = ['VideoSreeeen-Setup.exe', 'VideoSreeeen-Setup.exe.blockmap', 'latest.yml'];
 for (const name of names) await copyFile(join('artifacts/windows', name), join(target, name));
+await copyFile(
+  'artifacts/VideoSreeeen-SourceHelper.zip',
+  join(target, 'VideoSreeeen-SourceHelper.zip'),
+);
 const portable = `VideoSreeeen-Portable-${pkg.version}.exe`;
 await copyFile(
   join('artifacts/windows', `VideoSreeeen ${pkg.version}.exe`),
@@ -41,7 +45,13 @@ const manifest = {
   },
 };
 await writeFile(join(target, 'update.json'), JSON.stringify(manifest, null, 2) + '\n');
-const files = [...names, portable, 'VideoSreeeen-Android.apk', 'update.json'];
+const files = [
+  ...names,
+  portable,
+  'VideoSreeeen-Android.apk',
+  'VideoSreeeen-SourceHelper.zip',
+  'update.json',
+];
 await writeFile(
   join(target, 'SHA256SUMS.txt'),
   (await Promise.all(files.map(async (name) => (await digest(name)) + '  ' + name))).join('\n') +

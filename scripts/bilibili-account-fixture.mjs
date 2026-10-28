@@ -42,34 +42,15 @@ for (const [name, input, codec] of [
     'Generating the fixture failed; check VS_FFMPEG / ffmpeg availability',
   );
 }
-const deadline = Math.floor(Date.now() / 1000) + 3600;
-const source = {
-  loggedIn: true,
-  preview: false,
-  drm: false,
-  width: 1920,
-  height: 1080,
-  duration: 70,
-  videoCodec: 'avc1.640032',
-  audioCodec: 'mp4a.40.2',
-  url: 'https://fixture.mcdn.bilivideo.cn/public/video.m4s?deadline=' + deadline,
-  audio: 'https://fixture.mcdn.bilivideo.cn/public/audio.m4s?deadline=' + deadline,
-};
 const child = spawn(
   process.execPath,
-  [
-    'node_modules/tsx/dist/cli.mjs',
-    process.argv.includes('--web')
-      ? 'scripts/bilibili-web-session-check.ts'
-      : 'scripts/bilibili-account-check.ts',
-  ],
+  ['node_modules/tsx/dist/cli.mjs', 'scripts/extension-check.ts'],
   {
     windowsHide: true,
-    stdio: ['pipe', 'inherit', 'inherit'],
-    env: { ...process.env, VS_BILI_SYNTHETIC_MEDIA: '1', VS_BILI_WEB_REAL: '0' },
+    stdio: ['ignore', 'inherit', 'inherit'],
+    env: process.env,
   },
 );
-child.stdin.end(JSON.stringify(source));
 child.on('error', () => {
   process.exitCode = 1;
 });

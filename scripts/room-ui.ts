@@ -4,7 +4,7 @@ export async function useOriginalBilibili(page: Page) {
   await page
     .locator('#site-source-options')
     .evaluate((e) => ((e as HTMLDetailsElement).open = true));
-  await page.locator('#bili-web-compatible').uncheck();
+  await page.locator('#native-site-mode').check();
 }
 
 export async function playbackSettings(page: Page, open = true) {

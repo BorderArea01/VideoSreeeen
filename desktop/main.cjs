@@ -18,7 +18,6 @@ let blocks;
 let danmaku;
 let captureUntil = 0;
 let update;
-let publicSource;
 protocol.registerSchemesAsPrivileged([
   {
     scheme: 'vs-cache',
@@ -222,15 +221,6 @@ app.whenReady().then(async () => {
   });
   win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   win.webContents.on('will-navigate', (e) => e.preventDefault());
-  const openSiteAccount = require('./site-account.cjs')(win, () => {
-    event('site-account-closed', {});
-    const url = site?.webContents.getURL() ?? '';
-    if (/^https:\/\/(?:[^/]+\.)?bilibili\.com\//i.test(url)) {
-      sample = { available: false };
-      observed = [];
-      site.webContents.reload();
-    }
-  });
   danmaku = new (require('./danmaku.cjs'))(win);
   update = require('./updates.cjs')(event);
   win.webContents.session.setDisplayMediaRequestHandler((request, callback) => {
@@ -249,79 +239,8 @@ app.whenReady().then(async () => {
     if (e.sender !== win.webContents || e.senderFrame !== win.webContents.mainFrame)
       throw new Error('不允许的调用');
     switch (method) {
-      case 'publicBilibili': {
-        if (typeof data.id !== 'string' || !/^[a-f0-9-]{36}$/.test(data.id))
-          throw new Error('识别请求无效');
-        if (data.action === 'cancel') {
-          if (publicSource?.id === data.id) publicSource.abort.abort();
-          return {};
-        }
-        if (
-          !['resolve', 'next'].includes(data.action) ||
-          (data.mode !== undefined && !['hd', 'guest'].includes(data.mode)) ||
-          typeof data.url !== 'string' ||
-          data.url.length > 2048
-        )
-          throw new Error('识别请求无效');
-        publicSource?.abort.abort();
-        const pending = { id: data.id, abort: new AbortController() };
-        publicSource = pending;
-        try {
-          const {
-            resolvePublicBilibili,
-            nextPublicBilibili,
-            resolveAccountBilibiliPage,
-            allowedAccountBilibiliMetadata,
-          } = await import(pathToFileURL(path.join(__dirname, '../dist-server/index.mjs')).href);
-          const signal = AbortSignal.any([pending.abort.signal, AbortSignal.timeout(12000)]);
-          if (data.action === 'resolve' && data.mode !== 'guest')
-            return await resolveAccountBilibiliPage(data.url, (url) =>
-              require('./bilibili.cjs')(siteSession, allowedAccountBilibiliMetadata)(url, signal),
-            );
-          return await (data.action === 'next' ? nextPublicBilibili : resolvePublicBilibili)(
-            data.url,
-            signal,
-          );
-        } catch (cause) {
-          if (cause?.code === 'BILIBILI_LOGIN_REQUIRED' && !pending.abort.signal.aborted)
-            return { needsLogin: true };
-          throw new Error(
-            pending.abort.signal.aborted
-              ? '已取消识别'
-              : cause instanceof Error && cause.message.startsWith('B 站')
-                ? cause.message
-                : '本机暂时无法获取 B 站公开视频，请重试或使用原站播放',
-          );
-        } finally {
-          if (publicSource === pending) publicSource = null;
-        }
-      }
       case 'danmaku':
         if (site) await danmaku.push(data);
-        return {};
-      case 'siteAccount':
-        openSiteAccount();
-        return {};
-      case 'update':
-        return update(data.action);
-      case 'captureSite':
-        if (!site || site.webContents.isDestroyed()) throw new Error('请先打开原站视频');
-        await sampleSite();
-        {
-          const frame =
-            frames().find((frame) => frame.url === sample.frame) ?? site.webContents.mainFrame;
-          const focused = await frame.executeJavaScript(bridge + ';window.__VS.focus(true)', true);
-          if (!focused) throw new Error('未检测到可共享的播放器');
-        }
-        captureUntil = Date.now() + 10000;
-        return {};
-      case 'endCapture':
-        captureUntil = 0;
-        await Promise.all(
-          frames().map((frame) =>
-            frame.executeJavaScript('window.__VS?.focus?.(false)', true).catch(() => {}),
-          ),
-        );
         return {};
       case 'serverInfo':
         return serverInfo;
@@ -408,7 +327,6 @@ app.on('second-instance', () => {
   }
 });
 app.on('window-all-closed', () => {
-  publicSource?.abort.abort();
   void (async () => {
     try {
       await cache?.stop();

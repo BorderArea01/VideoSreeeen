@@ -39,11 +39,6 @@ test('静态解析原站下一集元数据及最后一集，不执行脚本', ()
     'https://www.mgnacg.com/bangumi/193-3-18/',
   );
   assert.equal(readNextEpisode(mgn, 'player_aaaa={"link_next":""}'), null);
-  const bili = 'https://www.bilibili.com/video/BV13Aa66LEAW/';
-  const data =
-    '__INITIAL_STATE__={"videoData":{"pages":[{"page":1,"part":"开篇"},{"page":2,"part":"后篇"}]}}';
-  assert.equal(readNextEpisode(bili, data)?.url, bili + '?p=2');
-  assert.equal(readNextEpisode(bili + '?p=2', data), null);
 });
 test('剧集元数据请求保持原站路径白名单，不开放通用代理', () => {
   const al = 'https://next.xifanacg.com/anime/3434/play/203799?source=AL';
@@ -55,13 +50,13 @@ test('剧集元数据请求保持原站路径白名单，不开放通用代理',
     'https://next.xifanacg.com/anime/3434/play/203800?source=AL',
   );
   assert.equal(nextEpisode(al, '/anime/3434/play/203800?source=xfy2'), null);
-  for (const url of [xifan, al, mgn, 'https://www.bilibili.com/video/BV13Aa66LEAW/?p=2'])
-    assert.ok(allowedSiteMetadata(url));
+  for (const url of [xifan, al, mgn]) assert.ok(allowedSiteMetadata(url));
   for (const url of [
     'https://next.xifanacg.com/admin',
     xifan + '&redirect=http://127.0.0.1',
     al + '&redirect=http://127.0.0.1',
     'https://www.bilibili.com/account',
+    'https://www.bilibili.com/video/BV13Aa66LEAW/?p=2',
     'http://next.xifanacg.com/anime/151/play/1986?source=xfy2',
   ])
     assert.equal(allowedSiteMetadata(url), false);

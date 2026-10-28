@@ -28,6 +28,10 @@ jobs:
             artifacts/windows/*.exe
             artifacts/windows/*.blockmap
             artifacts/windows/latest.yml
+      - uses: actions/upload-artifact@v4
+        with:
+          name: videosreeeen-extension
+          path: artifacts/VideoSreeeen-SourceHelper.zip
   android:
     runs-on: ubuntu-latest
     env:
@@ -87,6 +91,10 @@ jobs:
         with:
           name: videosreeeen-android
           path: artifacts/android
+      - uses: actions/download-artifact@v4
+        with:
+          name: videosreeeen-extension
+          path: artifacts
       - run: node -e 'if (process.env.GITHUB_REF_NAME !== "v" + require("./package.json").version) process.exit(1)'
       - run: npm run release:prepare
       - run: npm run release:publish

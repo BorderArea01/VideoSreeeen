@@ -44,8 +44,6 @@
 
 2026-10-27 对照 ZNote、复用已有浏览器登录会话的 720p / 1080p 真实取流与网页双端实播见 [B 站已登录会话取源复验](verification-bilibili-authorized-source.md)。随后将高清取源接入 Windows 链接入口的实现与分层验证见 [0.4.5 高清取源接入](verification-bilibili-account.md)，两轮证据不能混同。
 
-2026-10-28 用户允许短时服务端会话验证后，真实 Cloudflare 出口 412、默认关闭的 Node 网页扫码实验入口、合成双端播放及真实扫码成功后取源仍为 412 的结果见 [网页扫码取源验证](verification-bilibili-web-session-trial.md)。实验代码未发布到正式放映厅，不代表全网页高清取源已上线。
-
 ## 已实现与自动验证
 
 - 链接同步、Windows 原站画面、桌面浏览器标签页 / 屏幕、本地文件为可选方式；共同缓存默认关闭并折叠，未自动切换。原站画面自动放大播放器，保留播放器内部控件与弹幕，停止共享释放连接与轨道。
@@ -91,3 +89,5 @@
 | VideoSreeeen-Android.apk |   1,584,600 | `dfffbb563d0310f55f2a4c729f95d18b4b0e511ff25b36ea6dbe5af1b6288b4e` |
 
 可重复检查入口：`test:onboarding`、`test:ui`、`test:worker`、`test:p2p`、`test:broadcast`、`test:site-broadcast`、`scripts/package-check.ts`、`scripts/update-check.ts`。结构化原始证据保存在维护机器的忽略目录 `.local/`；历史记录见 [0.3.1](verification-0.3.1.md)。
+
+2026-10-28 B 站改为独立浏览器扩展取源，已移除游客低画质与扫码登录流程；实现、测试、产物、部署和真实播放分别见 [扩展取源验证](verification-browser-extension.md)。此前 B 站客户端与游客记录仅为历史版本证据，不再是当前使用说明。

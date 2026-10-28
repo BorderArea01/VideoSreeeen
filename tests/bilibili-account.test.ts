@@ -1,12 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { EventEmitter } from 'node:events';
-import { readFileSync } from 'node:fs';
-import { runInNewContext } from 'node:vm';
-import {
-  allowedAccountBilibiliMetadata,
-  resolveAccountBilibiliPage,
-} from '../server/bilibili-source';
+import { allowedAccountBilibiliMetadata, resolveAccountBilibiliPage } from '../shared/bilibili';
 import { allowedSiteMetadata } from '../server/site-source';
 import { MediaRelay } from '../server/media';
 
@@ -66,7 +60,6 @@ test('本机正常登录取源选完整 AVC 1080p / AAC，保留签名与分 P�
   assert.equal(result.source?.video, source('1080'));
   assert.equal(result.source?.audio, source('audio'));
   assert.equal(result.source?.bilibiliDirect, true);
-  assert.equal(result.source?.bilibiliHtml5, undefined);
   assert.equal(result.duration, 862);
   assert.equal(result.url, page + '?p=2');
   assert.match(f.requests[2]!, /cid=456&qn=80&fnval=16$/);
@@ -90,6 +83,19 @@ test('未登录直接返回真实登录条件，不继续请求播放流、不�
     (e: any) => e.code === 'BILIBILI_LOGIN_REQUIRED',
   );
   assert.equal(f.requests.length, 1);
+});
+
+test('保留原站实际返回的 MCDN 8082 签名地址，优先于需要原站请求头的常规备源', async () => {
+  const f = fixture();
+  const original = source('1080').replace(':4483', ':8082');
+  const track = f.play.data.dash.video.find((v: any) => v.codecs === 'avc1.640032');
+  track.baseUrl = 'https://upos-sz-mirrorhwo1.bilivideo.com/public/video.m4s?deadline=' + deadline;
+  track.backupUrl = [original];
+  f.play.data.dash.audio[0].baseUrl = source('audio').replace(':4483', ':8082');
+  const result = await resolveAccountBilibiliPage(page, f.read);
+  assert.equal(result.source?.video, original);
+  assert.equal(new URL(result.source!.audio!).port, '8082');
+  assert.equal(result.source?.referer, undefined);
 });
 
 test('高清源在自建后端也保持各端原 CDN 加载；缓存计划不把服务器包装成原站代理', async () => {
@@ -175,66 +181,4 @@ test('拒绝试看、DRM、错媒体、缺音轨、短片替代、失效签名�
     change(f);
     await assert.rejects(resolveAccountBilibiliPage(page, f.read));
   }
-});
-
-test('本机会话网络读取仅限白名单；保持会话、凭据、取消、响应上限与错误脱敏', async () => {
-  let request: any, options: any;
-  const session = { isolated: true };
-  const context: any = {
-    module: { exports: {} },
-    Buffer,
-    Error,
-    require: (name: string) => {
-      assert.equal(name, 'electron');
-      return {
-        net: {
-          request: (input: any) => {
-            options = input;
-            request = new EventEmitter();
-            request.headers = {};
-            request.setHeader = (key: string, value: string) => (request.headers[key] = value);
-            request.abort = () => {
-              request.aborted = true;
-            };
-            request.end = () => {};
-            return request;
-          },
-        },
-      };
-    },
-  };
-  runInNewContext(readFileSync('desktop/bilibili.cjs', 'utf8'), context);
-  const read = context.module.exports(session, allowedAccountBilibiliMetadata);
-  const url = 'https://api.bilibili.com/x/web-interface/nav';
-  const a = new AbortController(),
-    result = read(url, a.signal);
-  assert.equal(options.session, session);
-  assert.equal(options.credentials, 'include');
-  assert.equal(options.redirect, 'error');
-  assert.equal(request.headers.Cookie, undefined);
-  const response: any = new EventEmitter();
-  response.statusCode = 200;
-  request.emit('response', response);
-  response.emit('data', Buffer.from('{"code":0}'));
-  response.emit('end');
-  assert.equal(await result, '{"code":0}');
-  await assert.rejects(read('https://evil.test/', a.signal));
-  const oversized = read(url, a.signal),
-    large: any = new EventEmitter();
-  large.statusCode = 200;
-  request.emit('response', large);
-  large.emit('data', Buffer.alloc(512 * 1024 + 1));
-  await assert.rejects(oversized, /超过大小限制/);
-  assert.equal(request.aborted, true);
-  const b = new AbortController(),
-    cancelled = read(url, b.signal);
-  b.abort();
-  await assert.rejects(cancelled, /已取消/);
-  assert.equal(request.aborted, true);
-  const failure = read(url, a.signal);
-  request.emit('error', Error('https://signed.test/?cookie=secret'));
-  await assert.rejects(
-    failure,
-    (e: any) => !e.message.includes('secret') && !e.message.includes('signed.test'),
-  );
 });

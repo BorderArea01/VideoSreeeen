@@ -11,26 +11,14 @@ import { once } from 'node:events';
 import { MediaRelay } from './media';
 import { BroadcastRelay } from './broadcast-relay';
 import { VoiceRelay } from './voice';
-import { RoomSources, resolveBilibiliMetadata, nextBilibiliMetadata } from './site-source';
+import { RoomSources } from './site-source';
 import { fetchSiteMetadata } from './site-fetch';
 import { startProbe, finishProbe, type ProbeState } from './latency';
-import { BilibiliWebSessions, type BiliSessionFetch } from './bilibili-web-session';
-export { resolveAccountBilibiliPage, allowedAccountBilibiliMetadata } from './bilibili-source';
-
-export function resolvePublicBilibili(url: string, signal: AbortSignal) {
-  return resolveBilibiliMetadata(url, fetchSiteMetadata, signal);
-}
-export function nextPublicBilibili(url: string, signal: AbortSignal) {
-  return nextBilibiliMetadata(url, fetchSiteMetadata, signal);
-}
-
 export function createApp(
   options: {
     now?: () => number;
     origins?: string[];
     broadcastRelay?: boolean;
-    bilibiliWebTrial?: boolean;
-    bilibiliSessionFetch?: BiliSessionFetch;
   } = {},
 ) {
   const rooms = new Rooms(options.now);
@@ -40,9 +28,6 @@ export function createApp(
   const broadcastRelay = new BroadcastRelay(rooms);
   const voice = new VoiceRelay(rooms);
   const sources = new RoomSources(rooms, fetchSiteMetadata);
-  const biliSessions = options.bilibiliWebTrial
-    ? new BilibiliWebSessions(rooms, options.bilibiliSessionFetch, options.now)
-    : null;
   const root = resolve(fileURLToPath(new URL('../dist/', import.meta.url)));
   const allowed =
     options.origins ??
@@ -76,9 +61,7 @@ export function createApp(
       !['GET', 'HEAD'].includes(req.method ?? '') &&
       !(
         req.method === 'POST' &&
-        (req.url?.startsWith('/images/') ||
-          req.url?.startsWith('/resolve-source/') ||
-          req.url?.startsWith('/bili-web/'))
+        (req.url?.startsWith('/images/') || req.url?.startsWith('/resolve-source/'))
       )
     ) {
       res.writeHead(405).end();
@@ -86,18 +69,9 @@ export function createApp(
     }
     try {
       const url = new URL(req.url ?? '/', 'http://localhost');
-      if (
-        url.pathname.startsWith('/images/') ||
-        url.pathname.startsWith('/resolve-source/') ||
-        url.pathname.startsWith('/bili-web/')
-      ) {
-        if (url.pathname.startsWith('/bili-web/') && !biliSessions) {
-          req.resume();
-          res.writeHead(404).end();
-          return;
-        }
+      if (url.pathname.startsWith('/images/') || url.pathname.startsWith('/resolve-source/')) {
         if (
-          (url.pathname.startsWith('/resolve-source/') || url.pathname.startsWith('/bili-web/')) &&
+          url.pathname.startsWith('/resolve-source/') &&
           Number(req.headers['content-length']) > 4096
         ) {
           req.resume();
@@ -158,11 +132,9 @@ export function createApp(
         } as RequestInit);
         let response: Response;
         try {
-          response = url.pathname.startsWith('/bili-web/')
-            ? await biliSessions!.handle(request)
-            : url.pathname.startsWith('/images/')
-              ? await images.handle(request)
-              : await sources.handle(request);
+          response = url.pathname.startsWith('/images/')
+            ? await images.handle(request)
+            : await sources.handle(request);
         } finally {
           drain();
           res.off('close', aborted);
@@ -180,7 +152,6 @@ export function createApp(
         res.end(
           JSON.stringify({
             mediaRelay: true,
-            bilibiliWebTrial: !!biliSessions,
             broadcastRelay: options.broadcastRelay !== false,
             voice: true,
             p2p: true,
@@ -197,8 +168,7 @@ export function createApp(
           JSON.stringify({
             ok: true,
             app: 'videosreeeen',
-            version: '0.4.5',
-            bilibiliWebTrial: !!biliSessions,
+            version: '0.4.6',
             rooms: rooms.rooms.size,
           }),
         );
@@ -382,12 +352,10 @@ export function createApp(
       clearTimeout(authTimeout);
       clearInterval(heartbeat);
       if (room && seat) rooms.disconnect(room, seat, ws);
-      biliSessions?.sweep();
     });
     ws.on('error', () => {});
   });
   const sweeper = setInterval(() => {
-    biliSessions?.sweep();
     rooms.sweep();
     broadcastRelay.sweep();
     voice.sweep();
@@ -396,7 +364,6 @@ export function createApp(
   }, 5000);
   sweeper.unref();
   const close = async () => {
-    biliSessions?.close();
     clearInterval(sweeper);
     for (const ws of wss.clients) ws.terminate();
     for (const ws of mediaSockets.clients) ws.terminate();
@@ -413,7 +380,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   const app = createApp();
   const port = Number(process.env.PORT ?? 8787);
   app.server.listen(port, process.env.HOST ?? '0.0.0.0', () =>
-    console.log(`VideoSreeeen 0.4.5 listening on ${port}`),
+    console.log(`VideoSreeeen 0.4.6 listening on ${port}`),
   );
   for (const signal of ['SIGINT', 'SIGTERM'] as const)
     process.once(signal, () => {

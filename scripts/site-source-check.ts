@@ -15,8 +15,7 @@ import {
 const site = process.argv[2] || 'https://www.mgnacg.com/bangumi/193-3-17/';
 const xifan = new URL(site).hostname === 'next.xifanacg.com';
 const bilibili = new URL(site).hostname === 'www.bilibili.com';
-const nativeBili = process.env.VS_NATIVE_BILI === '1';
-assert.ok(!nativeBili || bilibili, 'Native public source mode is only for Bilibili');
+assert.ok(!bilibili, 'Use test:extension for Bilibili browser source verification');
 const provider = xifan ? 'xifan' : bilibili ? 'bilibili' : 'mgn';
 const sourceCode = new URL(site).searchParams.get('source');
 const xifanSourceId = new Map([
@@ -68,32 +67,9 @@ const proof: Record<string, any> = {
   localConfigUsesDirectCdn: !!app && directMedia,
   network: process.env.VS_TEST_PROXY ? 'explicit-test-proxy' : 'system-default',
   isolatedViewerStorage: true,
-  nativeBili,
 };
 let desktop: Awaited<ReturnType<typeof electron.launch>> | undefined;
 try {
-  if (nativeBili) {
-    await mkdir('.local', { recursive: true });
-    const profile = await mkdtemp(resolve('.local/bili-web-native-'));
-    const entry = join(profile, 'entry.cjs');
-    await writeFile(
-      entry,
-      `const {app}=require('electron');app.setPath('userData',${JSON.stringify(profile)});require(${JSON.stringify(resolve('desktop/main.cjs'))});`,
-    );
-    desktop = await electron.launch({
-      ...(process.env.VS_PACKAGED_EXE ? { executablePath: process.env.VS_PACKAGED_EXE } : {}),
-      args: [
-        ...(process.env.VS_PACKAGED_EXE ? [] : [entry]),
-        '--user-data-dir=' + profile,
-        '--mute-audio',
-        ...(process.env.VS_TEST_PROXY ? ['--proxy-server=' + process.env.VS_TEST_PROXY] : []),
-      ],
-      env: { ...process.env, VS_DEV_URL: process.env.VS_PACKAGED_EXE ? '' : origin },
-    });
-    desktop.process().on('exit', (code, signal) => {
-      proof.nativeExit = { code, signal };
-    });
-  }
   const context = desktop
     ? desktop.context()
     : await browser.newContext({ viewport: { width: 1440, height: 1080 } });
@@ -217,13 +193,6 @@ try {
   await guest.locator('#join-button').click();
   await host.locator('#member-count').filter({ hasText: '2' }).waitFor();
   const began = Date.now();
-  if (nativeBili) {
-    // This check retains explicit coverage of the older anonymous MP4 path.
-    await host
-      .locator('#site-source-options')
-      .evaluate((e) => ((e as HTMLDetailsElement).open = true));
-    await host.locator('#bili-source-quality').selectOption('guest');
-  }
   await selectSource(host, site);
   try {
     await host
@@ -243,15 +212,7 @@ try {
       );
     proof.publicVideoWorkerControlsBothClients = true;
   }
-  if (!nativeBili) assert.equal(metadataStatus, 200);
-  else {
-    assert.equal(metadataStatus, 0, 'Windows must resolve on this PC, not on Cloudflare');
-    assert.equal(await host.locator('#native-stage').isVisible(), false);
-    assert.equal(await host.locator('#bili-login-button').isVisible(), false);
-    assert.equal(await host.locator('#extract-button').isVisible(), false);
-    assert.equal(latest.media.source.bilibiliHtml5, true);
-    proof.hostLocalMetadata = true;
-  }
+  assert.equal(metadataStatus, 200);
   assert.equal(latest.media.url, site);
   assert.equal(latest.media.provider, provider);
   assert.ok(latest.media.source);
@@ -460,7 +421,7 @@ try {
   const before = commands.length;
   // Browser metadata failure/cancellation is checked separately. The native
   // path uses cancellable privileged IPC, never this HTTP metadata endpoint.
-  if (!nativeBili) {
+  {
     const reply = (video = latest.media.source.video) =>
       xifan
         ? {
@@ -529,39 +490,6 @@ try {
     );
     proof.unplayableResultNotPublished = true;
     await host.unroute(metadataRoute);
-  } else {
-    const cancelled = await host.evaluate(async (url) => {
-      const id = crypto.randomUUID();
-      const request = window
-        .desktop!.call('publicBilibili', { action: 'resolve', id, url, mode: 'guest' })
-        .then(
-          () => false,
-          () => true,
-        );
-      await window.desktop!.call('publicBilibili', { action: 'cancel', id });
-      return request;
-    }, site);
-    assert.equal(cancelled, true);
-    await assert.rejects(
-      host.evaluate(() =>
-        window.desktop!.call('publicBilibili', {
-          action: 'resolve',
-          id: crypto.randomUUID(),
-          url: 'https://127.0.0.1/private',
-        }),
-      ),
-    );
-    assert.equal(commands.length, before);
-    proof.nativeCancellationAndRestrictedUrls = true;
-    const previous = latest.media.id;
-    await selectSource(host, site);
-    await host.locator('#source-form[aria-busy="true"]').waitFor();
-    await choosePlayback(host, 'file');
-    await host.waitForTimeout(1000);
-    assert.equal(latest.media.id, previous);
-    assert.equal(commands.length, before);
-    proof.nativeCancelledUiKeepsMedia = true;
-    await choosePlayback(host, 'link');
   }
   if (process.env.VS_TEST_NEXT) {
     const unchanged = latest.media.id,
@@ -673,10 +601,6 @@ try {
   await browser.close();
   await app?.close();
   await mkdir('.local', { recursive: true });
-  const evidenceName = nativeBili
-    ? 'bilibili-native-web'
-    : xifan
-      ? `xifan-${sourceCode}`
-      : provider;
+  const evidenceName = xifan ? `xifan-${sourceCode}` : provider;
   await writeFile(`.local/${evidenceName}-playback-evidence.json`, JSON.stringify(proof, null, 2));
 }

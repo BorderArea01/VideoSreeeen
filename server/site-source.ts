@@ -2,13 +2,6 @@ import { createHash } from 'node:crypto';
 import type { MediaInput } from '../shared/protocol';
 import type { Rooms } from './rooms';
 import { nextEpisode, pageString } from '../shared/episodes';
-import {
-  allowedBilibiliMetadata,
-  bilibiliPage,
-  resolveBilibiliPage,
-  nextBilibiliPage,
-} from './bilibili-source';
-
 class SiteSourceError extends Error {}
 
 type TextFetch = (url: string, signal: AbortSignal) => Promise<Response>;
@@ -34,7 +27,6 @@ export function mgnPage(raw: string) {
 export function allowedSiteMetadata(raw: string) {
   const url = new URL(raw);
   return (
-    allowedBilibiliMetadata(url) ||
     (!url.username &&
       !url.password &&
       url.protocol === 'https:' &&
@@ -47,12 +39,9 @@ export function allowedSiteMetadata(raw: string) {
       !url.password &&
       !url.port &&
       url.protocol === 'https:' &&
-      ((url.hostname === 'next.xifanacg.com' &&
-        /^\/anime\/\d+\/play\/\d+\/?$/.test(url.pathname) &&
-        /^\?source=[A-Za-z0-9]+$/.test(url.search)) ||
-        (url.hostname === 'www.bilibili.com' &&
-          /^\/video\/BV[A-Za-z0-9]+\/$/.test(url.pathname) &&
-          (!url.search || /^\?p=\d+$/.test(url.search)))))
+      url.hostname === 'next.xifanacg.com' &&
+      /^\/anime\/\d+\/play\/\d+\/?$/.test(url.pathname) &&
+      /^\?source=[A-Za-z0-9]+$/.test(url.search))
   );
 }
 
@@ -65,17 +54,6 @@ export function readNextEpisode(page: string, html: string) {
       [pageString(html, 'nextLabel'), pageString(html, 'nextTitle')].filter(Boolean).join(' · ') ||
         '下一集',
     );
-  if (url.hostname === 'www.bilibili.com') {
-    const state = assignedJson(html, '__INITIAL_STATE__');
-    const pages = state.videoData?.pages;
-    const part = Number(url.searchParams.get('p') || 1);
-    if (!Array.isArray(pages)) return null;
-    const index = pages.findIndex((p: any) => p.page === part);
-    const next = index < 0 ? undefined : pages[index + 1];
-    return next
-      ? nextEpisode(page, url.pathname + '?p=' + next.page, String(next.part || '下一分P'))
-      : null;
-  }
   const player = assignedJson(html, 'player_aaaa');
   return nextEpisode(page, player.link_next);
 }
@@ -253,28 +231,6 @@ export async function resolveMgnPage(
   };
 }
 
-/** Authenticated metadata only. Video still loads directly from the original CDN. */
-function bilibiliReader(fetchText: TextFetch, signal: AbortSignal) {
-  return async (address: string) => {
-    const response = await fetchText(address, signal);
-    if (!response.ok) {
-      await response.body?.cancel();
-      throw new SiteSourceError(`B 站公开接口暂不可用（HTTP ${response.status}），请稍后重试`);
-    }
-    return smallText(response.body, 512 * 1024, signal);
-  };
-}
-export function nextBilibiliMetadata(raw: string, fetchText: TextFetch, signal: AbortSignal) {
-  return nextBilibiliPage(raw, bilibiliReader(fetchText, signal));
-}
-export function resolveBilibiliMetadata(raw: string, fetchText: TextFetch, signal: AbortSignal) {
-  return resolveBilibiliPage(raw, bilibiliReader(fetchText, signal)).catch((cause) => {
-    if (cause instanceof Error && cause.message.startsWith('B 站'))
-      throw new SiteSourceError(cause.message);
-    throw cause;
-  });
-}
-
 export class RoomSources {
   private busy = new Set<string>();
   private attempts = new Map<string, number>();
@@ -325,13 +281,10 @@ export class RoomSources {
           return reply({ error: '已离开房间' }, 401);
         return reply({ next });
       }
-      const bili = new URL(body.url).hostname === 'www.bilibili.com';
-      const url = bili ? bilibiliPage(body.url) : mgnPage(body.url);
+      const url = mgnPage(body.url);
       this.attempts.set(identity, Date.now());
       if (this.attempts.size > 256) this.attempts.delete(this.attempts.keys().next().value!);
-      const media = bili
-        ? await resolveBilibiliMetadata(url.href, this.fetchText, signal)
-        : await resolveMgnPage(url.href, this.fetchText, signal);
+      const media = await resolveMgnPage(url.href, this.fetchText, signal);
       if (!this.rooms.memberAccess(code, member, secret))
         return reply({ error: '已离开房间，识别结果未使用' }, 401);
       return reply({ media });

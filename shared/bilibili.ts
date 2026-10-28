@@ -1,8 +1,6 @@
-import type { MediaInput } from '../shared/protocol';
-import { nextEpisode } from '../shared/episodes';
+import type { MediaInput } from './protocol';
+import { nextEpisode } from './episodes';
 
-// Public UGC HTML5 playback only: no account cookies, app credentials, trial
-// flags, video relay or modification of the CDN's signed URLs.
 export function bilibiliPage(raw: string) {
   const page = new URL(raw);
   if (
@@ -16,15 +14,6 @@ export function bilibiliPage(raw: string) {
   return page;
 }
 
-export function allowedBilibiliMetadata(url: URL) {
-  if (url.origin !== 'https://api.bilibili.com' || url.username || url.password) return false;
-  return (
-    (url.pathname === '/x/web-interface/view' && /^\?bvid=BV[A-Za-z0-9]{10}$/.test(url.search)) ||
-    (url.pathname === '/x/player/playurl' &&
-      /^\?bvid=BV[A-Za-z0-9]{10}&cid=[1-9]\d{0,15}&qn=32&platform=html5$/.test(url.search))
-  );
-}
-
 async function publicInfo(raw: string, read: (url: string) => Promise<string>) {
   const page = bilibiliPage(raw);
   const bvid = page.pathname.split('/')[2]!;
@@ -32,7 +21,7 @@ async function publicInfo(raw: string, read: (url: string) => Promise<string>) {
   const info = JSON.parse(await read(`https://api.bilibili.com/x/web-interface/view?bvid=${bvid}`));
   const data = info.data;
   if (info.code !== 0 || data?.bvid !== bvid || data?.rights?.pay === 1)
-    throw new Error('B 站未向游客提供此视频；请使用客户端登录或选择共享画面');
+    throw new Error('B 站未提供此视频的可用信息，请在原站检查访问权限');
   return { page, bvid, part, data };
 }
 
@@ -44,78 +33,16 @@ export async function nextBilibiliPage(raw: string, read: (url: string) => Promi
     : null;
 }
 
-export async function resolveBilibiliPage(
-  raw: string,
-  read: (url: string) => Promise<string>,
-): Promise<MediaInput> {
-  const { page, bvid, part, data } = await publicInfo(raw, read);
-  const selected = Array.isArray(data.pages) ? data.pages.find((p: any) => p.page === part) : null;
-  if (
-    !selected ||
-    !Number.isSafeInteger(selected.cid) ||
-    selected.cid <= 0 ||
-    !Number.isFinite(selected.duration) ||
-    selected.duration <= 0
-  )
-    throw new Error('B 站没有返回此分 P 的公开播放信息');
-  const response = JSON.parse(
-    await read(
-      `https://api.bilibili.com/x/player/playurl?bvid=${bvid}&cid=${selected.cid}&qn=32&platform=html5`,
-    ),
-  );
-  const stream = response.data;
-  if (
-    response.code !== 0 ||
-    !stream ||
-    stream.is_preview ||
-    stream.is_drm ||
-    stream.format !== 'mp4' ||
-    ![16, 32].includes(stream.quality) ||
-    !Array.isArray(stream.durl) ||
-    stream.durl.length !== 1 ||
-    !Number.isFinite(stream.timelength) ||
-    Math.abs(stream.timelength / 1000 - selected.duration) > 2
-  )
-    throw new Error('B 站没有返回可供游客完整观看的 MP4；可使用客户端或共享画面');
-  const address = stream.durl[0]?.url;
-  if (typeof address !== 'string' || address.length > 8192) throw new Error('B 站播放地址无效');
-  const video = new URL(address);
-  const deadline = Number(video.searchParams.get('deadline'));
-  if (
-    video.protocol !== 'https:' ||
-    video.port ||
-    video.username ||
-    video.password ||
-    !/^[a-z0-9-]+\.bilivideo\.com$/.test(video.hostname) ||
-    !/\.mp4$/i.test(video.pathname) ||
-    !Number.isFinite(deadline) ||
-    deadline * 1000 <= Date.now() + 30000
-  )
-    throw new Error('B 站公开视频地址已过期或来源暂不支持，请重试');
-  return {
-    url: page.href,
-    provider: 'bilibili',
-    title: `${String(data.title || bvid)}${data.pages.length > 1 ? ` · P${part}` : ''}`.slice(
-      0,
-      200,
-    ),
-    source: { kind: 'file', video: video.href, bilibiliHtml5: true },
-    duration: selected.duration,
-  };
-}
-
-// Only the native provider calls this with its isolated original-site session.
-// No cookie values enter this resolver, its result, or the room protocol.
 export function allowedAccountBilibiliMetadata(raw: string) {
   const url = new URL(raw);
   return (
-    allowedBilibiliMetadata(url) ||
-    (url.origin === 'https://api.bilibili.com' &&
-      !url.username &&
-      !url.password &&
-      ((url.pathname === '/x/web-interface/nav' && !url.search) ||
-        (url.pathname === '/x/player/playurl' &&
-          /^\?bvid=BV[A-Za-z0-9]{10}&cid=[1-9]\d{0,15}&qn=80&fnval=16$/.test(url.search))))
+    url.origin === 'https://api.bilibili.com' &&
+    !url.username &&
+    !url.password &&
+    ((url.pathname === '/x/web-interface/view' && /^\?bvid=BV[A-Za-z0-9]{10}$/.test(url.search)) ||
+      (url.pathname === '/x/web-interface/nav' && !url.search) ||
+      (url.pathname === '/x/player/playurl' &&
+        /^\?bvid=BV[A-Za-z0-9]{10}&cid=[1-9]\d{0,15}&qn=80&fnval=16$/.test(url.search)))
   );
 }
 
@@ -124,7 +51,14 @@ function accountTrack(track: any, type: 'video' | 'audio') {
   const addresses = [
     track?.baseUrl ?? track?.base_url,
     ...(track?.backupUrl ?? track?.backup_url ?? []),
-  ];
+  ].sort((a, b) => {
+    // Prefer an original MCDN URL when provided. This route has independent
+    // browser playback evidence; keep every signed URL exactly as returned.
+    const mcdn = (value: unknown) =>
+      typeof value === 'string' &&
+      /^https:\/\/[a-z0-9-]+\.mcdn\.bilivideo\.cn(?::(?:4483|8082))?\//.test(value);
+    return Number(mcdn(b)) - Number(mcdn(a));
+  });
   for (const value of addresses) {
     if (typeof value !== 'string' || value.length > 8192) continue;
     try {
@@ -136,7 +70,7 @@ function accountTrack(track: any, type: 'video' | 'audio') {
         u.protocol === 'https:' &&
         !u.username &&
         !u.password &&
-        ((regular && !u.port) || (mcdn && (!u.port || u.port === '4483'))) &&
+        ((regular && !u.port) || (mcdn && ['', '4483', '8082'].includes(u.port))) &&
         /\.(m4s|mp4|m4a)$/i.test(u.pathname) &&
         Number.isFinite(deadline) &&
         deadline * 1000 > Date.now() + 30000 &&
@@ -155,9 +89,12 @@ export async function resolveAccountBilibiliPage(
   bilibiliPage(raw);
   const nav = JSON.parse(await read('https://api.bilibili.com/x/web-interface/nav'));
   if (nav.code !== 0 || nav.data?.isLogin !== true)
-    throw Object.assign(new Error('B 站高清取源需要房主在本机登录，观众无需登录'), {
-      code: 'BILIBILI_LOGIN_REQUIRED',
-    });
+    throw Object.assign(
+      new Error('B 站高清取源需要当前浏览器已登录；请在 B 站登录后回到这里重试，观众无需登录'),
+      {
+        code: 'BILIBILI_LOGIN_REQUIRED',
+      },
+    );
   const { page, bvid, part, data } = await publicInfo(raw, read);
   if (data.is_upower_exclusive || data.rights?.is_upower_exclusive)
     throw new Error('B 站此视频的访问权限需要在原站处理');
@@ -206,7 +143,7 @@ export async function resolveAccountBilibiliPage(
     .find(Boolean);
   if (!video || !audio)
     throw new Error(
-      'B 站未返回可供网页播放的 720p / 1080p AVC 与 AAC 轨道；可在高级选项手动选择游客兼容源',
+      'B 站未向当前账号返回完整的 720p / 1080p AVC 与 AAC 轨道，请在原站检查可用画质',
     );
   return {
     url: page.href,

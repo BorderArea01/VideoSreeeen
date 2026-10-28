@@ -1,6 +1,6 @@
 {
   "name": "videosreeeen",
-  "version": "0.4.5",
+  "version": "0.4.6",
   "private": true,
   "description": "多人观影：Windows、Android 和浏览器，共同缓存与 WebSocket 同步",
   "license": "GPL-3.0-only",
@@ -13,7 +13,7 @@
   "scripts": {
     "dev": "tsx server/index.ts",
     "dev:ui": "vite --host 127.0.0.1",
-    "build": "tsc --noEmit && vite build && node scripts/build-server.mjs",
+    "build": "tsc --noEmit && vite build && node scripts/build-server.mjs && npm run build:extension && node scripts/zip-extension.mjs",
     "start": "node dist-server/index.mjs",
     "desktop": "electron desktop/main.cjs",
     "package:windows": "electron-builder --win nsis portable --x64 --publish never",
@@ -45,8 +45,6 @@
     "test:site-broadcast": "tsx scripts/site-broadcast-check.ts",
     "test:playback-modes": "tsx scripts/playback-modes-check.ts",
     "test:chat-overlay": "tsx scripts/chat-overlay-check.ts",
-    "test:site-account": "tsx scripts/site-account-check.ts",
-    "test:bilibili-web-session": "node scripts/bilibili-account-fixture.mjs --web",
     "test:native-origin": "tsx scripts/native-origin-check.ts",
     "test:native-sync": "tsx scripts/native-sync-check.ts",
     "test:mgn-playback": "tsx scripts/mgn-playback-check.ts",
@@ -54,14 +52,15 @@
     "test:bilibili-quality": "tsx scripts/bilibili-quality-check.ts",
     "test:playback-retry": "tsx scripts/playback-retry-check.ts",
     "test:playback-clock": "tsx scripts/playback-clock-check.ts",
-    "test:playback-buffering": "tsx scripts/playback-buffering-check.ts"
+    "test:playback-buffering": "tsx scripts/playback-buffering-check.ts",
+    "build:extension": "node scripts/build-extension.mjs",
+    "test:extension": "node scripts/bilibili-account-fixture.mjs"
   },
   "dependencies": {
     "@noble/hashes": "2.4.0",
     "electron-updater": "^6.8.9",
     "hls.js": "^1.6.13",
     "ipaddr.js": "^2.3.0",
-    "qrcode-generator": "2.0.4",
     "ws": "^8.18.3",
     "zod": "^4.3.6"
   },

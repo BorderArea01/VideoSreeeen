@@ -40,6 +40,7 @@ assert.deepEqual(
     'VideoSreeeen-Setup.exe.blockmap',
     `VideoSreeeen-Portable-${pkg.version}.exe`,
     'VideoSreeeen-Android.apk',
+    'VideoSreeeen-SourceHelper.zip',
   ].sort(),
 );
 for (const required of [
