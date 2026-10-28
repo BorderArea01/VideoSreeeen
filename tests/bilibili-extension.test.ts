@@ -6,6 +6,7 @@ import { nextBilibiliPage, bilibiliPage } from '../shared/bilibili';
 import { allowedSiteMetadata, RoomSources } from '../server/site-source';
 import { Rooms } from '../server/rooms';
 import { readFileSync } from 'node:fs';
+import { supportsBilibiliExtension } from '../client/bilibili-extension';
 
 const source = buildSync({
   entryPoints: ['extension/background.ts'],
@@ -16,11 +17,19 @@ const source = buildSync({
 }).outputFiles[0]!.text;
 const id = '11111111-1111-4111-8111-111111111111';
 const page = 'https://www.bilibili.com/video/BV1R6xN66Exx/';
+
+test('旧取源助手必须先更新，观众端不要求助手；版本判断支持后续补丁和小版本', () => {
+  for (const version of [undefined, null, '', '0.1.0', '0.0.99', '0.1.1-beta', 'invalid'])
+    assert.equal(supportsBilibiliExtension(version), false);
+  for (const version of ['0.1.1', '0.1.10', '0.2.0', '1.0.0'])
+    assert.equal(supportsBilibiliExtension(version), true);
+});
 function environment(fetcher: typeof fetch) {
   let listener: any, removed: any, updated: any;
   runInNewContext(source, {
     chrome: {
       runtime: {
+        getManifest: () => ({ version: 'test-helper-version' }),
         onMessage: {
           addListener: (fn: any) => {
             listener = fn;
@@ -85,7 +94,7 @@ test('扩展只给受信网页顶层提供固定 B 站元数据能力，没有�
     'SOURCE_FAILED',
   );
   assert.equal(calls, 0);
-  assert.equal((await e.call({ action: 'ping' })).version, '0.1.0');
+  assert.equal((await e.call({ action: 'ping' })).version, 'test-helper-version');
 });
 
 test('未登录时仅检查登录状态，凭据由浏览器处理，不发游客请求，不泄露接口响应', async () => {

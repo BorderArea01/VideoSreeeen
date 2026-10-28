@@ -62,11 +62,14 @@ test('本机正常登录取源选完整 AVC 1080p / AAC，保留签名与分 P�
   assert.equal(result.source?.bilibiliDirect, true);
   assert.equal(result.duration, 862);
   assert.equal(result.url, page + '?p=2');
-  assert.match(f.requests[2]!, /cid=456&qn=80&fnval=16$/);
+  assert.match(f.requests[2]!, /cid=456&qn=80&fnval=16&platform=html5&high_quality=1$/);
   assert.equal(allowedSiteMetadata(f.requests[2]!), false);
   assert.equal(JSON.stringify(result).includes('isLogin'), false);
   for (const raw of [
     f.requests[2] + '&try_look=1',
+    f.requests[2]!.replace('&platform=html5&high_quality=1', ''),
+    f.requests[2]!.replace('platform=html5', 'platform=pc'),
+    f.requests[2]!.replace('high_quality=1', 'high_quality=0'),
     f.requests[2] + '&cookie=secret',
     'https://api.bilibili.com/x/web-interface/nav?redirect=https://evil.test',
     'https://api.bilibili.com.evil.test/x/web-interface/nav',

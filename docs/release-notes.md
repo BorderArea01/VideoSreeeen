@@ -1,5 +1,7 @@
 # 0.4.6 · B 站浏览器视频源助手
 
+**2026-10-28 网页修正：视频源助手已更新为 0.1.1。** 部分视频的桌面 CDN 签名会导致观众端 HTTP 403，现改用正常登录后的 HTML5 高清 DASH 签发线路，仍只接受完整 720p / 1080p AVC 与 AAC。旧助手会提示更新。使用下面的网页入口下载最新版助手；原始 v0.4.6 发行资产保留不变，未重新打包客户端。
+
 房主在电脑 Edge / Chrome 安装一次轻量助手，在放映厅粘贴 B 站链接即可取源；观众只用网页。复用同一浏览器已登录的 B 站账号，不再另外扫码或复制令牌。
 
 - 新增独立 Manifest V3 扩展，约 18 KB；只访问固定 B 站只读接口，不申请 cookies 权限，不读取或导出 Cookie 值。
@@ -10,7 +12,7 @@
 
 ## 使用与下载
 
-[打开网页版](https://videosreeeen.pages.dev) · [视频源助手 ZIP](https://github.com/BorderArea01/VideoSreeeen/releases/download/v0.4.6/VideoSreeeen-SourceHelper.zip) · [一次性安装步骤](https://github.com/BorderArea01/VideoSreeeen/blob/main/docs/browser-extension.md)
+[打开网页版](https://videosreeeen.pages.dev) · [最新视频源助手 ZIP](https://videosreeeen.pages.dev/downloads/VideoSreeeen-SourceHelper.zip) · [一次性安装步骤](https://github.com/BorderArea01/VideoSreeeen/blob/main/docs/browser-extension.md)
 
 当前为开源解压安装，尚未上架扩展商店。Edge 在 edge://extensions 开启开发人员模式后，加载解压后含 manifest.json 的文件夹，刷新放映厅即可。只有提供视频源的人需要安装。
 

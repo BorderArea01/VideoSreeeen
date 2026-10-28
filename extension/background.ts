@@ -63,7 +63,7 @@ chrome.runtime.onMessage.addListener(
     }
     const tab = sender.tab.id;
     if (message.action === 'ping') {
-      reply({ version: '0.1.0' });
+      reply({ version: chrome.runtime.getManifest().version });
       return false;
     }
     if (message.action === 'cancel') {

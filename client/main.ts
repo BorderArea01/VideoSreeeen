@@ -2527,7 +2527,11 @@ async function resolveSiteSource(media: MediaInput, autoplay = false, episodeTit
   } catch (cause) {
     if (controller.signal.aborted || sourceResolution !== controller) return;
     if (cause instanceof BilibiliExtensionError) {
-      $('bili-extension-help').hidden = cause.code !== 'MISSING' && cause.code !== 'UNAVAILABLE';
+      $('bili-extension-help').hidden = !['MISSING', 'UNAVAILABLE', 'UPDATE_REQUIRED'].includes(
+        cause.code,
+      );
+      $('bili-extension-help').textContent =
+        cause.code === 'UPDATE_REQUIRED' ? '更新视频源助手' : '安装视频源助手';
       $('bili-browser-login').hidden = cause.code !== 'LOGIN_REQUIRED';
       $('bili-open-browser').hidden = cause.code !== 'BROWSER';
     }

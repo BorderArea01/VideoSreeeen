@@ -155,6 +155,21 @@ try {
     0,
   );
   loggedIn = true;
+  await worker.evaluate(() => {
+    const runtime = (globalThis as any).chrome.runtime;
+    (globalThis as any).__vsOriginalManifest = runtime.getManifest;
+    runtime.getManifest = () => ({ version: '0.1.0' });
+  });
+  const beforeOldHelper = upstreamCalls;
+  await selectSource(host, pageUrl);
+  await host.locator('#bili-extension-help').filter({ hasText: '更新视频源助手' }).waitFor();
+  assert.equal(room.media, null);
+  assert.equal(upstreamCalls, beforeOldHelper);
+  proof.oldHelperRequiresUpdateBeforeSource = true;
+  await worker.evaluate(() => {
+    (globalThis as any).chrome.runtime.getManifest = (globalThis as any).__vsOriginalManifest;
+    delete (globalThis as any).__vsOriginalManifest;
+  });
   await selectSource(host, pageUrl);
   await host
     .locator('#current-playback')

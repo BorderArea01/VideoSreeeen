@@ -42,7 +42,9 @@ export function allowedAccountBilibiliMetadata(raw: string) {
     ((url.pathname === '/x/web-interface/view' && /^\?bvid=BV[A-Za-z0-9]{10}$/.test(url.search)) ||
       (url.pathname === '/x/web-interface/nav' && !url.search) ||
       (url.pathname === '/x/player/playurl' &&
-        /^\?bvid=BV[A-Za-z0-9]{10}&cid=[1-9]\d{0,15}&qn=80&fnval=16$/.test(url.search)))
+        /^\?bvid=BV[A-Za-z0-9]{10}&cid=[1-9]\d{0,15}&qn=80&fnval=16&platform=html5&high_quality=1$/.test(
+          url.search,
+        )))
   );
 }
 
@@ -108,7 +110,9 @@ export async function resolveAccountBilibiliPage(
     throw new Error('B 站没有返回当前分 P 的完整播放信息');
   const body = JSON.parse(
     await read(
-      `https://api.bilibili.com/x/player/playurl?bvid=${bvid}&cid=${selected.cid}&qn=80&fnval=16`,
+      // Request the normal authenticated HTML5 DASH route. Desktop-route
+      // signatures can reject other browser pages even for the same video.
+      `https://api.bilibili.com/x/player/playurl?bvid=${bvid}&cid=${selected.cid}&qn=80&fnval=16&platform=html5&high_quality=1`,
     ),
   );
   const stream = body.data;
