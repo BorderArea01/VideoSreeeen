@@ -20,7 +20,7 @@
 
 ## 验证与边界
 
-当前 Edge 已安装本项目自己的扩展；使用已有正常登录与真实 B 站视频，两端网页实际解码 1920×1080 / AAC，暂停和播放中跳至 30 秒通过。独立观众端没有扩展或 B 站登录。97 项测试、扩展隔离加载及合成双端播放、下一分 P、取消和失效保片检查通过。详见[分层验证记录](https://github.com/BorderArea01/VideoSreeeen/blob/main/docs/verification-browser-extension.md)。
+当前 Edge 已安装本项目自己的扩展；使用已有正常登录与真实 B 站视频 `BV19rHG6EEQ6`，两端网页实际解码 1920×1080 / AAC，暂停和播放中跳至 30 秒通过。独立观众端没有扩展或 B 站登录。本次网页修正的 98 项测试、扩展隔离加载、旧助手更新提示及合成双端播放、下一分 P、取消和失效保片检查通过。详见[本次修正记录](https://github.com/BorderArea01/VideoSreeeen/blob/main/docs/verification-bilibili-html5.md)和[原始发行验证](https://github.com/BorderArea01/VideoSreeeen/blob/main/docs/verification-browser-extension.md)。
 
 真实检查为同机双浏览器访问互联网视频源，不代表跨运营商、手机、Safari、长片或所有 B 站视频均已通过。画质取决于原站正常返回的完整 AVC / AAC 轨道；不绕过登录、付费、DRM 或访问控制。Windows / Android 不要求观众安装扩展，APK 未安装到设备。本轮未启用收费服务。
 
