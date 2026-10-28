@@ -8,6 +8,7 @@ import { closeInvitation, selectSource } from './room-ui';
 // Real mode needs an explicit, freshly confirmed login by the user. No system
 // browser profile, exported cookie, fake real login or saved media source.
 const real = process.env.VS_BILI_WEB_REAL === '1';
+const upstream: { endpoint: string; authenticated: boolean; status: number }[] = [];
 let confirmed = false;
 const key = '0123456789abcdef0123456789abcdef';
 const deadline = Math.floor(Date.now() / 1000) + 3600;
@@ -55,7 +56,19 @@ const fixture = async (url: string) => {
 };
 const app = createApp({
   bilibiliWebTrial: true,
-  ...(!real ? { bilibiliSessionFetch: fixture } : {}),
+  bilibiliSessionFetch: real
+    ? async (url, init) => {
+        const response = await fetch(url, init);
+        // Fixed API path only: never record QR keys, cookies, media or account data.
+        if (upstream.length < 96)
+          upstream.push({
+            endpoint: new URL(url).pathname,
+            authenticated: new Headers(init.headers).has('Cookie'),
+            status: response.status,
+          });
+        return response;
+      }
+    : fixture,
 });
 app.server.listen(0, '127.0.0.1');
 await once(app.server, 'listening');
@@ -80,6 +93,7 @@ const proof: any = {
   isolatedProfiles: true,
   localValidationService: true,
   cloudDeploymentProven: false,
+  ...(real ? { upstream } : {}),
 };
 let stage = 'create-room';
 let state: any;
@@ -168,10 +182,19 @@ try {
     console.log(JSON.stringify({ stage: 'awaiting-user-scan', officialBilibiliQr: true }));
   } else confirmed = true;
   stage = 'login-resume';
-  await host
-    .locator('#current-playback')
-    .filter({ hasText: '当前：共同播放' })
-    .waitFor({ timeout: real ? 180000 : 25000 });
+  await host.waitForFunction(
+    () => {
+      const playing = document.querySelector('#current-playback')?.textContent;
+      const loginOpen = document.querySelector<HTMLDialogElement>('#bili-web-login')?.open;
+      const error = document.querySelector('#link-error')?.textContent;
+      const errorVisible =
+        document.querySelector<HTMLElement>('#link-unavailable')?.hidden === false;
+      return playing?.includes('当前：共同播放') || (!loginOpen && errorVisible && !!error);
+    },
+    undefined,
+    { timeout: real ? 180000 : 25000 },
+  );
+  assert.ok(state.media?.source?.bilibiliDirect, '取源未成功，详见安全接口状态及界面提示');
   assert.equal(state.media.source.bilibiliDirect, true);
   proof.loginResumedOriginalLink = true;
   stage = 'play';

@@ -44,7 +44,7 @@
 
 2026-10-27 对照 ZNote、复用已有浏览器登录会话的 720p / 1080p 真实取流与网页双端实播见 [B 站已登录会话取源复验](verification-bilibili-authorized-source.md)。随后将高清取源接入 Windows 链接入口的实现与分层验证见 [0.4.5 高清取源接入](verification-bilibili-account.md)，两轮证据不能混同。
 
-2026-10-28 用户允许短时服务端会话验证后，真实 Cloudflare 出口 412、默认关闭的 Node 网页扫码实验入口、合成双端播放及尚待用户扫码的结果见 [网页扫码取源验证](verification-bilibili-web-session-trial.md)。实验代码未发布到正式放映厅，不代表全网页高清取源已上线。
+2026-10-28 用户允许短时服务端会话验证后，真实 Cloudflare 出口 412、默认关闭的 Node 网页扫码实验入口、合成双端播放及真实扫码成功后取源仍为 412 的结果见 [网页扫码取源验证](verification-bilibili-web-session-trial.md)。实验代码未发布到正式放映厅，不代表全网页高清取源已上线。
 
 ## 已实现与自动验证
 
