@@ -23,7 +23,12 @@ const browser = await chromium.launch({
     '--renderer-process-limit=1',
   ],
 });
-const evidence: Record<string, any> = { origin, source, generatedUsersOnly: true };
+const evidence: Record<string, any> = {
+  origin,
+  source,
+  generatedUsersOnly: true,
+  mediaResponses: [],
+};
 try {
   const context = await browser.newContext({ viewport: { width: 1440, height: 1080 } });
   const host = await context.newPage(),
@@ -31,6 +36,10 @@ try {
   const errors: string[] = [],
     commands: string[] = [];
   for (const page of [host, guest]) {
+    page.on('response', (response) => {
+      if (new URL(response.url()).pathname.startsWith('/media/'))
+        evidence.mediaResponses.push({ status: response.status() });
+    });
     page.on('pageerror', (error) => errors.push(error.message));
     page.on('websocket', (socket) =>
       socket.on('framesent', (event) => {
@@ -94,7 +103,7 @@ try {
       await page.locator('#video').evaluate((element) => {
         const v = element as HTMLVideoElement;
         return {
-          source: v.currentSrc,
+          sourceHost: v.currentSrc ? new URL(v.currentSrc).hostname : '',
           stream: !!v.srcObject,
           paused: v.paused,
           time: v.currentTime,
@@ -168,6 +177,27 @@ try {
   await host.locator('#leave-button').click();
   await guest.locator('#leave-button').click();
   console.log(JSON.stringify(evidence));
+} catch (error) {
+  evidence.playersAtFailure = [];
+  for (const context of browser.contexts())
+    for (const page of context.pages())
+      evidence.playersAtFailure.push(
+        await page
+          .evaluate(() => {
+            const v = document.querySelector<HTMLVideoElement>('#video');
+            return v
+              ? {
+                  ready: v.readyState,
+                  network: v.networkState,
+                  error: v.error?.code,
+                  frames: v.getVideoPlaybackQuality().totalVideoFrames,
+                  time: v.currentTime,
+                }
+              : null;
+          })
+          .catch(() => null),
+      );
+  throw error;
 } finally {
   await browser.close();
   await app?.close();

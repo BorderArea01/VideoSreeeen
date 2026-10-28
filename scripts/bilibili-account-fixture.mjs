@@ -57,11 +57,16 @@ const source = {
 };
 const child = spawn(
   process.execPath,
-  ['node_modules/tsx/dist/cli.mjs', 'scripts/bilibili-account-check.ts'],
+  [
+    'node_modules/tsx/dist/cli.mjs',
+    process.argv.includes('--web')
+      ? 'scripts/bilibili-web-session-check.ts'
+      : 'scripts/bilibili-account-check.ts',
+  ],
   {
     windowsHide: true,
     stdio: ['pipe', 'inherit', 'inherit'],
-    env: { ...process.env, VS_BILI_SYNTHETIC_MEDIA: '1' },
+    env: { ...process.env, VS_BILI_SYNTHETIC_MEDIA: '1', VS_BILI_WEB_REAL: '0' },
   },
 );
 child.stdin.end(JSON.stringify(source));

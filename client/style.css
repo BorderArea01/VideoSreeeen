@@ -794,6 +794,20 @@ input[type='range'] {
 #source-bili-login {
   margin-right: 8px;
 }
+#bili-web-login {
+  max-width: 460px;
+}
+#bili-web-qr {
+  display: flex;
+  justify-content: center;
+}
+#bili-web-qr svg {
+  width: 224px;
+  height: 224px;
+  background: white;
+  padding: 8px;
+  border-radius: 8px;
+}
 .playback-copy {
   color: #aaa0af;
   font-size: 12px;

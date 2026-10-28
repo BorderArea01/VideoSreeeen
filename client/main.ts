@@ -28,6 +28,7 @@ import { PageFullscreen } from './page-fullscreen';
 import { FullscreenIdle } from './fullscreen-idle';
 import { SeekControls, type SeekState } from './seek-controls';
 import { TabSessions, type TabSession } from './tab-session';
+import { BrowserBilibiliLogin, BrowserBilibiliLoginRequired } from './bilibili-web-login';
 import { PlayerToolbar } from './player-toolbar';
 import { isNative, nativeCall, onNative, platform, type NativeCache, type Sample } from './native';
 
@@ -85,7 +86,9 @@ $('link-error').insertAdjacentHTML(
   'afterend',
   '<button id="source-bili-login" type="button" class="button accent" hidden>登录 B 站并继续</button>',
 );
-$('source-bili-login').onclick = () => $('site-account-login').click();
+$('source-bili-login').onclick = () =>
+  isNative ? $('site-account-login').click() : browserBiliLogin.open();
+const defaultLinkCapability = $('link-capability').textContent;
 $('link-choice').append($('cache-options'));
 $('cache-options').querySelector('summary')!.textContent = '网络卡顿时：先完整缓存';
 $('cache-options').querySelector('summary')!.title =
@@ -288,6 +291,7 @@ const playbackClock = new PlaybackClock();
 const playbackKey = (snapshot: Snapshot) =>
   `${snapshot.code}:${snapshot.media?.id ?? ''}:${snapshot.epoch}:${snapshot.playback.revision}`;
 let mediaRelay = true;
+let bilibiliWebTrial = false;
 let sourceFailed = false;
 let localRetry: AbortController | null = null;
 let sourceTimedOut = false;
@@ -306,6 +310,21 @@ let sourceLogin: {
   title?: string;
   retry?: boolean;
 } | null = null;
+const browserBiliLogin = new BrowserBilibiliLogin(
+  () =>
+    bilibiliWebTrial && connected && room
+      ? { server: activeServer, code: room.code, member: memberId, secret: resume }
+      : null,
+  resumeBilibiliSource,
+);
+$('site-account-settings').insertAdjacentHTML(
+  'afterend',
+  '<details id="bili-web-settings" class="advanced" hidden><summary>B 站取源验证 · 临时登录</summary><p class="dialog-note">验证会话由当前取源服务短时处理，最长 15 分钟；不交给观众。</p><button id="bili-web-forget" type="button" class="button soft">删除本次取源登录</button></details>',
+);
+$('bili-web-forget').onclick = () => {
+  browserBiliLogin.forget();
+  toast('已请求删除本次取源登录');
+};
 let nextResolution: AbortController | null = null;
 let publisher: HTMLVideoElement | null = null;
 let publisherStream: MediaStream | null = null;
@@ -540,6 +559,8 @@ async function connect(kind: 'create' | 'join', reconnect = false) {
   latencies.clear();
   connectionView(reconnect ? '正在重新连接' : '正在连接');
   mediaRelay = true;
+  bilibiliWebTrial = false;
+  $('bili-web-settings').hidden = true;
   peers.setIceServers([], false);
   broadcastRelayEnabled = false;
   let roomRouting = false;
@@ -549,6 +570,13 @@ async function connect(kind: 'create' | 'join', reconnect = false) {
       const config = await response.json();
       if (generation !== connectionGeneration) return;
       mediaRelay = config.mediaRelay !== false;
+      bilibiliWebTrial = !isNative && config.bilibiliWebTrial === true;
+      $('bili-web-settings').hidden = !bilibiliWebTrial;
+      if (!isNative) $('source-bili-login').textContent = '扫码登录并继续';
+      if (!isNative)
+        $('link-capability').textContent = bilibiliWebTrial
+          ? '本页支持 B 站扫码取源验证；会话由取源服务短时使用，观众无需登录。'
+          : defaultLinkCapability;
       roomRouting = config.roomRouting === true;
       broadcastRelayEnabled = config.broadcastRelay === true;
       peers.setIceServers(
@@ -1549,7 +1577,10 @@ async function retryLocalVideo() {
     lastRevision = -1;
   } catch (cause) {
     if (localRetry !== request) return;
-    if (cause instanceof BilibiliLoginRequired && current()) {
+    if (
+      (cause instanceof BilibiliLoginRequired || cause instanceof BrowserBilibiliLoginRequired) &&
+      current()
+    ) {
       sourceLogin = {
         media,
         code: room.code,
@@ -2221,21 +2252,24 @@ function cacheProgress(event: NativeCache) {
     );
   }
 }
+function resumeBilibiliSource() {
+  const pending = sourceLogin;
+  if (
+    pending &&
+    connected &&
+    room?.code === pending.code &&
+    memberId === pending.member &&
+    room.media?.id === pending.previous
+  )
+    void (pending.retry
+      ? retryLocalVideo()
+      : resolveSiteSource(pending.media, pending.autoplay, pending.title));
+}
 onNative((type, data) => {
   if (type === 'cache') cacheProgress(data as NativeCache);
   if (type === 'site-error') error(data.message);
   if (type === 'site-account-closed') {
-    const pending = sourceLogin;
-    if (
-      pending &&
-      connected &&
-      room?.code === pending.code &&
-      memberId === pending.member &&
-      room.media?.id === pending.previous
-    )
-      void (pending.retry
-        ? retryLocalVideo()
-        : resolveSiteSource(pending.media, pending.autoplay, pending.title));
+    resumeBilibiliSource();
   }
 });
 
@@ -2540,6 +2574,7 @@ $('source-url').oninput = () => {
 };
 function cancelSourceResolution(clearLogin: unknown = true) {
   if (clearLogin !== false) {
+    browserBiliLogin.cancel();
     sourceLogin = null;
     $('source-bili-login').hidden = true;
   }
@@ -2587,7 +2622,7 @@ async function resolveSiteSource(media: MediaInput, autoplay = false, episodeTit
     operation({ type: 'media', media: resolved });
   } catch (cause) {
     if (controller.signal.aborted || sourceResolution !== controller) return;
-    if (cause instanceof BilibiliLoginRequired) {
+    if (cause instanceof BilibiliLoginRequired || cause instanceof BrowserBilibiliLoginRequired) {
       sourceLogin = { media, code, member, previous, autoplay, title: episodeTitle };
       $('source-bili-login').hidden = false;
     }
@@ -2603,6 +2638,8 @@ async function resolveSiteSource(media: MediaInput, autoplay = false, episodeTit
 }
 async function fetchResolvedSite(media: MediaInput, signal: AbortSignal): Promise<MediaInput> {
   if (media.provider === 'xifan') return resolveXifanPage(media, signal);
+  if (bilibiliWebTrial && !isNative && media.provider === 'bilibili')
+    return browserBiliLogin.resolve(media, signal);
   if (window.desktop && media.provider === 'bilibili') {
     const resolved = (await requestDesktopBilibili(
       'resolve',
@@ -2908,6 +2945,7 @@ function playbackError(event: Event) {
 video.addEventListener('error', playbackError);
 audio.addEventListener('error', playbackError);
 $('leave-button').onclick = () => {
+  browserBiliLogin.forget();
   connectionGeneration++;
   restoring = null;
   tabSessions.clear();
@@ -3112,6 +3150,7 @@ window.addEventListener('hashchange', () => {
   }
 });
 window.addEventListener('pagehide', () => {
+  browserBiliLogin.forget(false);
   seekControls.reset();
   voice.leave();
   cancelSourceResolution();
