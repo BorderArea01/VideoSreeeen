@@ -6,7 +6,7 @@
 
 **[打开网页版](https://videosreeeen.pages.dev)** · [Windows 安装版](https://github.com/BorderArea01/VideoSreeeen/releases/latest/download/VideoSreeeen-Setup.exe) · [Android APK](https://github.com/BorderArea01/VideoSreeeen/releases/latest/download/VideoSreeeen-Android.apk) · [全部发行版](https://github.com/BorderArea01/VideoSreeeen/releases) · [反馈问题](https://github.com/BorderArea01/VideoSreeeen/issues/new/choose)
 
-> **当前版本：[v0.4.5](https://github.com/BorderArea01/VideoSreeeen/releases/tag/v0.4.5)**。B 站共同播放默认使用房主本机登录态获取高清音视频源；朋友用网页观看，无需安装或登录。支持的实际档位取决于原站向账号返回的完整 AVC / AAC 轨道，不重新编码。
+> **当前版本：[v0.4.5](https://github.com/BorderArea01/VideoSreeeen/releases/tag/v0.4.5)**。B 站高清共同播放目前由 **Windows 房主客户端**使用本机登录态取源；朋友用网页观看，无需安装或登录。支持的实际档位取决于原站向账号返回的完整 AVC / AAC 轨道，不重新编码。
 
 ![VideoSreeeen：共同播放、房间成员、聊天与实时弹幕](docs/screenshots/desktop.png)
 
@@ -29,6 +29,8 @@ _本地双端实播截图，使用 MDN CC0 示例视频；昵称和消息为演�
 默认选择账号正常返回的 **720p / 1080p AVC 画面与 AAC 音轨**，两条轨道检查可加载后才替换房间影片；没有高清源时明确报错，不自动降为 360p。“原站与视频源”中可手动选择游客低画质，或取消“B 站取源后共同播放”使用客户端原站播放器。
 
 **客户端与系统浏览器的登录分开**，不会读取浏览器已经保存的 Cookie，也不需要安装 ZNote 或其他扩展。现有公共服务尚不支持全员只用网页发起 B 站高清取源。真实 B 站 1080p 网页实播与本版客户端入口的隔离测试分别记录，见[高清取源接入验证](docs/verification-bilibili-account.md)。
+
+**全网页授权方案（尚未上线）**：目标是房主粘贴链接，必要时跳转 B 站官方授权，返回后继续取源。已完成登录回调、令牌保管及房间续接设计；应用资质、高清取流权限和云端可达性仍需验证，不能将 OAuth 登录成功当成高清播放已支持。详见[全网页授权与取源设计](docs/design-bilibili-web-auth.md)。
 
 ![B 站链接入口：需要登录时可直接继续，默认高清，游客源为手动选项](docs/screenshots/bilibili-login.png)
 
