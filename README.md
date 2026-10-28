@@ -6,7 +6,7 @@
 
 **[打开网页版](https://videosreeeen.pages.dev)** · [Windows 安装版](https://github.com/BorderArea01/VideoSreeeen/releases/latest/download/VideoSreeeen-Setup.exe) · [Android APK](https://github.com/BorderArea01/VideoSreeeen/releases/latest/download/VideoSreeeen-Android.apk) · [全部发行版](https://github.com/BorderArea01/VideoSreeeen/releases) · [反馈问题](https://github.com/BorderArea01/VideoSreeeen/issues/new/choose)
 
-> **0.4.6 正在验证**：B 站改用房主浏览器的轻量视频源助手，复用已有登录；观众只用网页。游客低画质取源和扫码登录流程已移除。正式客户端下载暂仍为 [v0.4.5](https://github.com/BorderArea01/VideoSreeeen/releases/tag/v0.4.5)。
+> **当前版本：[v0.4.6](https://github.com/BorderArea01/VideoSreeeen/releases/tag/v0.4.6)**。B 站由房主浏览器的轻量视频源助手复用已有登录取源，观众只用网页。已通过正式公网房间双网页真实 1080p、音频及暂停 / 跳转验证；游客低画质取源和扫码登录流程已移除。
 
 ![VideoSreeeen：共同播放、房间成员、聊天与实时弹幕](docs/screenshots/desktop.png)
 
@@ -28,7 +28,7 @@ _本地双端实播截图，使用 MDN CC0 示例视频；昵称和消息为演�
 
 助手只负责取源，不读取或导出 Cookie，不把账号会话交给网页或服务器。选择正常权限下完整的 **720p / 1080p AVC 与 AAC 轨道**，可加载后才发布；失败或取消保留当前影片，不降级到游客低画质。旧的游客取源、服务端扫码实验和客户端专用登录入口均已删除。
 
-独立扩展已通过实际加载及合成双端播放、下一分 P、取消和登录失效检查；真实账号与发布验收分开记录，见[扩展取源验证](docs/verification-browser-extension.md)。安装包尚未上架扩展商店，当前提供约 18 KB 的开源 ZIP；[一次性安装步骤](docs/browser-extension.md)。
+独立扩展已通过实际加载、真实账号与正式公网房间双端 1080p 播放；合成检查另覆盖下一分 P、取消和登录失效，见[扩展取源验证](docs/verification-browser-extension.md)。安装包尚未上架扩展商店，当前提供约 18 KB 的开源 ZIP；[一次性安装步骤](docs/browser-extension.md)。
 
 ![轻量视频源助手：所有观看操作仍在网页里](docs/screenshots/source-helper-popup.png)
 
@@ -101,7 +101,7 @@ B 站取源在房主浏览器内完成，Cloudflare 只处理房间状态；视�
 
 | 平台                | 入口                                                                                                                                                                                                                    | 当前边界                                                         |
 | ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
-| Windows x64         | [安装版](https://github.com/BorderArea01/VideoSreeeen/releases/latest/download/VideoSreeeen-Setup.exe)／[便携版](https://github.com/BorderArea01/VideoSreeeen/releases/download/v0.4.5/VideoSreeeen-Portable-0.4.5.exe) | 安装版支持应用内下载并重启更新；便携版用于直接运行               |
+| Windows x64         | [安装版](https://github.com/BorderArea01/VideoSreeeen/releases/latest/download/VideoSreeeen-Setup.exe)／[便携版](https://github.com/BorderArea01/VideoSreeeen/releases/download/v0.4.6/VideoSreeeen-Portable-0.4.6.exe) | 安装版支持应用内下载并重启更新；便携版用于直接运行               |
 | Android 8.0+        | [APK](https://github.com/BorderArea01/VideoSreeeen/releases/latest/download/VideoSreeeen-Android.apk)                                                                                                                   | 应用内下载后由系统确认覆盖安装；已生成发行包，设备实测待补齐     |
 | 浏览器              | [直接打开](https://videosreeeen.pages.dev)                                                                                                                                                                              | 无需安装；标签页共享由电脑浏览器发起，移动端按实际浏览器能力使用 |
 | iPhone / iPad / Mac | [浏览器入口](https://videosreeeen.pages.dev)                                                                                                                                                                            | 不开发苹果原生客户端；Safari / iOS 实播、后台与锁屏仍待验收      |
