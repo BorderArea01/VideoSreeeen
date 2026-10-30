@@ -9,6 +9,7 @@ import { Latencies } from './latency';
 import { PlaybackHealth } from './playback-health';
 import { PlaybackClock } from './playback-clock';
 import { canSeekPlayback } from './playback-buffer';
+import { nextStartReady, waitForFirstVideoFrame } from './playback-startup';
 import { describePlaybackError, sourceDiagnostics, waitForPlayable } from './playback-source';
 import { DanmakuFeed } from './danmaku';
 import '../shared/danmaku.js';
@@ -341,6 +342,10 @@ const biliExtension = new BilibiliExtension();
 let sourceFailed = false;
 let localRetry: AbortController | null = null;
 let sourceTimedOut = false;
+let playerStartup: AbortController | null = null;
+let playerFirstFrameReady = false;
+let playerPriming = false;
+let frameReadySent = '';
 let automaticSeeks = 0,
   explicitSeeks = 0;
 let playbackPermissionNeeded = false;
@@ -385,7 +390,7 @@ let nativeBusy = false,
   cleanupState: 'idle' | 'running' | 'done' | 'error' = 'idle';
 let renderedChat = '';
 let nextBusy = false;
-let nextAutoplay: { code: string; url: string } | null = null;
+let nextAutoplay: { code: string; url: string; startedAt?: number } | null = null;
 const playbackHealth = new PlaybackHealth();
 const movieSound = new MovieSound(applyMovieSound);
 const voice = new RoomVoice($('chat-panel'), (active) => movieSound.voice(active));
@@ -442,7 +447,7 @@ function applyMovieSound(gain: number, muted: boolean) {
   video.volume = audio.volume = gain;
   audio.muted = muted;
   const preview = hasPendingPreview() || room?.media?.broadcast?.host === memberId;
-  video.muted = preview || !!audio.getAttribute('src') || muted;
+  video.muted = playerPriming || preview || !!audio.getAttribute('src') || muted;
   if (publisher && (publisher as HTMLVideoElement & { __stream?: MediaStream }).__stream) {
     if (publisherMonitor) publisherMonitor.gain.value = muted ? 0 : gain;
     else {
@@ -644,6 +649,7 @@ async function connect(kind: 'create' | 'join', reconnect = false) {
                 protocol: PROTOCOL,
                 capabilities: [
                   'latency-v1',
+                  'playback-ready-v1',
                   ...(cachePartsSupported
                     ? ['cache-parts-v1' as const, 'cache-window-v1' as const]
                     : []),
@@ -655,6 +661,7 @@ async function connect(kind: 'create' | 'join', reconnect = false) {
                 protocol: PROTOCOL,
                 capabilities: [
                   'latency-v1',
+                  'playback-ready-v1',
                   ...(cachePartsSupported
                     ? ['cache-parts-v1' as const, 'cache-window-v1' as const]
                     : []),
@@ -674,6 +681,7 @@ async function connect(kind: 'create' | 'join', reconnect = false) {
           connected = true;
           retries = 0;
           memberId = message.memberId;
+          frameReadySent = '';
           resume = message.resume;
           restoring = null;
           tabSessions.save({
@@ -926,14 +934,44 @@ function startNextWhenReady() {
     return;
   }
   if (room.media.url !== nextAutoplay.url) return;
+  nextAutoplay.startedAt ??= performance.now();
   if (room.playback.intent !== 'snapshot') {
     nextAutoplay = null;
     return;
   }
   if (room.mode === 'cache' && !room.cacheReady) return;
-  if (siteOpen ? (siteSample?.readyState ?? 0) < 2 : video.readyState < 2) return;
+  if (
+    siteOpen
+      ? (siteSample?.readyState ?? 0) < 2
+      : !playerFirstFrameReady || video.seeking || video.readyState < 2
+  )
+    return;
+  if (
+    room.mode === 'stream' &&
+    !nextStartReady(room.members, performance.now() - nextAutoplay.startedAt)
+  )
+    return;
   nextAutoplay = null;
   control('play');
+}
+function reportFrameReady() {
+  if (
+    !connected ||
+    !room?.media?.source ||
+    room.media.broadcast ||
+    room.mode !== 'stream' ||
+    loadedMedia !== room.media.id
+  )
+    return;
+  const ready = siteOpen
+    ? !!siteSample?.available && (siteSample.readyState ?? 0) >= 2
+    : playerFirstFrameReady;
+  const key = `${memberId}:${room.media.id}:${room.epoch}:${ready}`;
+  if (
+    key !== frameReadySent &&
+    send({ type: 'media-ready', mediaId: room.media.id, epoch: room.epoch, ready })
+  )
+    frameReadySent = key;
 }
 function openProvider() {
   if (!room?.media || room.media.broadcast || isNative) return;
@@ -1036,6 +1074,14 @@ function renderLiveStatus() {
   const badge = $('live-status');
   badge.title = '';
   const preview = hasPendingPreview();
+  if (!sharing && room?.media?.source && room.mode === 'stream' && !sourceFailed && !preview) {
+    const waiting = nextAutoplay?.url === room.media.url && room.playback.intent === 'snapshot';
+    const loading = !siteOpen && loadedMedia === room.media.id && !playerFirstFrameReady;
+    badge.hidden = !waiting && !loading;
+    badge.textContent = loading ? '正在加载视频画面…' : waiting ? '正在准备下一集…' : '';
+    badge.title = waiting ? '首次起播等待观众首帧，最长约 8 秒；后续缓冲只影响本机。' : '';
+    return;
+  }
   badge.hidden = !sharing && !preview;
   if (preview) {
     badge.textContent = '本机预览 · 正在建立房间共享';
@@ -1526,6 +1572,10 @@ function renderChat() {
   messages.scrollTop = nearBottom ? messages.scrollHeight : previousTop;
 }
 async function clearPlayback(keepSite = false, keepPreview = false) {
+  playerStartup?.abort();
+  playerStartup = null;
+  playerFirstFrameReady = false;
+  playerPriming = false;
   previewSource = undefined;
   seekControls.reset();
   automaticSeeks = explicitSeeks = 0;
@@ -1566,6 +1616,10 @@ async function clearPlayback(keepSite = false, keepPreview = false) {
 async function stopCachedPlayback() {
   cacheContext = null;
   if (loadedKind === 'cache') {
+    playerStartup?.abort();
+    playerStartup = null;
+    playerFirstFrameReady = false;
+    playerPriming = false;
     previewSource = undefined;
     seekControls.reset();
     hls?.destroy();
@@ -1656,6 +1710,11 @@ async function retryLocalVideo() {
   }
 }
 async function setPlayer(src: string, audioSrc?: string, isHls = false) {
+  playerStartup?.abort();
+  playerFirstFrameReady = false;
+  playerPriming = true;
+  const startup = new AbortController();
+  playerStartup = startup;
   previewSource = undefined;
   seekControls.reset();
   sourceFailed = false;
@@ -1677,6 +1736,7 @@ async function setPlayer(src: string, audioSrc?: string, isHls = false) {
   $('browser-hint').hidden = true;
   $('native-stage').hidden = true;
   if (audioSrc) {
+    audio.preload = 'auto';
     audio.src = audioSrc;
     video.muted = true;
   } else {
@@ -1684,6 +1744,7 @@ async function setPlayer(src: string, audioSrc?: string, isHls = false) {
     audio.load();
     video.muted = false;
   }
+  video.preload = 'auto';
   if (isHls) {
     const { default: Hls } = await import('hls.js');
     if (generation !== playerGeneration) return;
@@ -1706,8 +1767,29 @@ async function setPlayer(src: string, audioSrc?: string, isHls = false) {
     } else video.src = src;
   } else video.src = src;
   if (!hls) video.load();
+  const firstFrame = waitForFirstVideoFrame(video, startup.signal).then(() => {
+    if (!startup.signal.aborted && generation === playerGeneration && playerStartup === startup) {
+      video.pause();
+      playerPriming = false;
+    }
+  });
+  void Promise.all([firstFrame, ...(audioSrc ? [waitForPlayable(audio, startup.signal)] : [])])
+    .then(() => {
+      if (startup.signal.aborted || generation !== playerGeneration || playerStartup !== startup)
+        return;
+      playerFirstFrameReady = true;
+      movieSound.apply();
+      reportFrameReady();
+      applyPlayback(true);
+      startNextWhenReady();
+      render();
+    })
+    .catch(() => {});
   previewSource = { src, hls: isHls };
   movieSound.apply();
+  // Some HEVC decoders do not submit a paused first frame. Prime one muted
+  // frame locally, then pause it until the room starts; never play its audio.
+  playElement(video);
   return true;
 }
 async function loadStream(media: NonNullable<Snapshot['media']>) {
@@ -1772,6 +1854,7 @@ async function loadStream(media: NonNullable<Snapshot['media']>) {
 function applyPlayback(_explicit = false) {
   if (hasPendingPreview()) return;
   if (!room || !connected || pendingControl || (room.mode === 'cache' && !room.cacheReady)) return;
+  reportFrameReady();
   const playback = room.playback,
     target = currentPosition();
   // Keep a seek pending until its actual player can accept it. Metadata loading
@@ -1830,12 +1913,23 @@ function applyPlayback(_explicit = false) {
     (video.ended && room.members.find((m) => m.id === memberId)?.ended)
   )
     return;
+  if (playerStartup && !playerFirstFrameReady && loadedMedia === room.media?.id) {
+    if ((seek || initial) && !video.seeking && Math.abs(video.currentTime - target) > 0.12)
+      video.currentTime = Math.min(
+        target,
+        Number.isFinite(video.duration) ? Math.max(0, video.duration - 0.01) : target,
+      );
+    if (seek || initial) lastRevision = playback.revision;
+    if (!playerPriming) video.pause();
+    audio.pause();
+    return;
+  }
   const correction = reconcile(
     video.currentTime,
     target,
     playback.rate,
     playback.paused,
-    seek || initial,
+    seek || (initial && Math.abs(video.currentTime - target) > 0.12),
     catchingUp,
   );
   catchingUp = correction.kind === 'rate';
@@ -3187,6 +3281,7 @@ setInterval(() => {
   renderLiveStatus();
   if (room) {
     applyPlayback();
+    startNextWhenReady();
     if (room.media?.broadcast?.kind !== 'screen' && !hasPendingPreview()) {
       const position =
           room.media?.source &&

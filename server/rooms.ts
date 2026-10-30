@@ -23,6 +23,7 @@ export interface RoomSocket {
   close(code?: number, reason?: string): void;
 }
 interface Seat extends Member {
+  playbackReadyEvents?: boolean;
   latencyEvents?: boolean;
   rttAt?: number;
   resume: string;
@@ -160,6 +161,7 @@ export class Rooms {
       seat.name = name;
       seat.rtt = null;
       seat.rttAt = undefined;
+      seat.playbackReady = false;
       seat.cache = this.idleCache(room.epoch);
       seat.ended = false;
     } else seat = this.addSeat(room, name, socket);
@@ -342,6 +344,7 @@ export class Rooms {
         ended: seat.ended,
         cachePartsSupported: seat.cachePartsSupported === true,
         cacheWindowSupported: seat.cacheWindowSupported === true,
+        ...(seat.playbackReadyEvents ? { playbackReady: seat.playbackReady === true } : {}),
       })),
       chat: room.chat,
       ...(room.kickVote && room.kickVote.expires > this.now()
@@ -425,6 +428,7 @@ export class Rooms {
     seat.rttAt = undefined;
     seat.disconnectedAt = this.now();
     seat.cache = this.idleCache(room.epoch);
+    seat.playbackReady = false;
     if (room.media?.broadcast?.host === seat.id && !room.playback.paused) this.paused(room);
     if (leave) room.members.delete(seat.id);
     this.checkVote(room);
@@ -514,6 +518,20 @@ export class Rooms {
         throw new RoomError('conflict', '另一位成员刚刚操作了播放器，已同步最新状态，请重新操作');
     }
     switch (message.type) {
+      case 'media-ready': {
+        if (
+          !seat.playbackReadyEvents ||
+          room.media?.id !== message.mediaId ||
+          room.epoch !== message.epoch ||
+          room.mode !== 'stream' ||
+          !room.media.source ||
+          room.media.broadcast
+        )
+          return;
+        if (seat.playbackReady === message.ready) return;
+        seat.playbackReady = message.ready;
+        break;
+      }
       case 'unshare': {
         if (room.media?.broadcast?.host !== seat.id)
           throw new RoomError('not_host', '只有提供者可以结束共享');
@@ -576,6 +594,7 @@ export class Rooms {
         for (const s of room.members.values()) {
           s.cache = this.idleCache(room.epoch);
           s.ended = false;
+          s.playbackReady = false;
         }
         this.bump(room);
         break;
@@ -606,6 +625,7 @@ export class Rooms {
         for (const s of room.members.values()) {
           s.cache = this.idleCache(room.epoch);
           s.ended = false;
+          s.playbackReady = false;
         }
         this.paused(room);
         break;

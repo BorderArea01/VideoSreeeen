@@ -69,6 +69,7 @@ export interface Member {
   ended: boolean;
   cachePartsSupported?: boolean;
   cacheWindowSupported?: boolean;
+  playbackReady?: boolean;
 }
 export interface Chat {
   id: string;
@@ -114,7 +115,7 @@ export const clientMessageSchema = z.discriminatedUnion('type', [
     name: z.string().trim().min(1).max(30),
     protocol: z.literal(PROTOCOL),
     capabilities: z
-      .array(z.enum(['latency-v1', 'cache-parts-v1', 'cache-window-v1']))
+      .array(z.enum(['latency-v1', 'cache-parts-v1', 'cache-window-v1', 'playback-ready-v1']))
       .max(4)
       .optional(),
   }),
@@ -125,11 +126,17 @@ export const clientMessageSchema = z.discriminatedUnion('type', [
     resume: z.string().max(100).optional(),
     protocol: z.literal(PROTOCOL),
     capabilities: z
-      .array(z.enum(['latency-v1', 'cache-parts-v1', 'cache-window-v1']))
+      .array(z.enum(['latency-v1', 'cache-parts-v1', 'cache-window-v1', 'playback-ready-v1']))
       .max(4)
       .optional(),
   }),
   z.object({ type: z.literal('leave') }),
+  z.object({
+    type: z.literal('media-ready'),
+    mediaId: id,
+    epoch: z.number().int().nonnegative(),
+    ready: z.boolean(),
+  }),
   z.object({
     type: z.literal('kick-vote'),
     action: z.enum(['start', 'yes', 'no', 'withdraw']),

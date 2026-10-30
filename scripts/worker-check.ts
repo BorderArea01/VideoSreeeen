@@ -396,7 +396,7 @@ try {
     revokedCredentialSurvivesWake: true,
   };
 
-  const caps = ['latency-v1', 'cache-parts-v1', 'cache-window-v1'];
+  const caps = ['latency-v1', 'cache-parts-v1', 'cache-window-v1', 'playback-ready-v1'];
   const d = await client('ACD235');
   d.send({ type: 'create', name: 'window owner', protocol: 1, capabilities: caps });
   const dw = await d.next('welcome');
@@ -425,6 +425,24 @@ try {
     },
   });
   state = (await d.next('state')).room;
+  const startupRevision = state.playback.revision;
+  d.send({ type: 'media-ready', mediaId: state.media.id, epoch: state.epoch, ready: true });
+  state = (await d.next('state')).room;
+  assert.equal(state.members.find((m: any) => m.id === dw.memberId).playbackReady, true);
+  assert.equal(state.playback.revision, startupRevision);
+  await runtime.unsafeEvictDurableObject('videosreeeen-test', 'WatchRoom', {
+    name: 'ACD235',
+    webSockets: 'hibernate',
+  });
+  d.clear();
+  d.send({ type: 'snapshot' });
+  state = (await d.next('state')).room;
+  assert.equal(state.members.find((m: any) => m.id === dw.memberId).playbackReady, true);
+  evidence.startup = {
+    scopedFirstFrame: true,
+    separatePlaybackRevision: true,
+    hibernationPreserves: true,
+  };
   d.clear();
   d.send({
     type: 'mode',
