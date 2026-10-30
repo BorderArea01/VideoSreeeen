@@ -362,6 +362,158 @@ dialog .theme-choice input {
 }
 
 /* Only decorative layers fragment. Actual text, click targets and video remain intact. */
+:root[data-theme='glitch'] :is(.source-card, .members-card, .room-heading, .cache-options) {
+  position: relative;
+}
+:root[data-theme='glitch']
+  :is(
+    .source-card,
+    .members-card,
+    .chat-panel,
+    .room-heading,
+    .cache-options,
+    dialog,
+    .stage
+  )::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 31;
+  border-radius: inherit;
+  pointer-events: none;
+  background:
+    repeating-linear-gradient(
+        90deg,
+        #a5efff 0 17px,
+        transparent 17px 26px,
+        #ef9ee8 26px 32px,
+        transparent 32px 59px
+      )
+      top left / 100% 1px no-repeat,
+    repeating-linear-gradient(
+        90deg,
+        transparent 0 25px,
+        #9feeff 25px 49px,
+        transparent 49px 64px,
+        #d58cdb 64px 68px
+      )
+      bottom left / 100% 1px no-repeat,
+    repeating-linear-gradient(
+        0deg,
+        #a5efff 0 7px,
+        transparent 7px 16px,
+        #c38cdd 16px 20px,
+        transparent 20px 39px
+      )
+      top left / 1px 100% no-repeat,
+    repeating-linear-gradient(0deg, transparent 0 23px, #9feeff 23px 42px, transparent 42px 46px)
+      top right / 1px 100% no-repeat;
+  opacity: 0.85;
+}
+:root[data-theme='glitch']
+  :is(
+    .source-card,
+    .members-card,
+    .chat-panel,
+    .room-heading,
+    .cache-options,
+    dialog,
+    .stage
+  )::after {
+  content: '';
+  position: absolute;
+  z-index: 31;
+  top: 4px;
+  left: 2%;
+  width: 24%;
+  height: 2px;
+  pointer-events: none;
+  background: linear-gradient(
+    90deg,
+    #93edff 0 20%,
+    transparent 20% 27%,
+    #d291db 27% 68%,
+    transparent 68% 79%,
+    #b2f3ff 79%
+  );
+  box-shadow:
+    -4px -4px 0 -0.5px #80e3ff,
+    9px 3px 0 -0.5px #ce9cdd;
+  opacity: 0.75;
+}
+@keyframes theme-frame-tear {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-2px);
+  }
+  55% {
+    transform: translateX(3px);
+  }
+  80% {
+    transform: translateX(-1px);
+  }
+}
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  :root[data-theme='glitch']
+    :is(
+      .source-card,
+      .members-card,
+      .chat-panel,
+      .room-heading,
+      .cache-options,
+      dialog,
+      .stage
+    ):hover::before {
+    animation: theme-frame-tear 1000ms steps(4) 1;
+  }
+  :root[data-theme='glitch']
+    :is(
+      .source-card,
+      .members-card,
+      .chat-panel,
+      .room-heading,
+      .cache-options,
+      dialog,
+      .stage
+    ):hover::after {
+    animation: theme-frame-tear 850ms steps(3) 1 reverse;
+  }
+}
+@media (prefers-reduced-motion: reduce), (forced-colors: active) {
+  :root[data-theme='glitch']
+    :is(
+      .source-card,
+      .members-card,
+      .chat-panel,
+      .room-heading,
+      .cache-options,
+      dialog,
+      .stage
+    )::before,
+  :root[data-theme='glitch']
+    :is(
+      .source-card,
+      .members-card,
+      .chat-panel,
+      .room-heading,
+      .cache-options,
+      dialog,
+      .stage
+    )::after {
+    display: none;
+  }
+}
+:root[data-theme='glitch'] .page-cinema .stage::before,
+:root[data-theme='glitch'] .page-cinema .stage::after,
+:root[data-theme='glitch'] .stage:fullscreen::before,
+:root[data-theme='glitch'] .stage:fullscreen::after,
+:root[data-theme='glitch'] .player-shell:fullscreen .stage::before,
+:root[data-theme='glitch'] .player-shell:fullscreen .stage::after {
+  display: none;
+}
 :root[data-theme='glitch']
   :is(.topbar, .source-card, .hero-actions, .voice-actions, .dialog-buttons)
   .button,

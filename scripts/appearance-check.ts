@@ -203,6 +203,18 @@ try {
   await owner.locator('#send-button').click();
   await viewer.locator('.bubble').filter({ hasText: '皮肤只在本机切换。🟦' }).waitFor();
   proof.independentViewerAndChat = true;
+  const drag = await owner.locator('#chat-drag').boundingBox();
+  assert.ok(drag);
+  await owner.mouse.move(drag.x + 40, drag.y + 10);
+  await owner.mouse.down();
+  await owner.mouse.move(drag.x - 60, drag.y + 35);
+  await owner.mouse.up();
+  assert.equal(
+    await owner.locator('#chat-panel').evaluate((e) => getComputedStyle(e).position),
+    'fixed',
+  );
+  await owner.locator('#chat-dock').click();
+  proof.floatingChatPreserved = true;
   await owner.locator('#play-button').click();
   await owner.locator('#cache-options > summary').click();
   await owner.screenshot({ path: '.local/screenshots/theme-glitch-room.png', fullPage: true });
@@ -318,6 +330,14 @@ try {
     transform,
   );
   proof.buttonHoverAnimation = true;
+  await owner.locator('#members').hover();
+  const frame = owner.locator('.members-card').first();
+  assert.equal(
+    await frame.evaluate((e) => getComputedStyle(e, '::before').animationName),
+    'theme-frame-tear',
+  );
+  assert.equal(await frame.evaluate((e) => getComputedStyle(e, '::before').pointerEvents), 'none');
+  proof.containerFrames = true;
   assert.equal(
     await owner
       .locator('#room-button')
@@ -326,6 +346,10 @@ try {
   );
   await owner.locator('#page-fullscreen').click();
   await owner.waitForFunction(() => document.body.classList.contains('page-cinema'));
+  assert.equal(
+    await owner.locator('#stage').evaluate((e) => getComputedStyle(e, '::before').display),
+    'none',
+  );
   assert.equal(
     await owner.evaluate(
       () => document.querySelector('#video') === (window as any).__appearancePlayer,
