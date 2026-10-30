@@ -2,7 +2,7 @@
 
 可选外观、随机分配、播放中切换和故障艺术素材见 [2026-10-31 界面皮肤](appearance.md)。
 
-原 B 版的四个隔离设计变化、90% 材质不透明度、约 8% 边缘效果及视频保护区检查见 [B 系列预览验证](design/skin-directions-verification.md)；方案待选，未替换正式版本。
+当前待选视觉方向为 [从头重做的四张概念稿](design/glitch-concepts/README.md)，采用不同天空、材质、构图与破碎方式，选定后再实现；此前 [B 系列预览验证](design/skin-directions-verification.md) 作为历史记录保留。
 
 共同缓存面板布局整理、目录选择与桌面 / 窄屏截图见 [2026-10-31 缓存设置界面](verification-cache-ui.md)。
 

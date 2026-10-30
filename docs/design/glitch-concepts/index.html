@@ -1,0 +1,240 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="color-scheme" content="dark" />
+    <title>VideoSreeeen · 全新视觉方案</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+      html {
+        scroll-behavior: smooth;
+      }
+      body {
+        margin: 0;
+        background: #111317;
+        color: #eef0f5;
+        font:
+          14px/1.7 'Segoe UI',
+          'Microsoft YaHei',
+          sans-serif;
+      }
+      header,
+      main,
+      footer {
+        max-width: 1840px;
+        margin: auto;
+        padding: 28px 32px;
+      }
+      header {
+        display: flex;
+        align-items: end;
+        justify-content: space-between;
+        gap: 24px;
+      }
+      .eyebrow {
+        color: #abb2c1;
+        letter-spacing: 2px;
+        font-size: 11px;
+      }
+      h1 {
+        font-size: clamp(24px, 3vw, 38px);
+        font-weight: 550;
+        margin: 10px 0;
+        letter-spacing: -0.5px;
+      }
+      header p {
+        margin: 0;
+        color: #aeb5c2;
+      }
+      nav {
+        display: flex;
+        gap: 8px;
+      }
+      nav a {
+        padding: 9px 17px;
+        border: 1px solid #3a3e47;
+        color: #eceff5;
+      }
+      a {
+        color: inherit;
+        text-decoration: none;
+      }
+      a:focus-visible {
+        outline: 2px solid #aad8ff;
+        outline-offset: 5px;
+      }
+      main {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 36px 24px;
+        padding-top: 12px;
+      }
+      article {
+        min-width: 0;
+        scroll-margin-top: 16px;
+      }
+      .heading {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        padding: 0 0 13px;
+      }
+      h2 {
+        margin: 0;
+        font-size: 20px;
+        font-weight: 550;
+      }
+      h2 b {
+        margin-right: 10px;
+        font-weight: 400;
+        color: var(--accent);
+      }
+      .open {
+        color: #c1c8d6;
+        font-size: 12px;
+        white-space: nowrap;
+      }
+      .image {
+        display: block;
+        background: #20252e;
+      }
+      img {
+        width: 100%;
+        height: auto;
+        display: block;
+      }
+      .caption {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: space-between;
+        gap: 8px;
+        margin-top: 13px;
+        color: #aeb5c2;
+        font-size: 13px;
+      }
+      .caption strong {
+        font-weight: 400;
+        color: var(--accent);
+      }
+      footer {
+        border-top: 1px solid #2c3038;
+        color: #aeb5c2;
+        font-size: 12px;
+        display: flex;
+        justify-content: space-between;
+        gap: 20px;
+      }
+      @media (max-width: 800px) {
+        header {
+          align-items: start;
+          flex-direction: column;
+        }
+        header,
+        main,
+        footer {
+          padding: 22px 16px;
+        }
+        main {
+          grid-template-columns: 1fr;
+          padding-top: 0;
+        }
+        footer {
+          flex-wrap: wrap;
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        html {
+          scroll-behavior: auto;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div>
+        <span class="eyebrow">VideoSreeeen / VISUAL CONCEPTS</span>
+        <h1>四个全新视觉方向</h1>
+        <p>静态视觉概念稿 · 点击图片查看原图 · 选定后实现真实界面与动效</p>
+      </div>
+      <nav aria-label="选择方案">
+        <a href="#A">A</a><a href="#B">B</a><a href="#C">C</a><a href="#D">D</a>
+      </nav>
+    </header>
+    <main>
+      <article id="A" style="--accent: #a9d7ff">
+        <div class="heading">
+          <h2><b>A</b>天光断层</h2>
+          <a class="open" href="01-daylight-rupture.png" target="_blank" rel="noopener"
+            >查看原图 ↗</a
+          >
+        </div>
+        <a class="image" href="01-daylight-rupture.png" target="_blank" rel="noopener"
+          ><img
+            src="01-daylight-rupture.png"
+            width="1536"
+            height="1024"
+            alt="A 天光断层：晴昼云海，瓷白钴蓝材质，横向像素撕裂，右侧聊天与底部控制带"
+        /></a>
+        <div class="caption">
+          <strong>晴昼 · 瓷白 / 钴蓝</strong><span>细长像素流，建筑式横向构图</span>
+        </div>
+      </article>
+      <article id="B" style="--accent: #efb18f">
+        <div class="heading">
+          <h2><b>B</b>暮色熔帧</h2>
+          <a class="open" href="02-dusk-datamosh.png" target="_blank" rel="noopener">查看原图 ↗</a>
+        </div>
+        <a class="image" href="02-dusk-datamosh.png" target="_blank" rel="noopener"
+          ><img
+            src="02-dusk-datamosh.png"
+            width="1536"
+            height="1024"
+            alt="B 暮色熔帧：落日天空，暖铜与深紫胶片材质，数据熔合，错位浮岛布局"
+        /></a>
+        <div class="caption">
+          <strong>落日 · 暖铜 / 深紫</strong><span>胶片熔合，错位浮岛构图</span>
+        </div>
+      </article>
+      <article id="C" style="--accent: #cfdae1">
+        <div class="heading">
+          <h2><b>C</b>风暴碎页</h2>
+          <a class="open" href="03-storm-fracture.png" target="_blank" rel="noopener">查看原图 ↗</a>
+        </div>
+        <a class="image" href="03-storm-fracture.png" target="_blank" rel="noopener"
+          ><img
+            src="03-storm-fracture.png"
+            width="1536"
+            height="1024"
+            alt="C 风暴碎页：风暴云层，石墨与银白厚片撕裂，竖向工具栏与右侧聊天"
+        /></a>
+        <div class="caption">
+          <strong>风暴 · 石墨 / 银白</strong><span>厚片撕裂，工业编辑式构图</span>
+        </div>
+      </article>
+      <article id="D" style="--accent: #a6eddb">
+        <div class="heading">
+          <h2><b>D</b>极夜回声</h2>
+          <a class="open" href="04-aurora-echo.png" target="_blank" rel="noopener">查看原图 ↗</a>
+        </div>
+        <a class="image" href="04-aurora-echo.png" target="_blank" rel="noopener"
+          ><img
+            src="04-aurora-echo.png"
+            width="1536"
+            height="1024"
+            alt="D 极夜回声：极光星空，墨色与薄荷冷光，悬浮碎层，上方全景视频与下方双面板"
+        /></a>
+        <div class="caption">
+          <strong>极夜 · 墨色 / 薄荷</strong><span>冷光碎层，全景与双面板构图</span>
+        </div>
+      </article>
+    </main>
+    <footer>
+      <span>设计图中的文字、头像与控件为示例；本页用于选择视觉方向。</span
+      ><a href="README.md">制作说明与完整提示词 ↗</a>
+    </footer>
+  </body>
+</html>

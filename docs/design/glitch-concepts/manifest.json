@@ -1,0 +1,44 @@
+{
+  "date": "2026-10-31",
+  "kind": "static-visual-concepts",
+  "generator": "built-in image_gen",
+  "implemented": false,
+  "images": [
+    {
+      "key": "A",
+      "name": "天光断层",
+      "file": "01-daylight-rupture.png",
+      "width": 1536,
+      "height": 1024,
+      "bytes": 2548238,
+      "sha256": "5ca71ca6cf8a0c26c22b27fd57a8769e88c1ac02fc8566825eda40c93cb5e92a"
+    },
+    {
+      "key": "B",
+      "name": "暮色熔帧",
+      "file": "02-dusk-datamosh.png",
+      "width": 1536,
+      "height": 1024,
+      "bytes": 2591656,
+      "sha256": "a6616cdfb47dcf4eeaf828e910cd73abec76102e7acaf605313e24a03fc289a7"
+    },
+    {
+      "key": "C",
+      "name": "风暴碎页",
+      "file": "03-storm-fracture.png",
+      "width": 1536,
+      "height": 1024,
+      "bytes": 2537723,
+      "sha256": "39cd52d0cd2ff37b107bbea4588a9900800f1893a584147cf871b2f5d97ae44c"
+    },
+    {
+      "key": "D",
+      "name": "极夜回声",
+      "file": "04-aurora-echo.png",
+      "width": 1536,
+      "height": 1024,
+      "bytes": 2475819,
+      "sha256": "d7d1c74113fd0449e80d14b5d688fb28e1d438990a627516f8bcf935f2ea0fa3"
+    }
+  ]
+}

@@ -1,6 +1,8 @@
 # 2026-10-31 B 版四个变化方案验证
 
-当前预览：[四版动态对比](https://6025f61d.videosreeeen.pages.dev/board.html)、[完整交互](https://6025f61d.videosreeeen.pages.dev/index.html)。固定入口 [skin-directions](https://skin-directions.videosreeeen.pages.dev/board.html) 指向同一新版。Pages 预览分支 `skin-directions`，部署 `6025f61d`，实现提交 `c8b677b`，源码分支 `codex/skin-directions-20261031`。
+本轮候选已被用户否决，以下为历史验证记录。当前待选方案为 [从头重做的四张视觉概念稿](glitch-concepts/README.md)，选择视觉方向后再重新实现。
+
+历史预览：[四版动态对比](https://6025f61d.videosreeeen.pages.dev/board.html)、[完整交互](https://6025f61d.videosreeeen.pages.dev/index.html)。历史部署 `6025f61d`，实现提交 `c8b677b`，源码分支 `codex/skin-directions-20261031`。固定预览入口现用于全新视觉概念稿。
 
 ![四版实际浏览器截图](skin-directions-overview.png)
 
