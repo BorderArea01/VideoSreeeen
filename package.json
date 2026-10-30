@@ -29,6 +29,8 @@
     "worker:deploy": "wrangler deploy",
     "test:p2p": "tsx scripts/p2p-check.ts",
     "test:cache-download": "tsx scripts/cache-download-check.ts",
+    "test:cache-parts": "tsx scripts/cache-parts-check.ts",
+    "test:cache-location": "tsx scripts/cache-location-check.ts",
     "verify": "npm run format:check && npm test && npm run build && npm run check:worker && npm run worker:check",
     "test:worker": "tsx scripts/worker-check.ts",
     "pages:prepare": "node scripts/build-pages.mjs",

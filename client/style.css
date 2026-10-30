@@ -2308,3 +2308,42 @@ button {
     font-size: 9px;
   }
 }
+.cache-settings {
+  display: grid;
+  gap: 10px;
+  padding: 0 18px 16px;
+}
+.cache-settings label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13px;
+}
+.cache-settings select {
+  max-width: 70%;
+  padding: 8px;
+  color: inherit;
+  background: #19181f;
+  border: 1px solid #36333c;
+  border-radius: 8px;
+}
+.cache-location-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.cache-location-row span {
+  overflow-wrap: anywhere;
+}
+@media (max-width: 600px) {
+  .cache-settings label,
+  .cache-location-row {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .cache-settings select {
+    max-width: 100%;
+  }
+}

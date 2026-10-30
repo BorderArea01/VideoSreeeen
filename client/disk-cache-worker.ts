@@ -13,6 +13,14 @@ const files = new Map<
 >();
 const hex = (bytes: Uint8Array) => [...bytes].map((b) => b.toString(16).padStart(2, '0')).join('');
 let chain = Promise.resolve();
+let external: FileSystemDirectoryHandle | undefined;
+async function externalBlock(name: string, offset: number, length: number) {
+  const data = await (
+    await (await external!.getFileHandle(name + '.' + offset + '.part')).getFile()
+  ).arrayBuffer();
+  if (data.byteLength !== length) throw new Error('磁盘缓存分块长度已变化，请重新缓存');
+  return data;
+}
 globalThis.onmessage = (event: MessageEvent) => {
   const { id, action, ...p } = event.data;
   chain = chain.then(async () => {
@@ -29,9 +37,19 @@ globalThis.onmessage = (event: MessageEvent) => {
         )
           throw new Error('磁盘缓存计划无效');
         const root = await (
-          await navigator.storage.getDirectory()
+          p.parent ?? (await navigator.storage.getDirectory())
         ).getDirectoryHandle('videosreeeen-disk', { create: true });
         const directory = await root.getDirectoryHandle(p.directory, { create: true });
+        if (p.parent) {
+          external = directory;
+          const marker = await (
+            await directory.getFileHandle('videosreeeen-owner.json', { create: true })
+          ).createWritable();
+          await marker.write(
+            JSON.stringify({ app: 'videosreeeen-disk-v1', directory: p.directory }),
+          );
+          await marker.close();
+        }
         for (const f of p.files) {
           if (
             !validName(f.name) ||
@@ -41,31 +59,38 @@ globalThis.onmessage = (event: MessageEvent) => {
           )
             throw new Error('磁盘缓存文件无效');
           const handle = await directory.getFileHandle(f.name, { create: true });
-          if (typeof (handle as any).createSyncAccessHandle !== 'function')
+          if (!external && typeof (handle as any).createSyncAccessHandle !== 'function')
             throw new Error('此浏览器暂不支持磁盘缓存，请更新浏览器或使用客户端。');
-          const access = await (
-            handle as FileSystemFileHandle & { createSyncAccessHandle(): Promise<Access> }
-          ).createSyncAccessHandle();
+          const access = external
+            ? undefined
+            : await (
+                handle as FileSystemFileHandle & { createSyncAccessHandle(): Promise<Access> }
+              ).createSyncAccessHandle();
           files.set(f.name, { size: f.size, handle, access, blocks: new Set() });
         }
       } else if (action === 'finish') {
         const hashes: string[] = [];
         const buffer = new Uint8Array(BLOCK_SIZE);
-        for (const f of files.values()) {
-          if (!f.access || f.blocks.size !== Math.ceil(f.size / BLOCK_SIZE))
+        for (const [name, f] of files) {
+          if ((!f.access && !external) || f.blocks.size !== Math.ceil(f.size / BLOCK_SIZE))
             throw new Error('磁盘缓存尚未完整');
-          f.access.flush();
+          f.access?.flush();
           const hash = sha256.create();
+          const output =
+            external && p.assemble !== false ? await f.handle.createWritable() : undefined;
           for (let offset = 0; offset < f.size; offset += BLOCK_SIZE) {
             const part = buffer.subarray(0, Math.min(BLOCK_SIZE, f.size - offset));
-            if (f.access.read(part, { at: offset }) !== part.length)
+            if (external) part.set(new Uint8Array(await externalBlock(name, offset, part.length)));
+            else if (f.access!.read(part, { at: offset }) !== part.length)
               throw new Error('磁盘缓存读取不完整');
             hash.update(part);
+            if (output) await output.write(part as Uint8Array<ArrayBuffer>);
           }
+          await output?.close();
           hashes.push(hex(hash.digest()));
         }
         for (const f of files.values()) {
-          f.access!.close();
+          f.access?.close();
           f.access = undefined;
         }
         value = hex(sha256(new TextEncoder().encode(hashes.join('\n'))));
@@ -83,14 +108,31 @@ globalThis.onmessage = (event: MessageEvent) => {
         if (action === 'put') {
           const data = new Uint8Array(p.data);
           if (
-            !f.access ||
+            (!f.access && !external) ||
             data.length !== length ||
-            f.access.write(data, { at: p.offset }) !== length
+            (!external && f.access!.write(data, { at: p.offset }) !== length)
           )
             throw new Error('磁盘分块写入不完整');
+          if (external) {
+            const handle = await external.getFileHandle(p.name + '.' + p.offset + '.part', {
+              create: true,
+            });
+            const output = await handle.createWritable();
+            try {
+              await output.write(data);
+              await output.close();
+            } catch (cause) {
+              await output.abort().catch(() => {});
+              throw cause;
+            }
+          }
           f.blocks.add(p.offset);
         } else if (action === 'get' && f.blocks.has(p.offset)) {
-          if (f.access) {
+          if (external)
+            value = await (
+              await (await external.getFileHandle(p.name + '.' + p.offset + '.part')).getFile()
+            ).arrayBuffer();
+          else if (f.access) {
             const data = new Uint8Array(length);
             if (f.access.read(data, { at: p.offset }) !== length)
               throw new Error('磁盘分块读取不完整');

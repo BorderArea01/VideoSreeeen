@@ -54,6 +54,7 @@ export interface CacheStatus {
   epoch: number;
   peerBytes?: number;
   sourceBytes?: number;
+  parts?: string[];
 }
 export interface Member {
   id: string;
@@ -63,6 +64,7 @@ export interface Member {
   rttAgeMs?: number;
   cache: CacheStatus;
   ended: boolean;
+  cachePartsSupported?: boolean;
 }
 export interface Chat {
   id: string;
@@ -84,6 +86,7 @@ export interface Snapshot {
   mode: 'stream' | 'cache';
   epoch: number;
   cacheReady: boolean;
+  cacheParts?: 1 | 2 | 3;
   finished: boolean;
   members: Member[];
   chat: Chat[];
@@ -94,7 +97,10 @@ export const clientMessageSchema = z.discriminatedUnion('type', [
     type: z.literal('create'),
     name: z.string().trim().min(1).max(30),
     protocol: z.literal(PROTOCOL),
-    capabilities: z.array(z.literal('latency-v1')).max(4).optional(),
+    capabilities: z
+      .array(z.enum(['latency-v1', 'cache-parts-v1']))
+      .max(4)
+      .optional(),
   }),
   z.object({
     type: z.literal('join'),
@@ -102,7 +108,10 @@ export const clientMessageSchema = z.discriminatedUnion('type', [
     invite: z.string().max(200),
     resume: z.string().max(100).optional(),
     protocol: z.literal(PROTOCOL),
-    capabilities: z.array(z.literal('latency-v1')).max(4).optional(),
+    capabilities: z
+      .array(z.enum(['latency-v1', 'cache-parts-v1']))
+      .max(4)
+      .optional(),
   }),
   z.object({ type: z.literal('leave') }),
   z.object({ type: z.literal('unshare'), base: z.number().int().nonnegative(), op: id }),
@@ -125,6 +134,7 @@ export const clientMessageSchema = z.discriminatedUnion('type', [
     base: z.number().int().nonnegative(),
     op: id,
     mode: z.enum(['stream', 'cache']),
+    cacheParts: z.union([z.literal(1), z.literal(2), z.literal(3)]).optional(),
   }),
   z.object({
     type: z.literal('cache'),
@@ -135,6 +145,10 @@ export const clientMessageSchema = z.discriminatedUnion('type', [
     bytes: z.number().int().min(0).max(17179869184),
     peerBytes: z.number().int().nonnegative().max(17179869184).optional(),
     sourceBytes: z.number().int().nonnegative().max(17179869184).optional(),
+    parts: z
+      .array(z.string().regex(/^[a-f0-9]{64}$/))
+      .max(3)
+      .optional(),
     fingerprint: z
       .string()
       .regex(/^[a-f0-9]{64}$/)

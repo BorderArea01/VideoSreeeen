@@ -100,6 +100,9 @@ const ready = async (page: Page, timeout = 30000) => {
 try {
   const contexts = [await browser.newContext(), await browser.newContext(devices['Pixel 7'])];
   for (const context of contexts) {
+    await context.addInitScript(() => {
+      Object.defineProperty(window, 'showDirectoryPicker', { value: undefined });
+    });
     // Isolate origin-download recovery from P2P; the independent test:p2p
     // verifies member sourcing, corruption rejection and native disk writes.
     await context.route(origin + '/config', async (route) => {

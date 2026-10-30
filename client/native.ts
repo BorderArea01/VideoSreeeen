@@ -26,6 +26,7 @@ export interface NativeCache {
   audio?: string;
   peerBytes?: number;
   sourceBytes?: number;
+  parts?: string[];
 }
 declare global {
   interface Window {

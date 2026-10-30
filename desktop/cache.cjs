@@ -20,7 +20,10 @@ class DiskCache {
   }
   async init() {
     await fsp.mkdir(this.root, { recursive: true });
-    for (const name of await fsp.readdir(this.root))
+    for (const name of await fsp.readdir(this.root).catch((error) => {
+      if (error.code === 'ENOENT') return [];
+      throw error;
+    }))
       if (JOB.test(name)) await fsp.rm(this.directory(name), { recursive: true, force: true });
   }
   async start({ jobId, plan }) {
@@ -164,7 +167,10 @@ class DiskCache {
   }
   async stop() {
     for (const id of [...this.jobs.keys()]) await this.clear(id);
-    for (const name of await fsp.readdir(this.root))
+    for (const name of await fsp.readdir(this.root).catch((error) => {
+      if (error.code === 'ENOENT') return [];
+      throw error;
+    }))
       if (JOB.test(name)) await fsp.rm(this.directory(name), { recursive: true, force: true });
   }
   async response(request) {
@@ -177,6 +183,62 @@ class DiskCache {
     }
     const name = decodeURIComponent(url.pathname.slice(1));
     if (!NAME.test(name) || name.includes('..')) return new Response('Not found', { status: 404 });
+    const partial = this.partial?.(url.hostname, name);
+    if (partial) {
+      const size = partial.size;
+      let start = 0,
+        end = size - 1;
+      const range = request.headers.get('range');
+      if (range) {
+        const match = /^bytes=(\d*)-(\d*)$/.exec(range);
+        if (!match || (!match[1] && !match[2])) return new Response('', { status: 416 });
+        start = match[1] ? Number(match[1]) : Math.max(0, size - Number(match[2]));
+        if (match[1] && match[2]) end = Math.min(end, Number(match[2]));
+      }
+      if (
+        !Number.isSafeInteger(start) ||
+        !Number.isSafeInteger(end) ||
+        start > end ||
+        start >= size
+      )
+        return new Response('', { status: 416, headers: { 'Content-Range': `bytes */${size}` } });
+      let position = start,
+        cancelled = false;
+      const stream = new ReadableStream({
+        async pull(controller) {
+          try {
+            const offset = Math.floor(position / (256 * 1024)) * 256 * 1024;
+            const bytes = await partial.read(offset, request.signal);
+            if (cancelled) return;
+            const part = bytes.subarray(
+              position - offset,
+              Math.min(bytes.length, end - offset + 1),
+            );
+            position += part.length;
+            controller.enqueue(part);
+            if (position > end) controller.close();
+          } catch (cause) {
+            if (!cancelled) controller.error(cause);
+          }
+        },
+        cancel() {
+          cancelled = true;
+        },
+      });
+      const headers = {
+        'Content-Type': name.endsWith('.m4a') ? 'audio/mp4' : 'video/mp4',
+        'Content-Length': String(end - start + 1),
+        'Accept-Ranges': 'bytes',
+        'Cache-Control': 'no-store',
+        'Access-Control-Allow-Origin': '*',
+      };
+      if (range) headers['Content-Range'] = `bytes ${start}-${end}/${size}`;
+      if (request.method === 'HEAD') {
+        await stream.cancel();
+        return new Response(null, { status: range ? 206 : 200, headers });
+      }
+      return new Response(stream, { status: range ? 206 : 200, headers });
+    }
     try {
       await fsp.access(path.join(dir, 'complete.json'));
       const file = path.join(dir, name),

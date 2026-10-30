@@ -18,10 +18,18 @@ import { describeUrl } from '../shared/sites';
 import { nextEpisode } from '../shared/episodes';
 import { positionAt, reconcile } from '../shared/sync';
 import { DeviceCache } from './cache';
+import { BrowserDiskCache } from './disk-cache';
 import { RoomPeers } from './peers';
 import { setupUpdates } from './updates';
 import { BroadcastPeers } from './broadcast';
 import { BroadcastRelayClient } from './broadcast-relay';
+import {
+  cacheDirectory,
+  loadCacheDirectory,
+  chooseCacheDirectory,
+  canChooseCacheDirectory,
+  authorizeCacheDirectory,
+} from './cache-location';
 import { RoomVoice } from './voice';
 import { MovieSound } from './audio-mix';
 import { PageFullscreen } from './page-fullscreen';
@@ -69,6 +77,59 @@ const playbackPicker = new PlaybackPicker((choice) => {
 $('link-capability').textContent = isNative
   ? '每人独立加载视频，只同步进度，画质不经转码。支持视频直链和客户端内的原站播放器；原站需要各自登录。'
   : '各自加载，同步进度。支持视频直链与稀饭 xfy2 / AL / xfxf1；B 站由房主浏览器的视频源助手取源，观众无需安装。蜜柑为实验支持。';
+$('cache-options').insertAdjacentHTML(
+  'beforeend',
+  `
+  <div class="cache-settings">
+    <label>开始播放的条件<select id="cache-parts"><option value="1">完整缓存后播放</option><option value="2">全员缓存首批 1/2 后播放</option><option value="3">全员缓存首批 1/3 后播放</option></select></label>
+    <div class="cache-location-row"><span id="cache-location" class="dialog-note"></span><button id="cache-location-choose" type="button" class="button soft small">选择缓存目录</button></div>
+    <p class="dialog-note" title="按文件字节分批，另行下载播放器必需的初始化数据；不代表片长精确等分。后续下载赶不上播放时仍可能等待。">首批落盘并校验后开播，后台继续缓存；完整缓存最稳妥。</p>
+  </div>`,
+);
+function renderCacheLocation(path?: string) {
+  $('cache-location').textContent = path
+    ? `缓存目录：${path}`
+    : cacheDirectory()
+      ? `缓存目录：${cacheDirectory()!.name} / videosreeeen-disk`
+      : canChooseCacheDirectory()
+        ? '首次缓存请选择目录，建议 D 盘；之后记住选择。'
+        : '缓存保存在浏览器 / 系统管理的应用存储中，此设备不能选择磁盘。';
+  $<HTMLButtonElement>('cache-location-choose').disabled =
+    !!window.VSNative || (!window.desktop && !canChooseCacheDirectory());
+}
+$('cache-location-choose').onclick = () => {
+  if (cache.jobId) {
+    toast('请先关闭共同缓存，再更换目录');
+    return;
+  }
+  void (
+    window.desktop
+      ? nativeCall('chooseCacheLocation').then((result) => renderCacheLocation(result.path))
+      : chooseCacheDirectory().then(() => renderCacheLocation())
+  ).catch((cause) => {
+    if (cause?.name !== 'AbortError') error(cause);
+  });
+};
+if (window.desktop)
+  void nativeCall('cacheLocation')
+    .then((result) => renderCacheLocation(result.path))
+    .catch(error);
+else
+  void loadCacheDirectory()
+    .then(() => {
+      renderCacheLocation();
+      void cache.sweep().catch(error);
+    })
+    .catch(() => renderCacheLocation());
+const cachePartsSupported =
+  !!window.desktop ||
+  (!isNative &&
+    window.isSecureContext &&
+    BrowserDiskCache.supported() &&
+    'serviceWorker' in navigator);
+if (!cachePartsSupported)
+  for (const option of Array.from($<HTMLSelectElement>('cache-parts').options))
+    option.disabled = option.value !== '1';
 if (!isNative)
   $<HTMLInputElement>('source-url').placeholder = '粘贴 B 站、稀饭、蜜柑页面或视频直链';
 $('site-source-options').hidden = !isNative;
@@ -91,13 +152,13 @@ $('bili-open-browser').onclick = () => {
   if (room) openExternal(`${activeServer}/#${room.invite}`);
 };
 $('link-choice').append($('cache-options'));
-$('cache-options').querySelector('summary')!.textContent = '网络卡顿时：先完整缓存';
+$('cache-options').querySelector('summary')!.textContent = '共同缓存 · 按需启用';
 $('cache-options').querySelector('summary')!.title =
   '仅供可下载的视频：全员完整下载后再播放，看完清理。实时共享画面不使用此功能。';
 if (!isNative)
   $('cache-options').insertAdjacentHTML(
     'beforeend',
-    '<p class="dialog-note" title="支持浏览器磁盘存储时分块写盘，上限 4 GiB，受本机空间与源站下载许可限制；旧浏览器仍受小文件容量限制。">完整下载到各自设备后播放，看完自动清理。长视频使用浏览器磁盘缓存。</p>',
+    '<p class="dialog-note" title="支持浏览器磁盘存储时分块写盘，上限 4 GiB，受本机空间与源站下载许可限制；旧浏览器仍受小文件容量限制。">缓存写入各自设备，看完自动清理；源站须允许下载。</p>',
   );
 $('cache-button').insertAdjacentHTML(
   'afterend',
@@ -563,12 +624,23 @@ async function connect(kind: 'create' | 'join', reconnect = false) {
       socket.send(
         JSON.stringify(
           kind === 'create'
-            ? { type: 'create', name, protocol: PROTOCOL, capabilities: ['latency-v1'] }
+            ? {
+                type: 'create',
+                name,
+                protocol: PROTOCOL,
+                capabilities: [
+                  'latency-v1',
+                  ...(cachePartsSupported ? ['cache-parts-v1' as const] : []),
+                ],
+              }
             : {
                 type: 'join',
                 name,
                 protocol: PROTOCOL,
-                capabilities: ['latency-v1'],
+                capabilities: [
+                  'latency-v1',
+                  ...(cachePartsSupported ? ['cache-parts-v1' as const] : []),
+                ],
                 invite,
                 ...(resume ? { resume } : {}),
               },
@@ -1221,6 +1293,11 @@ function render() {
   renderChat();
   renderLatencies();
   const caching = room?.mode === 'cache';
+  $<HTMLSelectElement>('cache-parts').disabled = !!caching;
+  for (const option of Array.from($<HTMLSelectElement>('cache-parts').options))
+    option.disabled =
+      option.value !== '1' && (!cachePartsSupported || room?.media?.source?.kind === 'hls');
+  if (caching) $<HTMLSelectElement>('cache-parts').value = String(room?.cacheParts ?? 1);
   $('mode-toggle').setAttribute('aria-checked', String(!!caching));
   const hashes = new Set(
     room?.members.filter((m) => m.cache.state === 'ready').map((m) => m.cache.fingerprint),
@@ -1236,9 +1313,11 @@ function render() {
         ? '视频内容不一致，请重新识别并让大家缓存同一份视频。'
         : room!.cacheReady
           ? '大家都已准备好，可以一起开始播放。'
-          : '等待所有成员完整缓存，期间无法开始播放。'
+          : (room!.cacheParts ?? 1) > 1
+            ? '等待全员首批内容落盘并校验，之后边播边缓存。'
+            : '等待所有成员完整缓存，期间无法开始播放。'
       : cacheAvailable
-        ? '有人边播边卡时再启用：每人完整下载，全部就绪后播放，看完自动清理。'
+        ? '按需启用：可选完整下载或首批缓存后开播，看完自动清理。'
         : '先选择可下载的视频源。全员下载完整后再看；共享画面不使用此功能。';
   const mine = room?.members.find((m) => m.id === memberId)?.cache;
   const needsCache = !!caching && (!room?.cacheReady || loadedKind !== 'cache');
@@ -1251,13 +1330,15 @@ function render() {
       : cleanupState === 'error'
         ? '缓存清理失败'
         : '这一幕已结束，正在清理缓存'
-    : mine?.state === 'ready'
-      ? '本机已准备好'
-      : mine?.state === 'downloading'
-        ? `正在完整缓存 · ${Math.floor(mine.progress * 100)}%`
-        : mine?.state === 'error'
-          ? '本机缓存未完成'
-          : '等待完整缓存';
+    : mine?.parts?.length && mine.state === 'downloading'
+      ? `首批已就绪 · 后台缓存 ${Math.floor(mine.progress * 100)}%`
+      : mine?.state === 'ready'
+        ? '本机已准备好'
+        : mine?.state === 'downloading'
+          ? `正在完整缓存 · ${Math.floor(mine.progress * 100)}%`
+          : mine?.state === 'error'
+            ? '本机缓存未完成'
+            : '等待完整缓存';
   $('cache-stream').hidden = mine?.state !== 'error' || !!room?.finished;
   $('cache-description').textContent =
     mine?.state === 'error'
@@ -2146,7 +2227,13 @@ function cacheProgress(event: NativeCache) {
     return;
   if (event.state === 'downloading' && event.error) cacheNote = event.error;
   const now = performance.now();
-  if (event.state !== 'downloading' || now - lastProgressSend > 800) {
+  if (
+    event.state !== 'downloading' ||
+    event.entry ||
+    (event.parts?.length ?? 0) !==
+      (room.members.find((m) => m.id === memberId)?.cache.parts?.length ?? 0) ||
+    now - lastProgressSend > 800
+  ) {
     lastProgressSend = now;
     send({
       type: 'cache',
@@ -2157,11 +2244,12 @@ function cacheProgress(event: NativeCache) {
       bytes: event.bytes,
       peerBytes: event.peerBytes,
       sourceBytes: event.sourceBytes,
+      ...(event.parts ? { parts: event.parts } : {}),
       ...(event.fingerprint ? { fingerprint: event.fingerprint } : {}),
       ...(event.error ? { error: event.error } : {}),
     });
   }
-  if (event.state === 'ready' && event.entry) {
+  if (event.entry && (event.state === 'ready' || event.parts?.length)) {
     loadedKind = 'cache';
     loadedMedia = room.media.id;
     siteOpen = false;
@@ -2686,7 +2774,11 @@ $('fullscreen').onclick = () => {
   else void $('player-shell').requestFullscreen().catch(error);
 };
 $('mode-toggle').onclick = () =>
-  operation({ type: 'mode', mode: room?.mode === 'cache' ? 'stream' : 'cache' });
+  operation({
+    type: 'mode',
+    mode: room?.mode === 'cache' ? 'stream' : 'cache',
+    cacheParts: Number($<HTMLSelectElement>('cache-parts').value) as 1 | 2 | 3,
+  });
 $('cache-stream').onclick = () => operation({ type: 'mode', mode: 'stream' });
 $('cache-button').onclick = () => {
   if (room?.finished) {
@@ -2703,6 +2795,10 @@ $('cache-button').onclick = () => {
     send({ type: 'cache', mediaId, epoch, state: 'downloading', progress: 0, bytes: 0 });
     render();
     try {
+      if (!isNative && canChooseCacheDirectory() && !cacheDirectory()) {
+        await chooseCacheDirectory();
+        renderCacheLocation();
+      } else if (!isNative) await authorizeCacheDirectory();
       await clearing;
       if (room?.media?.id !== mediaId || room.epoch !== epoch || !room.media.source) return;
       if (loadedKind === 'cache') await stopCachedPlayback();
@@ -2714,6 +2810,7 @@ $('cache-button').onclick = () => {
         activeServer,
         `/cache-plan/${room.code}/${room.mediaToken}`,
         room.media.source,
+        room.cacheParts ?? 1,
       );
     } catch (e) {
       if (room?.media?.id === mediaId && room.epoch === epoch) {

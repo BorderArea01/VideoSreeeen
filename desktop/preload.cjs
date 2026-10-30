@@ -12,6 +12,8 @@ const allowed = new Set([
   'cacheStart',
   'cacheClear',
   'cacheIO',
+  'cacheLocation',
+  'chooseCacheLocation',
   'captureSite',
   'endCapture',
   'update',

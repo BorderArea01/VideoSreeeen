@@ -6,6 +6,7 @@ const {
   protocol,
   session,
   shell,
+  dialog,
 } = require('electron');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -13,8 +14,10 @@ const { pathToFileURL } = require('node:url');
 const os = require('node:os');
 const { DiskCache } = require('./cache.cjs');
 const { BlockCache } = require('./blocks.cjs');
+const { cacheRoot, saveCacheRoot } = require('./cache-location.cjs');
 const { popupTarget } = require('./navigation.cjs');
 let blocks;
+let cacheLocationError = '';
 let danmaku;
 let captureUntil = 0;
 let update;
@@ -182,10 +185,15 @@ app.whenReady().then(async () => {
     };
   }
   bridge = fs.readFileSync(path.join(__dirname, '../shared/page-bridge.js'), 'utf8');
-  cache = new DiskCache(path.join(app.getPath('userData'), 'cache', 'media'), (data) =>
-    event('cache', data),
-  );
-  await cache.init();
+  let root;
+  try {
+    root = await cacheRoot(app.getPath('userData'));
+  } catch (cause) {
+    cacheLocationError = cause.message;
+    root = path.join(app.getPath('userData'), 'cache', 'VideoSreeeen-cache');
+  }
+  cache = new DiskCache(root, (data) => event('cache', data));
+  if (!cacheLocationError) await cache.init();
   blocks = new BlockCache(cache);
   protocol.handle('vs-cache', (req) => cache.response(req));
   const siteSession = session.fromPartition('persist:sites');
@@ -296,11 +304,29 @@ app.whenReady().then(async () => {
         return {};
       }
       case 'cacheStart':
+        if (cacheLocationError) throw new Error(cacheLocationError);
         return cache.start(data);
+      case 'cacheLocation':
+        return { path: cacheLocationError ? '所选磁盘不可用，请重新选择目录' : cache.root };
+      case 'chooseCacheLocation': {
+        if (blocks.jobs.size || cache.jobs.size)
+          throw new Error('请先结束或取消当前缓存，再修改目录');
+        const selected = await dialog.showOpenDialog(win, {
+          title: '选择缓存所在磁盘或文件夹',
+          defaultPath: path.dirname(cache.root),
+          properties: ['openDirectory', 'createDirectory'],
+        });
+        if (selected.canceled || !selected.filePaths[0]) return { path: cache.root };
+        cache.root = await saveCacheRoot(app.getPath('userData'), selected.filePaths[0]);
+        await cache.init();
+        cacheLocationError = '';
+        return { path: cache.root };
+      }
       case 'cacheClear':
         blocks.cancel(data.jobId);
         return cache.clear(data.jobId);
       case 'cacheIO':
+        if (cacheLocationError) throw new Error(cacheLocationError);
         return blocks.call(data);
       default:
         throw new Error('未知命令');

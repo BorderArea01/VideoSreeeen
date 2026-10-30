@@ -44,6 +44,7 @@ export interface Room {
   touched: number;
   ops: Map<string, true>;
   cleaned: boolean;
+  cacheParts?: 1 | 2 | 3;
 }
 export type StoredRoom = Omit<Room, 'members' | 'ops'> & {
   members: Array<[string, Omit<Seat, 'socket'>]>;
@@ -186,6 +187,24 @@ export class Rooms {
   }
   cacheReady(room: Room) {
     const seats = [...room.members.values()];
+    if ((room.cacheParts ?? 1) > 1) {
+      const first = seats[0]?.cache.parts?.[0];
+      const minimum = Math.min(...seats.map((s) => s.cache.parts?.length ?? 0));
+      return (
+        !!room.media?.source &&
+        !!first &&
+        seats.length > 0 &&
+        seats.every(
+          (s) =>
+            s.online &&
+            s.cachePartsSupported &&
+            s.cache.epoch === room.epoch &&
+            ['downloading', 'ready'].includes(s.cache.state) &&
+            !!s.cache.parts?.length &&
+            s.cache.parts.slice(0, minimum).every((hash, i) => hash === seats[0]!.cache.parts![i]),
+        )
+      );
+    }
     return (
       !!room.media?.source &&
       seats.length > 0 &&
@@ -211,6 +230,7 @@ export class Rooms {
       mode: room.mode,
       epoch: room.epoch,
       cacheReady: this.cacheReady(room),
+      cacheParts: room.cacheParts ?? 1,
       finished: room.cleaned,
       members: [...room.members.values()].map((seat) => ({
         ...this.latencySample(seat),
@@ -218,6 +238,7 @@ export class Rooms {
         online: seat.online,
         cache: seat.cache,
         ended: seat.ended,
+        cachePartsSupported: seat.cachePartsSupported === true,
       })),
       chat: room.chat,
     };
@@ -436,8 +457,14 @@ export class Rooms {
           throw new RoomError('broadcast_mode', '实时画面不使用共同缓存');
         if (message.mode === 'cache' && !room.media.source)
           throw new RoomError('no_source', '请先在客户端识别并共享可下载的视频源');
+        const parts = message.mode === 'cache' ? (message.cacheParts ?? 1) : 1;
+        if (parts > 1 && room.media.source?.kind === 'hls')
+          throw new RoomError('cache_format', 'HLS 暂保留完整缓存，分段缓存支持 MP4 / DASH');
+        if (parts > 1 && [...room.members.values()].some((s) => !s.cachePartsSupported))
+          throw new RoomError('cache_version', '分段缓存需要所有成员刷新到新版网页或更新客户端');
         this.broadcast(room, { type: 'cleanup', mediaId: room.media.id, epoch: room.epoch });
         room.mode = message.mode;
+        room.cacheParts = parts;
         room.epoch++;
         room.cleaned = false;
         for (const s of room.members.values()) {
@@ -495,6 +522,16 @@ export class Rooms {
           room.cleaned
         )
           return;
+        if ((room.cacheParts ?? 1) > 1 && message.parts?.length) {
+          if (
+            message.parts.length > room.cacheParts! ||
+            message.bytes < 1 ||
+            message.progress < message.parts.length / room.cacheParts! ||
+            (seat.cache.parts?.length ?? 0) > message.parts.length ||
+            seat.cache.parts?.some((hash, i) => hash !== message.parts![i])
+          )
+            throw new RoomError('invalid_cache', '分段缓存校验或进度无效');
+        }
         if (
           message.state === 'ready' &&
           (!message.fingerprint || message.progress !== 1 || message.bytes < 1)
@@ -509,6 +546,7 @@ export class Rooms {
           epoch: room.epoch,
           peerBytes: message.peerBytes,
           sourceBytes: message.sourceBytes,
+          parts: message.parts,
         };
         this.pauseForBarrier(room);
         break;

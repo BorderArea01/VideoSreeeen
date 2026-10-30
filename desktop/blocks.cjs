@@ -15,6 +15,23 @@ class BlockCache {
     this.jobs = new Map();
     this.requests = new Map();
     this.cancelled = new Set();
+    cache.partial = (id, name) => {
+      const job = this.jobs.get(id),
+        file = job?.files.get(name);
+      if (!job?.progressive || !file) return undefined;
+      return {
+        size: file.size,
+        read: async (offset, signal) => {
+          const deadline = Date.now() + 30000;
+          while (!file.blocks.has(offset)) {
+            if (signal.aborted || this.jobs.get(id) !== job || Date.now() > deadline)
+              throw new Error('缓存分块尚未就绪');
+            await new Promise((resolve) => setTimeout(resolve, 50));
+          }
+          return Buffer.from(await this.call({ action: 'get', jobId: id, name, offset }), 'base64');
+        },
+      };
+    };
   }
   cancel(id) {
     this.cancelled.add(id);
@@ -50,7 +67,12 @@ class BlockCache {
         await fs.rm(dir, { recursive: true, force: true });
         throw new Error('缓存任务已取消');
       }
-      this.jobs.set(p.jobId, { files, entry: p.entry, audio: p.audio });
+      this.jobs.set(p.jobId, {
+        files,
+        entry: p.entry,
+        audio: p.audio,
+        progressive: p.progressive === true,
+      });
       return {};
     }
     const job = this.jobs.get(p.jobId);

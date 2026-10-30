@@ -17,6 +17,9 @@ import {
   RangeMetadataUnavailable,
 } from './cache-network';
 import { BrowserDiskCache } from './disk-cache';
+import { cacheDirectory } from './cache-location';
+import { cacheStream } from './cache-stream';
+import { mp4Bootstrap, partOffsets, type CacheParts } from '../shared/cache-parts';
 
 const PREFIX = 'videosreeeen-';
 export class DeviceCache {
@@ -27,6 +30,7 @@ export class DeviceCache {
   private sourceBytes = 0;
   private disk: BrowserDiskCache | null = null;
   private sequential = new Set<string>();
+  private parts: CacheParts = 1;
   jobId = '';
   constructor(
     private progress: (event: NativeCache) => void,
@@ -56,9 +60,16 @@ export class DeviceCache {
       this.sequential.add(url);
     return result instanceof Uint8Array ? encode(result) : result;
   }
-  async start(jobId: string, server: string, planPath: string, source: Source) {
+  async start(
+    jobId: string,
+    server: string,
+    planPath: string,
+    source: Source,
+    parts: CacheParts = 1,
+  ) {
     await this.clear();
     this.jobId = jobId;
+    this.parts = parts;
     this.controller = new AbortController();
     this.peerBytes = 0;
     this.sourceBytes = 0;
@@ -99,6 +110,7 @@ export class DeviceCache {
     for (const file of plan.files) if (file.url) file.url = new URL(file.url, server).href;
     signal.throwIfAborted();
     if (plan.kind === 'hls') {
+      if (this.parts > 1) throw new Error('HLS 暂使用完整缓存，请选择完整下载后播放');
       if (!isNative)
         throw new Error('浏览器暂不支持完整 HLS 缓存，请使用 Windows 或 Android 客户端');
       this.progress({
@@ -172,6 +184,10 @@ export class DeviceCache {
           ? disk.get(files![file]!.name, offset)
           : new Uint8Array(await (await browser!.match(cacheKey(file, offset)))!.arrayBuffer());
     await this.peers.start(files, read);
+    if (this.parts > 1) {
+      await this.downloadParts(jobId, files, urls, plan, signal, read, disk);
+      return;
+    }
     let bytes = 0,
       ordinal = 0;
     for (let file = 0; file < files.length; file++) {
@@ -272,12 +288,29 @@ export class DeviceCache {
     let ready: NativeCache;
     if (isNative) ready = await nativeCall('cacheIO', { action: 'finish', jobId });
     else if (disk) {
-      const fingerprint = await disk.finish();
+      const external = !!cacheDirectory();
+      const fingerprint = await disk.finish(!external);
       signal.throwIfAborted();
-      const entry = URL.createObjectURL(await disk.file(plan.entry));
-      this.objectUrls.push(entry);
-      const audio = plan.audio ? URL.createObjectURL(await disk.file(plan.audio)) : undefined;
-      if (audio) this.objectUrls.push(audio);
+      const local = external
+        ? await cacheStream(
+            jobId,
+            files,
+            async (name, offset) =>
+              read(
+                files!.findIndex((f) => f.name === name),
+                offset,
+              ),
+            signal,
+          )
+        : undefined;
+      const entry = local ? local(plan.entry) : URL.createObjectURL(await disk.file(plan.entry));
+      if (!local) this.objectUrls.push(entry);
+      const audio = plan.audio
+        ? local
+          ? local(plan.audio)
+          : URL.createObjectURL(await disk.file(plan.audio))
+        : undefined;
+      if (audio && !local) this.objectUrls.push(audio);
       ready = {
         state: 'ready',
         jobId,
@@ -317,6 +350,181 @@ export class DeviceCache {
     signal.throwIfAborted();
     this.progress({ ...ready, peerBytes: this.peerBytes, sourceBytes: this.sourceBytes });
   }
+  private async downloadParts(
+    jobId: string,
+    files: FileInfo[],
+    urls: string[][],
+    plan: CachePlan,
+    signal: AbortSignal,
+    read: (file: number, offset: number) => Promise<Uint8Array>,
+    disk: BrowserDiskCache | null,
+  ) {
+    if (!isNative && !disk) throw new Error('此浏览器暂不支持磁盘分段缓存');
+    if (window.VSNative)
+      throw new Error('当前 Android 客户端请使用完整缓存，或使用新版网页分段缓存');
+    const complete = files.map(() => new Map<number, string>());
+    const pending = new Map<string, Promise<Uint8Array>>();
+    const whole = new Map<number, { done: Promise<void>; failed?: unknown }>();
+    let bytes = 0;
+    const total = files.reduce((n, f) => n + f.size, 0);
+    const fingerprints: string[] = [];
+    const report = (entry?: string, audio?: string) =>
+      this.progress({
+        state: 'downloading',
+        jobId,
+        progress: bytes / total,
+        bytes,
+        peerBytes: this.peerBytes,
+        sourceBytes: this.sourceBytes,
+        parts: [...fingerprints],
+        ...(entry ? { entry } : {}),
+        ...(audio ? { audio } : {}),
+      });
+    const store = async (index: number, offset: number, data: Uint8Array) => {
+      const file = files[index]!;
+      if (data.length !== Math.min(BLOCK_SIZE, file.size - offset))
+        throw new Error('缓存分块长度不符');
+      signal.throwIfAborted();
+      if (complete[index]!.has(offset)) return;
+      const hash = await hexDigest(data);
+      if (isNative)
+        await nativeCall('cacheIO', {
+          action: 'put',
+          jobId,
+          name: file.name,
+          offset,
+          data: encode(data),
+        });
+      else await disk!.put(file.name, offset, data);
+      signal.throwIfAborted();
+      complete[index]!.set(offset, hash);
+      bytes += data.length;
+      this.peers.announce(index, offset, hash);
+      report();
+    };
+    const ensure = (index: number, offset: number): Promise<Uint8Array> => {
+      signal.throwIfAborted();
+      if (complete[index]!.has(offset)) return read(index, offset);
+      const key = index + ':' + offset;
+      if (pending.has(key)) return pending.get(key)!;
+      const task = (async () => {
+        const file = files[index]!,
+          length = Math.min(BLOCK_SIZE, file.size - offset);
+        let data = await this.peers.get(index, offset, 100);
+        if (data) this.peerBytes += data.length;
+        else {
+          let failure: unknown;
+          for (const url of urls[index]!) {
+            try {
+              if (this.sequential.has(url)) throw new RangeMetadataUnavailable();
+              data = decode(await this.network('fetch', jobId, url, plan.referer, offset, length));
+              break;
+            } catch (cause) {
+              signal.throwIfAborted();
+              failure = cause;
+              if (!isNative && cause instanceof RangeMetadataUnavailable) {
+                if (!whole.has(index)) {
+                  const task = { done: Promise.resolve(), failed: undefined as unknown };
+                  task.done = downloadWholeTrack(url, file.size, signal, async (p, chunk) => {
+                    this.sourceBytes += chunk.length;
+                    await store(index, p, chunk);
+                  }).catch((error) => {
+                    task.failed = error;
+                    throw error;
+                  });
+                  void task.done.catch(() => {});
+                  whole.set(index, task);
+                }
+                const deadline = Date.now() + 30000;
+                while (!complete[index]!.has(offset)) {
+                  signal.throwIfAborted();
+                  if (whole.get(index)!.failed) throw whole.get(index)!.failed;
+                  if (Date.now() > deadline) throw new Error('等待顺序下载超时，请选择完整缓存');
+                  await new Promise((resolve) => setTimeout(resolve, 50));
+                }
+                return read(index, offset);
+              }
+            }
+          }
+          if (!data)
+            throw failure instanceof RangeMetadataUnavailable
+              ? new Error('源站未公开可靠的分块范围，请改用完整缓存')
+              : (failure ?? new Error('缓存分块下载失败'));
+          this.sourceBytes += data.length;
+        }
+        await store(index, offset, data);
+        return data;
+      })().finally(() => pending.delete(key));
+      pending.set(key, task);
+      return task;
+    };
+    const localUrl = isNative
+      ? (name: string) => `vs-cache://${jobId}/${name}`
+      : await cacheStream(
+          jobId,
+          files,
+          async (name, offset, requestSignal) => {
+            const index = files.findIndex((f) => f.name === name),
+              deadline = Date.now() + 28000;
+            while (!complete[index]?.has(offset)) {
+              signal.throwIfAborted();
+              requestSignal.throwIfAborted();
+              if (Date.now() > deadline) throw new Error('等待后续缓存超时，请重试本机缓存');
+              await new Promise((resolve) => setTimeout(resolve, 50));
+            }
+            signal.throwIfAborted();
+            return read(index, offset);
+          },
+          signal,
+        );
+    const bootstrap: number[][] = [];
+    for (let i = 0; i < files.length; i++) {
+      bootstrap[i] = await mp4Bootstrap(files[i]!.size, (offset) => ensure(i, offset));
+      for (const offset of bootstrap[i]!) await ensure(i, offset);
+    }
+    for (let part = 1; part <= this.parts; part++) {
+      const hashes: unknown[] = [];
+      for (let i = 0; i < files.length; i++) {
+        for (const offset of partOffsets(files[i]!.size, part, this.parts)) await ensure(i, offset);
+        const offsets = [
+          ...new Set([
+            ...bootstrap[i]!,
+            ...Array.from({ length: part }, (_, p) =>
+              partOffsets(files[i]!.size, p + 1, this.parts),
+            ).flat(),
+          ]),
+        ].sort((a, b) => a - b);
+        hashes.push([
+          files[i]!.name,
+          files[i]!.size,
+          offsets.map((offset) => [offset, complete[i]!.get(offset)]),
+        ]);
+      }
+      fingerprints.push(await hexDigest(new TextEncoder().encode(JSON.stringify(hashes))));
+      signal.throwIfAborted();
+      report(
+        part === 1 ? localUrl(plan.entry) : undefined,
+        part === 1 && plan.audio ? localUrl(plan.audio) : undefined,
+      );
+    }
+    await Promise.all([...whole.values()].map((task) => task.done));
+    const ready = isNative
+      ? await nativeCall('cacheIO', { action: 'finish', jobId })
+      : {
+          fingerprint: await disk!.finish(false),
+        };
+    signal.throwIfAborted();
+    this.progress({
+      state: 'ready',
+      jobId,
+      progress: 1,
+      bytes,
+      fingerprint: ready.fingerprint,
+      parts: fingerprints,
+      peerBytes: this.peerBytes,
+      sourceBytes: this.sourceBytes,
+    });
+  }
   private async prepare(jobId: string, plan: CachePlan, files: FileInfo[]) {
     if (isNative) {
       await nativeCall('cacheIO', {
@@ -325,6 +533,7 @@ export class DeviceCache {
         entry: plan.entry,
         ...(plan.audio ? { audio: plan.audio } : {}),
         files,
+        progressive: this.parts > 1,
       });
       return null;
     }
@@ -334,11 +543,15 @@ export class DeviceCache {
       files.reduce((n, f) => n + f.size, 0) > 128 * 1024 ** 2 ||
       files.some((f) => f.size > 96 * 1024 ** 2);
     if (large && !BrowserDiskCache.supported()) checkBrowserCacheSize(files);
-    const estimate = await navigator.storage.estimate(),
+    const external = !!cacheDirectory();
+    const estimate = external ? {} : await navigator.storage.estimate(),
       total = files.reduce((n, f) => n + f.size, 0);
-    if ((estimate.quota ?? 0) - (estimate.usage ?? 0) < total + (large ? 256 : 32) * 1024 ** 2)
+    if (
+      !external &&
+      (estimate.quota ?? 0) - (estimate.usage ?? 0) < total + (large ? 256 : 32) * 1024 ** 2
+    )
       throw new Error('浏览器可用存储不足');
-    if (large) {
+    if (large || external || this.parts > 1) {
       this.disk = await BrowserDiskCache.create(jobId, files, this.controller!.signal);
       return null;
     }

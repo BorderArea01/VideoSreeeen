@@ -1,4 +1,5 @@
 import type { FileInfo } from './peers';
+import { cacheDirectory, authorizeCacheDirectory } from './cache-location';
 
 const ROOT = 'videosreeeen-disk';
 export class BrowserDiskCache {
@@ -10,6 +11,7 @@ export class BrowserDiskCache {
     { resolve: (value: any) => void; reject: (error: Error) => void }
   >();
   private release = () => {};
+  private parent?: FileSystemDirectoryHandle;
   private constructor(private directory: string) {
     this.worker = new Worker(new URL('./disk-cache-worker.ts', import.meta.url), {
       type: 'module',
@@ -31,7 +33,9 @@ export class BrowserDiskCache {
     return !!navigator.storage?.getDirectory && typeof Worker !== 'undefined' && !!navigator.locks;
   }
   static async create(jobId: string, files: FileInfo[], signal: AbortSignal) {
+    await authorizeCacheDirectory();
     const store = new BrowserDiskCache(`${Date.now()}-${jobId}`);
+    store.parent = cacheDirectory();
     const stop = () => {
       void store.clear().catch(() => {});
     };
@@ -49,7 +53,7 @@ export class BrowserDiskCache {
           .catch(reject);
       });
       signal.throwIfAborted();
-      await store.call('init', { directory: store.directory, files });
+      await store.call('init', { directory: store.directory, files, parent: store.parent });
       signal.throwIfAborted();
       return store;
     } catch (cause) {
@@ -82,12 +86,14 @@ export class BrowserDiskCache {
   async get(name: string, offset: number): Promise<Uint8Array> {
     return new Uint8Array(await this.call('get', { name, offset }));
   }
-  async finish(): Promise<string> {
-    return this.call('finish');
+  async finish(assemble = true): Promise<string> {
+    return this.call('finish', { assemble });
   }
   async file(name: string) {
     if (this.closed) throw new DOMException('缓存已取消', 'AbortError');
-    const root = await (await navigator.storage.getDirectory()).getDirectoryHandle(ROOT);
+    const root = await (this.parent ?? (await navigator.storage.getDirectory())).getDirectoryHandle(
+      ROOT,
+    );
     return (await (await root.getDirectoryHandle(this.directory)).getFileHandle(name)).getFile();
   }
   async clear() {
@@ -95,7 +101,9 @@ export class BrowserDiskCache {
     this.worker.terminate();
     this.rejectAll(new DOMException('缓存已取消', 'AbortError'));
     try {
-      const root = await (await navigator.storage.getDirectory()).getDirectoryHandle(ROOT);
+      const root = await (
+        this.parent ?? (await navigator.storage.getDirectory())
+      ).getDirectoryHandle(ROOT);
       await root.removeEntry(this.directory, { recursive: true });
     } catch (cause) {
       if (!(cause instanceof DOMException && cause.name === 'NotFoundError')) throw cause;
@@ -105,24 +113,46 @@ export class BrowserDiskCache {
   }
   static async sweep() {
     if (!this.supported()) return;
-    let root: FileSystemDirectoryHandle;
-    try {
-      root = await (await navigator.storage.getDirectory()).getDirectoryHandle(ROOT);
-    } catch (cause) {
-      if (cause instanceof DOMException && cause.name === 'NotFoundError') return;
-      throw cause;
-    }
-    for await (const name of (
-      root as FileSystemDirectoryHandle & { keys(): AsyncIterableIterator<string> }
-    ).keys()) {
-      if (
-        !/^\d+-[a-zA-Z0-9-]{1,80}$/.test(name) ||
-        Date.now() - Number(name.split('-')[0]) < 24 * 60 * 60 * 1000
-      )
-        continue;
-      await navigator.locks.request(ROOT + ':' + name, { ifAvailable: true }, async (lock) => {
-        if (lock) await root.removeEntry(name, { recursive: true });
-      });
+    const parents: Array<{ handle: FileSystemDirectoryHandle; external: boolean }> = [
+      { handle: await navigator.storage.getDirectory(), external: false },
+    ];
+    const selected = cacheDirectory();
+    if (selected && (await selected.queryPermission({ mode: 'readwrite' })) === 'granted')
+      parents.push({ handle: selected, external: true });
+    for (const parent of parents) {
+      let root: FileSystemDirectoryHandle;
+      try {
+        root = await parent.handle.getDirectoryHandle(ROOT);
+      } catch (cause) {
+        if (cause instanceof DOMException && cause.name === 'NotFoundError') continue;
+        throw cause;
+      }
+      for await (const name of (
+        root as FileSystemDirectoryHandle & { keys(): AsyncIterableIterator<string> }
+      ).keys()) {
+        if (
+          !/^\d+-[a-zA-Z0-9-]{1,80}$/.test(name) ||
+          Date.now() - Number(name.split('-')[0]) < 24 * 60 * 60 * 1000
+        )
+          continue;
+        await navigator.locks.request(ROOT + ':' + name, { ifAvailable: true }, async (lock) => {
+          if (!lock) return;
+          if (parent.external) {
+            try {
+              const directory = await root.getDirectoryHandle(name);
+              const owner = JSON.parse(
+                await (
+                  await (await directory.getFileHandle('videosreeeen-owner.json')).getFile()
+                ).text(),
+              );
+              if (owner.app !== 'videosreeeen-disk-v1' || owner.directory !== name) return;
+            } catch {
+              return;
+            }
+          }
+          await root.removeEntry(name, { recursive: true });
+        });
+      }
     }
   }
 }
