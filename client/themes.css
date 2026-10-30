@@ -1,0 +1,489 @@
+/* Appearance controls share the original palette, even when the theme is changed. */
+.appearance-settings {
+  padding: 16px 0 20px;
+}
+.appearance-heading,
+.appearance-auto {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+.appearance-heading h3 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 500;
+}
+.appearance-heading > span,
+.appearance-auto {
+  font-size: 10px;
+  color: var(--muted);
+}
+.theme-choices {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  padding: 0;
+  margin: 12px 0;
+  border: 0;
+  gap: 12px;
+}
+.theme-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+dialog .theme-choice {
+  position: relative;
+  display: block;
+  margin: 0;
+  padding: 5px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  color: var(--text);
+  cursor: pointer;
+}
+dialog .theme-choice input {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  padding: 0;
+}
+.theme-choice:has(input:checked) {
+  border-color: var(--orange);
+  background: color-mix(in srgb, var(--orange) 8%, transparent);
+}
+.theme-choice:has(input:focus-visible) {
+  outline: 2px solid var(--orange);
+  outline-offset: 3px;
+}
+.theme-swatch {
+  position: relative;
+  display: block;
+  height: 76px;
+  border-radius: 5px;
+  overflow: hidden;
+}
+.theme-swatch-classic {
+  background: linear-gradient(125deg, #16151b, #47343b);
+}
+.theme-swatch-glitch {
+  background: #438bd0 url('./assets/themes/glitch-sky.webp') center / cover;
+}
+.theme-swatch i,
+.theme-swatch b,
+.theme-swatch em {
+  position: absolute;
+  display: block;
+}
+.theme-swatch i {
+  inset: 17px 35% 12px 15px;
+  background: #14151bd9;
+  border: 1px solid #f2ad8644;
+  border-radius: 4px;
+}
+.theme-swatch b {
+  bottom: 20px;
+  left: 24px;
+  width: 34%;
+  height: 7px;
+  background: #f2ad86;
+  border-radius: 2px;
+}
+.theme-swatch em {
+  inset: 17px 14px 12px 70%;
+  background: #1a1922cc;
+  border-radius: 3px;
+}
+.theme-swatch-glitch i {
+  border-color: #bbf5ff;
+  background: #0b294ac9;
+}
+.theme-swatch-glitch b {
+  background: #b4f5ff;
+  box-shadow:
+    5px -4px 0 -2px #ef78ff,
+    -5px 5px 0 -2px #61f1ff;
+}
+.theme-choice-name {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 5px;
+  padding: 10px 5px 5px;
+  font-size: 12px;
+}
+.theme-choice-name small {
+  font-size: 9px;
+  color: var(--muted);
+}
+.theme-choice:has(input:checked) .theme-choice-name::after {
+  content: '✓';
+  margin-left: auto;
+  color: var(--orange);
+}
+.appearance-auto .text-button {
+  min-height: 32px;
+  font-size: 11px;
+}
+
+/* Glitch Art: a photographic sky behind opaque-enough, readable blue panels. */
+:root[data-theme='glitch'] {
+  color-scheme: dark;
+  --bg: #0b497c;
+  --panel: #0d2843;
+  --line: #6bbee252;
+  --text: #eaf7ff;
+  --muted: #a6c5df;
+  --orange: #a3eeff;
+  --accent: #8ee6fa;
+}
+:root[data-theme='glitch'] body {
+  background: linear-gradient(140deg, #287ccd, #57b5ee 60%, #d7f4ff);
+}
+#theme-scene {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+  pointer-events: none;
+  contain: strict;
+}
+:root[data-theme='glitch'] #app {
+  position: relative;
+  z-index: 1;
+}
+:root[data-theme='glitch'] .topbar {
+  background: #082641ed;
+  border-color: #b6eaff66;
+}
+:root[data-theme='glitch'] .brand-mark {
+  background: #b0efff;
+  color: #103b60;
+  border-radius: 4px;
+  transform: none;
+  box-shadow:
+    5px -3px 0 -2px #ff98edaa,
+    -4px 4px 0 -2px #60e9ff;
+}
+:root[data-theme='glitch'] .brand-mark svg {
+  transform: none;
+}
+:root[data-theme='glitch'] .brand-light {
+  color: #d3eaff;
+}
+:root[data-theme='glitch'] .room-heading {
+  background: linear-gradient(100deg, #082641eb, #082641b8);
+  padding: 16px;
+  border-left: 2px solid #b7f4ff;
+  border-radius: 4px;
+}
+:root[data-theme='glitch'] .room-heading h1 {
+  text-shadow:
+    -1px 0 #61e8ff,
+    1px 0 #df8ddd;
+}
+:root[data-theme='glitch'] :is(.room-heading p, .eyebrow, .platform, .connection) {
+  color: #b7d6ed;
+}
+:root[data-theme='glitch'] :is(.source-card, .members-card, .chat-panel, .emoji-picker) {
+  background: #082641f2;
+  border-color: #addfff66;
+  box-shadow:
+    0 8px 28px #00284925,
+    3px 0 0 -2px #f39be466;
+}
+:root[data-theme='glitch']
+  :is(.chat-heading, .chat-compose, .invite-line, .source-actions, .advanced, .app-foot) {
+  border-color: #9bd7f33d;
+}
+:root[data-theme='glitch']
+  :is(
+    .playback-copy,
+    .source-actions .subtle,
+    .cache-field-label,
+    .cache-field > label,
+    .cache-field-note,
+    .cache-help,
+    .cache-panel .mode-copy p,
+    .cache-summary-end,
+    .cache-options > summary,
+    .cache-location-row > span,
+    .voice-status,
+    .voice-volume,
+    .voice-devices summary,
+    .member-info small,
+    .message-meta,
+    .chat-empty,
+    .chat-empty p,
+    .chat-empty small,
+    .empty-members,
+    .invite-line,
+    .dialog-note,
+    .dialog-copy,
+    .help-steps,
+    .advanced summary,
+    dialog label,
+    .voice-devices label,
+    .live-label
+  ) {
+  color: #b4cfe4;
+}
+:root[data-theme='glitch']
+  :is(
+    .source-form,
+    .room-tabs,
+    .voice-devices select,
+    dialog input,
+    .cache-options[open],
+    .cache-settings select,
+    .cache-location-row
+  ) {
+  color: #eaf7ff;
+  border-color: #84c7e660;
+  background: #071f36;
+}
+:root[data-theme='glitch'] :is(.source-form input, .chat-compose textarea) {
+  color: #f0faff;
+}
+:root[data-theme='glitch'] :is(input, textarea)::placeholder {
+  color: #99b7ce;
+}
+:root[data-theme='glitch'] .playback-tabs button {
+  border-color: #95cff653;
+  background: #102f4b;
+  color: #e2f2ff;
+}
+:root[data-theme='glitch'] .playback-tabs button small {
+  color: #b4cfe4;
+}
+:root[data-theme='glitch']
+  :is(.playback-tabs button[aria-selected='true'], .room-tabs button[aria-pressed='true']) {
+  border-color: #a3eeff;
+  background: #1c4865;
+  color: #d3f7ff;
+  box-shadow: 3px 0 0 -1px #f39be499;
+}
+:root[data-theme='glitch'] .cache-options[open] > summary {
+  border-color: #78bcd442;
+}
+:root[data-theme='glitch'] :is(.cache-select > svg, .icon-button, .text-button) {
+  color: #b3d7ef;
+}
+:root[data-theme='glitch'] .soft {
+  background: #244b68;
+  color: #e2f6ff;
+}
+:root[data-theme='glitch'] .accent,
+:root[data-theme='glitch'] .send-button {
+  background: linear-gradient(100deg, #c0f4ff, #88daef);
+  color: #0b3451;
+  box-shadow:
+    3px 0 0 -1px #ff8bde88,
+    -2px 0 0 -1px #64edff;
+}
+:root[data-theme='glitch'] .accent:hover {
+  background: #d4f8ff;
+}
+:root[data-theme='glitch'] .welcome {
+  background:
+    linear-gradient(90deg, #e5f6fff2, #ddf4ff50 85%),
+    url('./assets/themes/glitch-sky.webp') center / cover;
+  color: #0d3558;
+}
+:root[data-theme='glitch'] :is(.scene-orb, .scene-lines) {
+  display: none;
+}
+:root[data-theme='glitch'] :is(.welcome-text p, .welcome .tag, .welcome .text-button) {
+  color: #234e70;
+}
+:root[data-theme='glitch'] .welcome h2 {
+  text-shadow:
+    -1px 0 #7ae5f4,
+    1px 0 #c882bf;
+}
+:root[data-theme='glitch'] .welcome .accent {
+  background: #123e62;
+  color: #effaff;
+}
+:root[data-theme='glitch'] dialog {
+  background: #0c2944;
+  border-color: #b5e6ff99;
+}
+:root[data-theme='glitch'] .bubble {
+  color: #eaf7ff;
+  background: #173b58;
+  border-color: #79bbdb55;
+}
+:root[data-theme='glitch'] .mine .bubble {
+  background: #235371;
+  border-color: #a3eeff77;
+  color: #effaff;
+}
+:root[data-theme='glitch'] :is(.avatar, .section-heading b, .chat-empty > span) {
+  color: #c9f3ff;
+  background: #295272;
+}
+:root[data-theme='glitch'] :is(.latency, .latency.slow, .member-kick) {
+  color: #b4e6ee;
+}
+:root[data-theme='glitch'] .voice-actions :is(.active, .is-muted) {
+  background: #27506d;
+  border-color: #8cd8f4;
+  color: #d7f7ff;
+}
+:root[data-theme='glitch'] .kick-vote {
+  background: #173c57;
+  border-color: #83cae3;
+}
+:root[data-theme='glitch'] .kick-vote > span {
+  color: #bcd7ea;
+}
+:root[data-theme='glitch'] :is(.screen-foot, .app-foot) {
+  background: #082641e6;
+  color: #bad5e9;
+  padding: 10px 12px;
+  border-radius: 4px;
+}
+:root[data-theme='glitch'] .transport {
+  background: #0a253d;
+}
+:root[data-theme='glitch'] body.page-cinema {
+  background: #000;
+}
+:root[data-theme='glitch'] .page-cinema #theme-scene {
+  display: none;
+}
+
+/* Only decorative layers fragment. Actual text, click targets and video remain intact. */
+:root[data-theme='glitch']
+  :is(.topbar, .source-card, .hero-actions, .voice-actions, .dialog-buttons)
+  .button,
+:root[data-theme='glitch'] .send-button {
+  position: relative;
+  isolation: isolate;
+  border-radius: 4px;
+}
+:root[data-theme='glitch']
+  :is(.topbar, .source-card, .hero-actions, .voice-actions, .dialog-buttons)
+  .button::before,
+:root[data-theme='glitch'] .send-button::before {
+  content: '';
+  position: absolute;
+  inset: -2px -5px;
+  z-index: -1;
+  pointer-events: none;
+  border-radius: inherit;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent 0 4px,
+    #72e8ffb3 4px 5px,
+    transparent 5px 7px,
+    #ec9bdf99 7px 8px,
+    transparent 8px 11px
+  );
+  mask-image: linear-gradient(90deg, #000 0 12%, transparent 20% 75%, #000 86%);
+  opacity: 0.65;
+}
+:root[data-theme='glitch']
+  :is(.topbar, .source-card, .hero-actions, .voice-actions, .dialog-buttons)
+  .button::after,
+:root[data-theme='glitch'] .send-button::after {
+  content: '';
+  position: absolute;
+  pointer-events: none;
+  width: 3px;
+  height: 3px;
+  top: 15%;
+  right: -5px;
+  background: #c9f3ff;
+  box-shadow:
+    -18px -5px #7aeeff,
+    -31px 37px #8bdbf5,
+    4px 12px #e797df,
+    -8px 32px #c6f8ff;
+  opacity: 0.6;
+}
+@keyframes theme-slice {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  18% {
+    transform: translateX(6px) skewX(-8deg);
+  }
+  40% {
+    transform: translateX(-6px);
+  }
+  64% {
+    transform: translateX(4px) skewX(6deg);
+  }
+}
+@keyframes theme-fragments {
+  0%,
+  100% {
+    transform: translate(0, 0);
+    opacity: 0.6;
+  }
+  40% {
+    transform: translate(5px, -5px);
+    opacity: 0.85;
+  }
+  70% {
+    transform: translate(-3px, -2px);
+    opacity: 0.4;
+  }
+}
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  :root[data-theme='glitch']
+    :is(.topbar, .source-card, .hero-actions, .voice-actions, .dialog-buttons)
+    .button:not(:disabled):hover::before,
+  :root[data-theme='glitch'] .send-button:not(:disabled):hover::before {
+    background: linear-gradient(90deg, #65ddff, #c0f5ff 65%, #f4a2df);
+    mask-image: repeating-linear-gradient(0deg, #000 0 2px, transparent 2px 6px);
+    animation: theme-slice 950ms steps(5) infinite;
+  }
+  :root[data-theme='glitch']
+    :is(.topbar, .source-card, .hero-actions, .voice-actions, .dialog-buttons)
+    .button:not(:disabled):hover::after,
+  :root[data-theme='glitch'] .send-button:not(:disabled):hover::after {
+    animation: theme-fragments 1200ms steps(6) infinite;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  :root[data-theme='glitch'] button::before,
+  :root[data-theme='glitch'] button::after {
+    animation: none !important;
+    transform: none !important;
+  }
+}
+@media (max-width: 540px) {
+  .top-actions:has(#appearance-button) {
+    gap: 7px;
+  }
+  :root[data-theme='glitch'] .room-heading {
+    padding: 12px;
+  }
+}
+@media (forced-colors: active) {
+  #theme-scene {
+    display: none;
+  }
+  :root[data-theme='glitch'] body,
+  :root[data-theme='glitch']
+    :is(.welcome, .source-card, .members-card, .chat-panel, .topbar, .room-heading, dialog) {
+    background: Canvas;
+    color: CanvasText;
+  }
+  :root[data-theme='glitch'] button::before,
+  :root[data-theme='glitch'] button::after,
+  .theme-swatch {
+    display: none;
+  }
+}
