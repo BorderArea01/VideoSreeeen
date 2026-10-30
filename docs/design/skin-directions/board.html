@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>四版视觉方向 · 总览</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: #07131f;
+        color: #e8f2fa;
+        font:
+          14px 'Segoe UI',
+          'Microsoft YaHei',
+          sans-serif;
+        padding: 24px;
+      }
+      header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin: 0 0 20px;
+      }
+      h1 {
+        font-size: 20px;
+        font-weight: 500;
+        margin: 0;
+      }
+      header small {
+        color: #9aafc3;
+        font-size: 11px;
+      }
+      a {
+        color: inherit;
+        text-decoration: none;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 18px;
+      }
+      .proposal {
+        border: 1px solid #2d4155;
+        border-radius: 10px;
+        overflow: hidden;
+        background: #122436;
+      }
+      .label {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 13px 17px;
+        font-size: 12px;
+      }
+      .label small {
+        color: #a4b7ca;
+        font-size: 10px;
+      }
+      .viewport {
+        height: 516px;
+        position: relative;
+        overflow: hidden;
+      }
+      iframe {
+        width: 1400px;
+        height: 1020px;
+        transform-origin: top left;
+        border: 0;
+        transform: scale(var(--scale, 0.5));
+      }
+      .proposal:focus-within {
+        outline: 1px solid #9bb5ca;
+      }
+      @media (max-width: 850px) {
+        .grid {
+          grid-template-columns: 1fr;
+        }
+        header small {
+          display: none;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>VideoSreeeen / 四个交互方向</h1>
+      <small>点击标题进入完整交互预览 · 同一布局，不同材质与动作</small>
+    </header>
+    <div class="grid">
+      <section class="proposal">
+        <a class="label" href="index.html#A"><b>A · 晴空断层</b><small>故障感 / 平衡 ↗</small></a>
+        <div class="viewport"><iframe title="A 晴空断层" src="index.html?embed=1#A"></iframe></div>
+      </section>
+      <section class="proposal">
+        <a class="label" href="index.html#B"><b>B · 云层浮玻璃</b><small>轻盈 / 舒适 ↗</small></a>
+        <div class="viewport">
+          <iframe title="B 云层浮玻璃" src="index.html?embed=1#B"></iframe>
+        </div>
+      </section>
+      <section class="proposal">
+        <a class="label" href="index.html#C"><b>C · 胶片回声</b><small>安静 / 电影感 ↗</small></a>
+        <div class="viewport"><iframe title="C 胶片回声" src="index.html?embed=1#C"></iframe></div>
+      </section>
+      <section class="proposal">
+        <a class="label" href="index.html#D"><b>D · 棱镜折面</b><small>层次 / 个性 ↗</small></a>
+        <div class="viewport"><iframe title="D 棱镜折面" src="index.html?embed=1#D"></iframe></div>
+      </section>
+    </div>
+    <script>
+      new ResizeObserver(() => {
+        for (const p of document.querySelectorAll('.viewport')) {
+          const s = p.clientWidth / 1400;
+          p.style.setProperty('--scale', s);
+          p.style.height = 1020 * s + 'px';
+        }
+      }).observe(document.querySelector('.grid'));
+    </script>
+  </body>
+</html>

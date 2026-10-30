@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="zh-CN" data-variant="A">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="color-scheme" content="dark light" />
+    <title>VideoSreeeen · 四版交互提案</title>
+    <link rel="stylesheet" href="styles.css" />
+    <script src="preview.js" defer></script>
+  </head>
+  <body>
+    <canvas id="sky" aria-hidden="true"></canvas>
+    <section class="review-bar" aria-label="方案选择">
+      <div class="review-intro">
+        <strong>外观实验室 <span>04 DIRECTIONS</span></strong
+        ><small>交互提案 · 演示内容 · 不连接真实房间</small>
+      </div>
+      <nav id="directions" aria-label="四版交互方案">
+        <a href="#A" aria-current="true"><b>A</b> 晴空断层</a><a href="#B"><b>B</b> 云层浮玻璃</a
+        ><a href="#C"><b>C</b> 胶片回声</a><a href="#D"><b>D</b> 棱镜折面</a>
+      </nav>
+      <button id="demonstrate" class="review-action" type="button">
+        播放交互示范 <span>↗</span>
+      </button>
+    </section>
+    <div class="app">
+      <header class="topbar">
+        <a class="brand" href="#A"><span class="brand-icon">▥</span> Video<span>Sreeeen</span></a>
+        <div class="top-actions">
+          <span class="preview-label">本机设计预览</span
+          ><button class="action ghost" type="button">切换皮肤</button
+          ><button class="action primary" type="button">邀请成员 <span>↗</span></button>
+        </div>
+      </header>
+      <main>
+        <section class="main-column">
+          <div class="room-heading">
+            <div>
+              <span class="eyebrow">PRIVATE SCREENING</span>
+              <h1 id="direction-title">晴空断层</h1>
+              <p id="direction-subtitle">保留故障感，放缓发生方式。</p>
+            </div>
+            <span class="chapter">SKIN <b id="chapter">01</b> / 04</span>
+          </div>
+          <section class="screen surface" data-kind="player">
+            <div class="material" aria-hidden="true"></div>
+            <div class="film-art" aria-hidden="true">
+              <div class="moon"></div>
+              <div class="hill hill-back"></div>
+              <div class="hill hill-front"></div>
+            </div>
+            <div class="movie-label"><span>影片区域</span><small>界面动效留在画面之外</small></div>
+            <div class="film-caption">
+              <span>THE QUIET HOURS</span><b>让画面，自己说话。</b
+              ><small>设计占位画面 · 不是真实播放</small>
+            </div>
+            <div class="screen-bottom"><span>同步播放 · 独立画面层</span><span>16 : 9</span></div>
+          </section>
+          <section class="source surface">
+            <div class="material" aria-hidden="true"></div>
+            <div class="panel-heading">
+              <h2>播放方式</h2>
+              <span>共同播放</span>
+            </div>
+            <div class="mode-row">
+              <button class="mode active" type="button">
+                <span>↗</span>
+                <div>共同播放<small>各自加载，同步进度</small></div></button
+              ><button class="mode" type="button">
+                <span>▱</span>
+                <div>共享画面<small>一人提供，大家观看</small></div></button
+              ><button class="mode" type="button">
+                <span>▥</span>
+                <div>本地视频<small>选择本机文件</small></div>
+              </button>
+            </div>
+            <div class="source-form">
+              <span aria-hidden="true">↗</span
+              ><input
+                aria-label="演示视频链接"
+                placeholder="粘贴视频链接 · 仅展示输入外观"
+              /><button class="action primary" type="button">同步此链接 <span>→</span></button>
+            </div>
+            <button class="cache-row" type="button">
+              <span>↓ 共同缓存</span><span>默认关闭 <b>⌄</b></span>
+            </button>
+          </section>
+          <section class="design-notes surface">
+            <div class="material" aria-hidden="true"></div>
+            <div class="panel-heading">
+              <h2 id="notes-title">A / 晴空断层</h2>
+              <span id="character">平衡 · 克制的故障</span>
+            </div>
+            <dl>
+              <div>
+                <dt>背景</dt>
+                <dd id="note-background"></dd>
+              </div>
+              <div>
+                <dt>容器</dt>
+                <dd id="note-surface"></dd>
+              </div>
+              <div>
+                <dt>按钮</dt>
+                <dd id="note-button"></dd>
+              </div>
+            </dl>
+          </section>
+        </section>
+        <aside>
+          <section class="members surface">
+            <div class="material" aria-hidden="true"></div>
+            <div class="panel-heading">
+              <h2>放映室成员</h2>
+              <span>预览</span>
+            </div>
+            <div class="member">
+              <span class="avatar">我</span>
+              <div><strong>我的设备</strong><small>本机外观</small></div>
+              <i></i>
+            </div>
+            <div class="member">
+              <span class="avatar second">友</span>
+              <div><strong>演示观众</strong><small>独立选择皮肤</small></div>
+              <i></i>
+            </div>
+            <button class="invite action ghost" type="button">＋ 邀请成员</button>
+          </section>
+          <section class="voice surface">
+            <div class="material" aria-hidden="true"></div>
+            <div class="panel-heading">
+              <h2>房间语音</h2>
+              <span>♩</span>
+            </div>
+            <p>在这里试试按钮的反馈。</p>
+            <button class="action primary" type="button">♩ 加入语音</button>
+            <div class="device-row">音频设备 <span>⌄</span></div>
+          </section>
+          <section class="chat surface">
+            <div class="material" aria-hidden="true"></div>
+            <div class="panel-heading">
+              <h2>聊天室</h2>
+              <span>◻</span>
+            </div>
+            <div id="chat-messages">
+              <div class="message">
+                <small>演示内容</small>
+                <p>背景、容器和按钮，共用一套节奏。</p>
+              </div>
+              <div class="message mine">
+                <small>本机预览</small>
+                <p>把鼠标慢慢扫过，再快速扫一次。</p>
+              </div>
+            </div>
+            <form id="chat-form">
+              <input
+                id="chat-input"
+                aria-label="本机演示消息"
+                placeholder="试试输入…"
+                maxlength="100"
+              /><button class="action primary send" type="submit" aria-label="发送到本机演示">
+                ↗
+              </button>
+            </form>
+          </section>
+          <div class="hint"><span>试用顺序</span>扫过页面空白 → 掠过卡片 → 悬停并点击按钮</div>
+        </aside>
+      </main>
+      <footer>
+        <span>VideoSreeeen / 视觉方向研究</span><span id="motion-status">动态交互已启用</span
+        ><a href="board.html">四版并排对比 ↗</a>
+      </footer>
+    </div>
+    <div id="notice" role="status" hidden>仅预览交互反馈，不操作真实房间。</div>
+  </body>
+</html>
