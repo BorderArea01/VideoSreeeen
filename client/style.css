@@ -2069,16 +2069,54 @@ button {
   min-width: 120px;
 }
 .cache-options {
-  margin-top: 16px;
+  margin-top: 14px;
+  border: 1px solid transparent;
+  border-radius: 10px;
 }
 .cache-options > summary {
   cursor: pointer;
-  color: var(--muted);
-  font-size: 12px;
-  width: max-content;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  list-style: none;
+  color: #b6adb9;
+  font-size: 11px;
+  padding: 10px 12px;
 }
-.cache-options .mode-card {
-  margin-top: 10px;
+.cache-options > summary::-webkit-details-marker {
+  display: none;
+}
+.cache-summary-label,
+.cache-summary-end {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.cache-summary-end {
+  font-size: 10px;
+  color: #8f8493;
+}
+.cache-options[open] {
+  background: #16151b;
+  border-color: #343039;
+}
+.cache-options[open] > summary {
+  border-bottom: 1px solid #2c2831;
+}
+.cache-options[open] .cache-summary-end > svg {
+  transform: rotate(180deg);
+}
+.cache-options.active .cache-summary-label,
+.cache-options.active #cache-mode-status {
+  color: var(--orange);
+}
+.cache-options > summary:hover {
+  color: var(--orange);
+}
+.cache-options :is(summary, button, select):focus-visible {
+  outline: 2px solid var(--orange);
+  outline-offset: 3px;
 }
 .brand small,
 .frame-index,
@@ -2308,43 +2346,153 @@ button {
     font-size: 9px;
   }
 }
+.cache-panel {
+  padding: 16px;
+}
+.cache-panel .mode-card {
+  margin: 0 0 16px;
+  padding: 0;
+  background: none;
+  border: 0;
+  border-radius: 0;
+}
+.cache-panel .mode-copy h3 {
+  margin: 0 0 5px;
+  font-size: 12px;
+}
+.cache-panel .mode-copy p {
+  color: #a69ba9;
+  font-size: 11px;
+}
+.cache-panel .switch {
+  box-sizing: content-box;
+  width: 30px;
+  height: 16px;
+  padding: 3px;
+}
+.cache-panel .switch i {
+  width: 16px;
+  height: 16px;
+}
+.cache-panel .switch[aria-checked='true'] i {
+  transform: translateX(14px);
+}
 .cache-settings {
   display: grid;
-  gap: 10px;
-  padding: 0 18px 16px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
 }
-.cache-settings label {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  font-size: 13px;
+.cache-field {
+  min-width: 0;
+  display: grid;
+  align-content: start;
+  gap: 8px;
+}
+.cache-field > label,
+.cache-field-label {
+  display: block;
+  margin: 0;
+  color: #a69ba9;
+  font-size: 11px;
+  font-weight: 400;
+}
+.cache-select {
+  position: relative;
+}
+.cache-select > svg {
+  position: absolute;
+  right: 12px;
+  top: 13px;
+  pointer-events: none;
+  color: #a69ba9;
 }
 .cache-settings select {
-  max-width: 70%;
-  padding: 8px;
+  display: block;
+  width: 100%;
+  min-height: 40px;
+  appearance: none;
+  padding: 9px 34px 9px 12px;
+  font: inherit;
+  font-size: 12px;
   color: inherit;
-  background: #19181f;
+  background: #1d1b22;
   border: 1px solid #36333c;
   border-radius: 8px;
+  cursor: pointer;
+}
+.cache-settings select:disabled {
+  cursor: default;
+  opacity: 0.65;
+}
+.cache-field-note {
+  margin: 0;
+  color: #978c9b;
+  font-size: 10px;
+  line-height: 1.65;
 }
 .cache-location-row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+  min-width: 0;
+  min-height: 40px;
+  border: 1px solid #36333c;
+  border-radius: 8px;
+  background: #1d1b22;
+  padding: 4px;
+  gap: 8px;
 }
-.cache-location-row span {
-  overflow-wrap: anywhere;
+.cache-location-row > span {
+  flex: 1;
+  min-width: 0;
+  padding-left: 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+  color: #c1b8c4;
+}
+.cache-location-row .button {
+  flex-shrink: 0;
+  padding: 6px 10px;
+  min-height: 30px;
+  border-radius: 5px;
+  font-size: 10px;
+}
+.cache-help {
+  margin-top: 14px;
+  font-size: 10px;
+  color: #978c9b;
+}
+.cache-help > summary {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  width: fit-content;
+  list-style: none;
+  cursor: pointer;
+  padding: 3px 0;
+}
+.cache-help > summary::-webkit-details-marker {
+  display: none;
+}
+.cache-help > summary:hover {
+  color: var(--orange);
+}
+.cache-help p {
+  margin: 8px 0 0;
+  line-height: 1.8;
+  max-width: 66em;
 }
 @media (max-width: 600px) {
-  .cache-settings label,
-  .cache-location-row {
-    align-items: flex-start;
-    flex-direction: column;
+  .cache-panel {
+    padding: 14px;
   }
-  .cache-settings select {
-    max-width: 100%;
+  .cache-settings {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 16px;
+  }
+  .cache-location-row .button {
+    min-height: 34px;
   }
 }
 .kick-vote {

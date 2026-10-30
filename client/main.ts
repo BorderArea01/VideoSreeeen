@@ -64,7 +64,7 @@ $('app').innerHTML = `
 <section id="stage" class="stage"><div id="welcome" class="welcome"><div class="scene-lines"></div><div class="scene-orb"></div><div class="frame-index">V / S <span>PRIVATE CINEMA</span></div><div class="welcome-text"><span class="tag">链接 · 画面 · 本地视频</span><h2>选择视频，<br>开始同步观看。</h2><p>支持视频链接、实时画面和本地文件。</p><div class="hero-actions"><button id="hero-create" class="button accent">${icon('plus', 18)} 创建房间 ${icon('arrow', 17)}</button><button id="hero-join" class="text-button">通过邀请加入 →</button></div></div><div class="scene-footer"><span>PLAY · SYNC · SHARE</span><span>01 — ∞</span></div></div><video id="video" playsinline preload="metadata" hidden></video><audio id="audio" preload="metadata"></audio><div id="native-stage" class="native-stage" hidden><div class="native-hint">正在客户端内打开原站…</div></div><div id="browser-hint" class="browser-hint" hidden>${icon('globe', 36)}<h3 id="browser-title">选择播放方式</h3><p id="browser-description"></p><div class="browser-actions"><button id="browser-provide" class="button accent">提供视频给房间</button><button id="browser-takeover" class="button outline" hidden>改由我提供视频</button><button id="browser-local-video" class="button soft" title="选择本机视频，实时传给房间成员">打开视频文件</button></div><div class="browser-secondary"><button id="browser-invite" class="text-button" title="客户端成员也可识别视频源，或共享原站画面">邀请成员提供视频</button><button id="browser-help" class="text-button">使用方法</button></div></div><div id="cache-overlay" class="cache-overlay" hidden><span class="cache-icon">${icon('download', 28)}</span><h3 id="cache-title">等待完整缓存</h3><p id="cache-description">每人完整缓存，等最慢的朋友准备好。</p><div class="cache-track"><i id="cache-progress"></i></div><button id="cache-button" class="button accent">开始本机缓存</button></div></section>
 <div class="transport"><button id="play-button" class="play-button" title="播放或暂停" aria-label="播放或暂停">${icon('play', 19)}</button><span id="position" class="time">00:00</span><input id="seek" aria-label="播放进度" type="range" min="0" max="100" step="0.1" value="0"><span id="duration" class="time muted">00:00</span><select id="rate" aria-label="播放速度"><option value="0.5">0.5×</option><option value="1" selected>1×</option><option value="1.25">1.25×</option><option value="1.5">1.5×</option><option value="2">2×</option></select><div id="video-sound" class="player-volume" hidden><button id="live-sound" class="icon-button" title="静音视频" aria-label="静音视频">${icon('volume', 19)}</button><input id="video-volume" type="range" min="0" max="100" step="1" value="100" aria-label="视频音量" title="仅调整本机视频音量"></div>${button('fullscreen', '全屏', 'expand')}</div>
 ${playbackPickerMarkup}
-<details id="cache-options" class="cache-options"><summary title="默认关闭。只有大家都卡时才考虑完整缓存；实时画面不使用此模式。">共同缓存</summary><section class="mode-card"><div class="mode-copy"><span class="mode-symbol">${icon('download', 22)}</span><div><h3>共同缓存模式 <span class="pill">手动启用</span></h3><p id="mode-description">仅在大家都卡时使用；默认边播边看。</p></div></div><button id="mode-toggle" class="switch" role="switch" aria-checked="false" aria-label="共同缓存模式"><i></i></button></section></details><div class="screen-foot"><span id="control-summary">${icon('shield', 14)} 多人可控 · 自动同步</span><span id="sync-status">等待加入房间</span></div>
+<details id="cache-options" class="cache-options"><summary><span class="cache-summary-label">${icon('download', 15)} 共同缓存</span><span class="cache-summary-end"><span id="cache-mode-status">默认关闭</span>${icon('chevron', 15)}</span></summary><div class="cache-panel"><section class="mode-card"><div class="mode-copy"><div><h3>缓存后同步开播</h3><p id="mode-description">网络不稳时再开启，看完自动清理。</p></div></div><button id="mode-toggle" class="switch" role="switch" aria-checked="false" aria-label="共同缓存模式" aria-describedby="mode-description"><i></i></button></section></div></details><div class="screen-foot"><span id="control-summary">${icon('shield', 14)} 多人可控 · 自动同步</span><span id="sync-status">等待加入房间</span></div>
 </section>
 <aside id="sidebar" class="sidebar"><section class="members-card"><div class="section-heading"><span>${icon('users', 18)} 放映室成员 <b id="member-count">0</b></span><span class="live-label">${icon('signal', 14)} RTT</span></div><div id="members" class="members"><p class="empty-members">暂无成员</p></div><button id="sidebar-invite" class="invite-line">${icon('plus', 16)} 邀请成员</button></section><section id="chat-panel" class="chat-panel"><div id="chat-drag" class="chat-heading" title="拖拽可悬浮聊天室"><div>${icon('chat', 18)} 聊天室 <span class="tiny-dot"></span></div><div>${button('chat-dock', '停靠聊天室', 'expand')}</div></div><div id="chat-messages" class="chat-messages"><div id="chat-empty" class="chat-empty"><span>${icon('chat', 30)}</span><p>暂无消息</p><small>加入房间后，消息会出现在这里。</small></div></div><div id="emoji-picker" class="emoji-picker" hidden></div><div class="chat-compose"><textarea id="chat-input" title="Enter 发送，Shift + Enter 换行" aria-label="聊天消息" placeholder="发送消息…" rows="2" maxlength="2000"></textarea><div class="compose-actions"><div>${button('emoji-button', '选择表情', 'smile')}${button('image-button', '发送图片或 GIF 表情包', 'image')}<input id="image-input" type="file" accept="image/png,image/jpeg,image/gif,image/webp" hidden></div><button id="send-button" class="send-button" title="发送消息" aria-label="发送消息">${icon('send', 17)}</button></div></div></section><div class="sidebar-foot">VIDEOSREEEEN <span>✳</span></div></aside></main>
 <footer class="app-foot"><span>VideoSreeeen <b>0.4.6</b></span><span>GPL-3.0 · 开源</span><button id="leave-button" class="text-button" hidden>${icon('exit', 14)} 离开放映室</button></footer>
@@ -79,25 +79,41 @@ const playbackPicker = new PlaybackPicker((choice) => {
 $('link-capability').textContent = isNative
   ? '每人独立加载视频，只同步进度，画质不经转码。支持视频直链和客户端内的原站播放器；原站需要各自登录。'
   : '各自加载，同步进度。支持视频直链与稀饭 xfy2 / AL / xfxf1；B 站由房主浏览器的视频源助手取源，观众无需安装。蜜柑为实验支持。';
-$('cache-options').insertAdjacentHTML(
-  'beforeend',
-  `
+$('cache-options')
+  .querySelector('.cache-panel')!
+  .insertAdjacentHTML(
+    'beforeend',
+    `
   <div class="cache-settings">
-    <label>开始播放的条件<select id="cache-parts"><option value="1">完整缓存后播放</option><option value="2">全员缓存首批 1/2 后播放</option><option value="3">全员缓存首批 1/3 后播放</option></select></label>
-    <div class="cache-location-row"><span id="cache-location" class="dialog-note"></span><button id="cache-location-choose" type="button" class="button soft small">选择缓存目录</button></div>
-    <p class="dialog-note" title="按文件字节分批，依据视频索引保留解码所需数据；不代表片长精确等分。已清理和未缓存区域不能跳转，下载赶不上播放时仍会等待。">分批缓存边播边下载，看过一批清理一批；完整缓存保留回看。</p>
-  </div>`,
-);
+    <div class="cache-field"><label for="cache-parts">开播条件</label><div class="cache-select"><select id="cache-parts" aria-describedby="cache-parts-note"><option value="1">完整缓存后播放</option><option value="2">首批 1/2 就绪后播放</option><option value="3">首批 1/3 就绪后播放</option></select>${icon('chevron', 15)}</div><p id="cache-parts-note" class="cache-field-note">全员下载完成再开播，保留整片回看。</p></div>
+    <div class="cache-field"><span class="cache-field-label" id="cache-location-label">保存位置</span><div class="cache-location-row"><span id="cache-location" aria-labelledby="cache-location-label"></span><button id="cache-location-choose" type="button" class="button soft small">选择目录</button></div><p id="cache-location-note" class="cache-field-note">记住所选目录，仅清理本应用缓存。</p></div>
+  </div><details class="cache-help"><summary>${icon('info', 14)} 缓存说明</summary><p>缓存写入各自设备，源站须允许下载。分批按文件字节划分，并非片长等分；看过一批后清理一批，灰色进度不可跳转。下载赶不上播放时仍会等待；需要回看请选择完整缓存。浏览器可能需要再次确认目录权限。</p></details>`,
+  );
+function renderCacheStrategy() {
+  const parts = Number($<HTMLSelectElement>('cache-parts').value);
+  $('cache-parts-note').textContent =
+    parts === 1
+      ? '全员下载完成再开播，保留整片回看。'
+      : `全员首批 1/${parts} 落盘后开播，看过的批次自动清理。`;
+}
+$('cache-parts').onchange = renderCacheStrategy;
 function renderCacheLocation(path?: string) {
-  $('cache-location').textContent = path
-    ? `缓存目录：${path}`
+  const location = path
+    ? path
     : cacheDirectory()
-      ? `缓存目录：${cacheDirectory()!.name} / videosreeeen-disk`
+      ? `${cacheDirectory()!.name} / videosreeeen-disk`
       : canChooseCacheDirectory()
-        ? '首次缓存请选择目录，建议 D 盘；之后记住选择。'
-        : '缓存保存在浏览器 / 系统管理的应用存储中，此设备不能选择磁盘。';
+        ? '尚未选择 · 建议 D 盘'
+        : '浏览器 / 系统管理';
+  $('cache-location').textContent = location;
+  $('cache-location').title = location;
+  $('cache-location-choose').textContent = path || cacheDirectory() ? '更换目录' : '选择目录';
   $<HTMLButtonElement>('cache-location-choose').disabled =
     !!window.VSNative || (!window.desktop && !canChooseCacheDirectory());
+  $('cache-location-choose').hidden = $<HTMLButtonElement>('cache-location-choose').disabled;
+  $('cache-location-note').textContent = $<HTMLButtonElement>('cache-location-choose').disabled
+    ? '此设备不支持选择磁盘，仅清理本应用缓存。'
+    : '记住所选目录，仅清理本应用缓存。';
 }
 $('cache-location-choose').onclick = () => {
   if (cache.jobId) {
@@ -154,14 +170,8 @@ $('bili-open-browser').onclick = () => {
   if (room) openExternal(`${activeServer}/#${room.invite}`);
 };
 $('link-choice').append($('cache-options'));
-$('cache-options').querySelector('summary')!.textContent = '共同缓存 · 按需启用';
 $('cache-options').querySelector('summary')!.title =
-  '仅供可下载的视频：全员完整下载后再播放，看完清理。实时共享画面不使用此功能。';
-if (!isNative)
-  $('cache-options').insertAdjacentHTML(
-    'beforeend',
-    '<p class="dialog-note" title="支持浏览器磁盘存储时分块写盘，上限 4 GiB，受本机空间与源站下载许可限制；旧浏览器仍受小文件容量限制。">缓存写入各自设备，看完自动清理；源站须允许下载。</p>',
-  );
+  '默认关闭。网络不稳时可手动开启，仅适用于允许下载的视频源。';
 $('cache-button').insertAdjacentHTML(
   'afterend',
   '<button id="cache-stream" class="text-button" hidden title="关闭全房间共同缓存，继续各自加载视频">返回边播边看</button>',
@@ -1385,6 +1395,8 @@ function render() {
     option.disabled =
       option.value !== '1' && (!cachePartsSupported || room?.media?.source?.kind === 'hls');
   if (caching) $<HTMLSelectElement>('cache-parts').value = String(room?.cacheParts ?? 1);
+  renderCacheStrategy();
+  $('cache-mode-status').textContent = caching ? '已启用' : '默认关闭';
   $('mode-toggle').setAttribute('aria-checked', String(!!caching));
   const hashes = new Set(
     room?.members.filter((m) => m.cache.state === 'ready').map((m) => m.cache.fingerprint),
@@ -1404,8 +1416,8 @@ function render() {
             ? '等待全员首批内容落盘并校验，之后边播边缓存。'
             : '等待所有成员完整缓存，期间无法开始播放。'
       : cacheAvailable
-        ? '按需启用：可选完整下载或首批缓存后开播，看完自动清理。'
-        : '先选择可下载的视频源。全员下载完整后再看；共享画面不使用此功能。';
+        ? '网络不稳时再开启，看完自动清理。'
+        : '先选择允许下载的视频源。';
   const mine = room?.members.find((m) => m.id === memberId)?.cache;
   const needsCache = !!caching && (!room?.cacheReady || loadedKind !== 'cache');
   $('cache-overlay').hidden = !needsCache || preview;
