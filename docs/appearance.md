@@ -50,6 +50,11 @@ Create one production website background asset, landscape 16:9, high detail. Use
 
 ## 部署记录
 
-本轮只计划更新 Pages 静态网页，不更新房间 Worker、Durable Objects、客户端安装包或 Release；正式部署与公网复核后补记产物。
+- 最终运行时代码 `a82fc2d95b6b3f98a18785514674b96d22cc81e6`；Pages `b38d32f5`，正式入口仍为 <https://videosreeeen.pages.dev>。此前皮肤交互版本 `3c220ed` 的外框补充在此版本集中落地。
+- 仅更新 Pages 静态网页；房间 Worker 保持 `4091586b-6275-4ba8-9be5-bd2c680a3e92`，没有部署或迁移 Durable Objects，没有更改用户房间状态，没有打包或发布客户端 / Release。
+- 公网独立双端房间已通过完整 `test:appearance`，包括容器边框、背景实时绘制与停止、按钮悬停动画、缩放、皮肤选择、播放连续、聊天、浮动停靠和全屏；视频为受控 MP4 fixture，房间通过真实公网 WSS。证据 `.local/appearance-public-evidence.json`，不代表原站全线路或手机真机验证。
+- 核对了线上 HTML 与 7 个资源的 SHA-256，均与本地成品一致，回执 `.local/appearance-public-assets.json`。入口 `assets/index-ByAASs3a.js`：`455ffa01242678b30b4a76f7f1c0dd56d40e7f2ad56fa212fa932e803116d3c0`；CSS `assets/index-CE6dm9uK.css`：`d2c7928e3c9496530f82495e6d4c098fe1bb528db878078123ded3f504f066dc`；背景 `assets/glitch-sky-CfFwXJSI.webp`：`40692ee38260d428b021ee01e7aab8341ac067625db9427469ef4cd893077de2`。
+- 初版完整 [Verify 已通过](https://github.com/BorderArea01/VideoSreeeen/actions/runs/41104339168)；外框补充的 [Verify](https://github.com/BorderArea01/VideoSreeeen/actions/runs/41105037848) 记录时运行中。本地最终构建与隔离 / 公网外框回归均已通过，未触发客户端发布工作流。
+- 当前 dist 和 Pages 上传目录各约 1.2 MB，没有新增安装包、候选构建目录或历史归档；唯一回退仍由 `.local/rollback/manifest.json` 定位，素材原始 PNG 作为源资产保留。
 
 实现参考：[sessionStorage](https://developer.mozilla.org/en-US/docs/Web/API/Window/sessionStorage)、[减少动态效果](https://developer.mozilla.org/en-US/docs/Web/CSS/@media/prefers-reduced-motion)、[CSS 装饰伪元素](https://developer.mozilla.org/en-US/docs/Web/CSS/::after)。没有引入 UI 动画依赖或后台定时动画。
