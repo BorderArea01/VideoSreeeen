@@ -1542,6 +1542,7 @@ function renderChat() {
   for (const message of room?.chat ?? []) {
     const row = document.createElement('div');
     row.className = `message ${message.memberId === memberId ? 'mine' : ''}`;
+    row.dataset.initial = Array.from(message.name.trim())[0] || '?';
     const meta = document.createElement('div');
     meta.className = 'message-meta';
     meta.textContent = `${message.name} · ${new Date(message.at).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}`;

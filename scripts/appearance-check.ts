@@ -50,7 +50,7 @@ const browser = await chromium.launch({
 const failures: string[] = [];
 const proof: Record<string, unknown> = {
   at: new Date().toISOString(),
-  production: !!process.env.VS_PUBLIC_URL,
+  target: process.env.VS_PUBLIC_URL ? 'public-preview' : 'local',
   realPhone: false,
 };
 async function context(roll: number) {
@@ -83,6 +83,7 @@ async function select(page: Page, value: string) {
     await page.locator('#appearance-button').click();
   await page.locator(`.theme-choice:has(input[value="${value}"])`).click();
   assert.equal(await theme(page), value);
+  await page.waitForTimeout(180); // Let the existing 150 ms color transition settle before screenshots.
 }
 async function close(page: Page) {
   await page.locator('[data-close="settings-dialog"]').first().click();
@@ -152,7 +153,7 @@ try {
   await viewer.goto(invite);
   await viewer.locator('#name-input').fill('隔离观众');
   await viewer.locator('#join-button').click();
-  await owner.locator('#member-count').filter({ hasText: '2' }).waitFor();
+  await owner.waitForFunction(() => document.getElementById('member-count')?.textContent === '2');
   await selectSource(owner, url);
   await owner.waitForFunction(
     () => document.querySelector<HTMLVideoElement>('#video')!.readyState >= 2,
@@ -171,6 +172,13 @@ try {
       .querySelector('#video')!
       .addEventListener('loadstart', () => (window as any).__appearanceLoads++);
   });
+  await owner.locator('.daylight-voice > summary').click();
+  await owner.evaluate(() => {
+    (window as any).__appearanceVoice = document.getElementById('voice-panel');
+  });
+  await owner.locator('#voice-join').click();
+  await owner.locator('#voice-mic').waitFor({ state: 'visible' });
+  await owner.locator('.daylight-voice > summary').click();
   watchingAppearance = true;
   const stateBefore = await owner
     .locator('#video')
@@ -180,6 +188,18 @@ try {
   assert.equal(await theme(viewer), 'classic');
   await select(owner, 'glitch');
   await close(owner);
+  await owner.locator('.daylight-voice > summary').click();
+  assert.equal(
+    await owner.evaluate(
+      () => document.getElementById('voice-panel') === (window as any).__appearanceVoice,
+    ),
+    true,
+  );
+  await owner.locator('#voice-mic').waitFor({ state: 'visible' });
+  assert.equal(await owner.locator('#voice-mic').innerText(), '开麦');
+  await owner.locator('#voice-leave').click();
+  await owner.locator('.daylight-voice > summary').click();
+  proof.voiceReceiveSurvivesSkinSwitch = true;
   const uninterrupted = await owner.evaluate(() => {
     const v = document.querySelector<HTMLVideoElement>('#video')!;
     return {
@@ -202,6 +222,9 @@ try {
   await owner.locator('#chat-input').fill('皮肤只在本机切换。🟦');
   await owner.locator('#send-button').click();
   await viewer.locator('.bubble').filter({ hasText: '皮肤只在本机切换。🟦' }).waitFor();
+  await viewer.locator('#chat-input').fill('观众端收到消息，视频继续播放。');
+  await viewer.locator('#send-button').click();
+  await owner.locator('.bubble').filter({ hasText: '观众端收到消息，视频继续播放。' }).waitFor();
   proof.independentViewerAndChat = true;
   const drag = await owner.locator('#chat-drag').boundingBox();
   assert.ok(drag);
@@ -227,13 +250,48 @@ try {
       .locator('.appearance-settings')
       .screenshot({ path: 'docs/screenshots/appearance-picker.png' });
   await close(owner);
+  await owner.locator('#cache-options > summary').click();
   await select(owner, 'classic');
   await close(owner);
   await owner.screenshot({ path: '.local/screenshots/theme-classic-room.png', fullPage: true });
   await select(owner, 'glitch');
   await close(owner);
   await owner.evaluate(() => window.scrollTo(0, 0));
+  proof.palette = await owner.evaluate(() =>
+    Object.fromEntries(
+      ['#room-button', '#source-form .button', '#choose-screen', '#voice-join'].map((selector) => {
+        const e = document.querySelector<HTMLElement>(selector)!;
+        const s = getComputedStyle(e);
+        return [
+          selector,
+          {
+            color: s.color,
+            background: s.backgroundColor,
+            opacity: s.opacity,
+            disabled: (e as HTMLButtonElement).disabled,
+          },
+        ];
+      }),
+    ),
+  );
   await owner.screenshot({ path: '.local/screenshots/theme-glitch-viewport.png' });
+  await owner.setViewportSize({ width: 1536, height: 1024 });
+  await owner.mouse.move(4, 180);
+  await owner.waitForTimeout(1400);
+  const composition = await owner.evaluate(() =>
+    Object.fromEntries(
+      ['#player-shell', '#chat-panel', '#playback-picker'].map((selector) => [
+        selector,
+        document.querySelector(selector)!.getBoundingClientRect().toJSON(),
+      ]),
+    ),
+  );
+  assert.ok(Math.abs(composition['#player-shell'].top - 204) < 3);
+  assert.ok(Math.abs(composition['#player-shell'].left - 80) < 3);
+  assert.ok(Math.abs(composition['#player-shell'].height - composition['#chat-panel'].height) < 3);
+  assert.ok(Math.abs(composition['#playback-picker'].width - 1376) < 5);
+  proof.referenceComposition1536 = composition;
+  await owner.screenshot({ path: '.local/screenshots/daylight-reference-1536.png' });
   if (!process.env.VS_PUBLIC_URL)
     await owner.screenshot({ path: 'docs/screenshots/glitch-art.png' });
   for (const width of [390, 320]) {
@@ -253,11 +311,14 @@ try {
   proof.mobileLayouts = [390, 320];
   await owner.setViewportSize({ width: 1440, height: 1000 });
   await owner.evaluate(() => window.scrollTo(0, 0));
-  const signature = () =>
-    owner.locator('#theme-scene').evaluate((element: HTMLCanvasElement) => {
+  const signature = (selector = '#theme-scene') =>
+    owner.locator(selector).evaluate((element: HTMLCanvasElement) => {
       const data = element.getContext('2d')!.getImageData(0, 0, element.width, element.height).data;
       let result = 2166136261;
-      for (let i = 0; i < data.length; i += 4096) result = Math.imul(result ^ data[i]!, 16777619);
+      for (let i = 0; i < data.length; i += 256) {
+        result = Math.imul(result ^ data[i]!, 16777619);
+        result = Math.imul(result ^ data[i + 3]!, 16777619);
+      }
       return result;
     });
   await owner.mouse.move(10, 200);
@@ -299,57 +360,75 @@ try {
   await cdp.send('Emulation.setPageScaleFactor', { pageScaleFactor: 1 });
   proof.backgroundResizesAndZooms = true;
   await owner.emulateMedia({ reducedMotion: 'reduce' });
-  await owner.locator('#room-button').hover();
+  await owner.locator('#source-form .button').hover();
   assert.equal(
     await owner
-      .locator('#room-button')
+      .locator('#source-form .button')
       .evaluate((e) => getComputedStyle(e, '::before').animationName),
     'none',
   );
+  await owner.waitForTimeout(500);
+  const reducedInk = await signature();
+  await owner.mouse.move(15, 180);
+  await owner.waitForTimeout(150);
+  assert.equal(await signature(), reducedInk);
   proof.reducedMotion = true;
   await owner.emulateMedia({ forcedColors: 'active' });
-  assert.equal(await owner.locator('#theme-scene').isVisible(), false);
+  await owner.locator('#theme-scene').waitFor({ state: 'hidden' });
   await owner.emulateMedia({ forcedColors: 'none' });
-  assert.equal(await owner.locator('#theme-scene').isVisible(), true);
+  await owner.locator('#theme-scene').waitFor({ state: 'visible' });
   proof.forcedColors = true;
   await owner.emulateMedia({ reducedMotion: 'no-preference' });
   await owner.evaluate(() => window.scrollTo(0, 0));
-  await owner.locator('#room-button').hover();
-  assert.equal(
-    await owner
-      .locator('#room-button')
-      .evaluate((e) => getComputedStyle(e, '::before').animationName),
-    'theme-slice',
-  );
-  const transform = await owner
-    .locator('#room-button')
-    .evaluate((e) => getComputedStyle(e, '::before').transform);
-  await owner.waitForTimeout(330);
-  assert.notEqual(
-    await owner.locator('#room-button').evaluate((e) => getComputedStyle(e, '::before').transform),
-    transform,
-  );
-  proof.buttonHoverAnimation = true;
+  await owner.mouse.move(4, 100);
+  await owner.waitForTimeout(1400);
+  const buttonBefore = await signature('#theme-fragments');
+  await owner.locator('#source-form .button').hover();
+  await owner.waitForTimeout(140);
+  assert.notEqual(await signature('#theme-fragments'), buttonBefore);
+  const afterimage = await signature('#theme-fragments');
+  await owner.waitForTimeout(180);
+  assert.notEqual(await signature('#theme-fragments'), afterimage);
+  await owner.waitForTimeout(1300);
+  const settledButton = await signature('#theme-fragments');
+  await owner.waitForTimeout(250);
+  assert.equal(await signature('#theme-fragments'), settledButton);
+  proof.buttonMaterialAfterimage = true;
+  await owner.locator('.daylight-members > summary').click();
   await owner.locator('#members').hover();
-  const frame = owner.locator('.members-card').first();
-  assert.equal(
-    await frame.evaluate((e) => getComputedStyle(e, '::before').animationName),
-    'theme-frame-tear',
-  );
+  const frame = owner.locator('.daylight-members .members-card');
+  await owner.waitForTimeout(140);
+  assert.notEqual(await signature('#theme-fragments'), buttonBefore);
   assert.equal(await frame.evaluate((e) => getComputedStyle(e, '::before').pointerEvents), 'none');
-  proof.containerFrames = true;
   assert.equal(
-    await owner
-      .locator('#room-button')
-      .evaluate((e) => getComputedStyle(e, '::before').pointerEvents),
+    await owner.locator('#theme-fragments').evaluate((e) => getComputedStyle(e).pointerEvents),
+    'none',
+  );
+  // Real rendered decoration must never cover the player, including its controls.
+  const protectedPixels = await owner.evaluate(() => {
+    const canvas = document.querySelector<HTMLCanvasElement>('#theme-fragments')!;
+    const scale = canvas.width / canvas.getBoundingClientRect().width;
+    const context = canvas.getContext('2d')!;
+    for (const selector of ['#player-shell', '#source-url', '#chat-input']) {
+      const r = document.querySelector(selector)!.getBoundingClientRect();
+      const yEnd = Math.min(innerHeight, r.bottom);
+      for (let y = Math.max(0, r.top); y < yEnd; y += 7)
+        for (let x = Math.max(0, r.left); x < Math.min(innerWidth, r.right); x += 7)
+          if (context.getImageData(Math.floor(x * scale), Math.floor(y * scale), 1, 1).data[3]) return false;
+    }
+    return true;
+  });
+  assert.equal(protectedPixels, true);
+  proof.materialEdgesAndVideoExclusion = true;
+  await owner.locator('.daylight-members > summary').click();
+  assert.equal(
+    await owner.locator('#theme-scene').evaluate((e) => getComputedStyle(e).pointerEvents),
     'none',
   );
   await owner.locator('#page-fullscreen').click();
   await owner.waitForFunction(() => document.body.classList.contains('page-cinema'));
-  assert.equal(
-    await owner.locator('#stage').evaluate((e) => getComputedStyle(e, '::before').display),
-    'none',
-  );
+  assert.equal(await owner.locator('#theme-fragments').isVisible(), false);
+  assert.equal(await owner.locator('#theme-scene').isVisible(), false);
   assert.equal(
     await owner.evaluate(
       () => document.querySelector('#video') === (window as any).__appearancePlayer,
@@ -394,6 +473,15 @@ try {
   await select(blocked, 'classic');
   await close(blocked);
   proof.storageBlockedStillUsable = true;
+  const linkedContext = await context(0);
+  const linked = await linkedContext.newPage();
+  await linked.goto(origin + '?skin=glitch');
+  assert.equal(await theme(linked), 'glitch');
+  assert.equal(new URL(linked.url()).searchParams.has('skin'), false);
+  await linked.reload();
+  assert.equal(await theme(linked), 'glitch');
+  await linkedContext.close();
+  proof.skinLinkAndRememberedChoice = true;
   assert.deepEqual(failures, []);
   proof.passed = true;
   console.log(JSON.stringify(proof, null, 2));

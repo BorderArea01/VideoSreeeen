@@ -103,6 +103,11 @@ const controls: any[] = [],
   errors: string[] = [];
 try {
   const context = await browser.newContext({ viewport: { width: 1440, height: 1080 } });
+  if (process.env.VS_TEST_SKIN === 'glitch' || process.env.VS_TEST_SKIN === 'classic')
+    await context.addInitScript(
+      (value) => localStorage.setItem('videosreeeen.appearance', value),
+      process.env.VS_TEST_SKIN,
+    );
   if (app)
     await context.route(origin + '/config', async (route) => {
       const response = await route.fetch();
@@ -123,6 +128,7 @@ try {
     });
   }
   await host.goto(origin);
+  evidence.skin = await host.evaluate(() => document.documentElement.dataset.theme);
   await host.locator('#hero-create').click();
   await host.locator('#name-input').fill('播放器验收');
   await host.locator('#create-button').click();

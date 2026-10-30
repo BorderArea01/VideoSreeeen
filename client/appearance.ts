@@ -1,11 +1,12 @@
 import './themes.css';
 import { GlitchScene } from './appearance-scene';
+import { DaylightLayout } from './appearance-layout';
 
 const themes = ['classic', 'glitch'] as const;
 type Theme = (typeof themes)[number];
 const preferenceKey = 'videosreeeen.appearance';
 const sessionKey = 'videosreeeen.appearance.session';
-const names: Record<Theme, string> = { classic: '暖夜 · 原版', glitch: '晴空故障 · Glitch Art' };
+const names: Record<Theme, string> = { classic: '暖夜 · 原版', glitch: '天光断层 · Glitch Art' };
 const valid = (value: string | null): value is Theme => themes.includes(value as Theme);
 function read(kind: 'localStorage' | 'sessionStorage', key: string) {
   try {
@@ -29,26 +30,43 @@ const preference = read('localStorage', preferenceKey);
 const session = read('sessionStorage', sessionKey);
 const navigation = performance.getEntriesByType('navigation')[0] as
   PerformanceNavigationTiming | undefined;
+// A shareable preview can select a skin without changing the invitation hash.
+const pageUrl = new URL(location.href);
+const requested = pageUrl.searchParams.get('skin');
 let automatic = !valid(preference);
 let current: Theme = valid(preference)
   ? preference
   : valid(session) && navigation?.type !== 'navigate'
     ? session
     : randomTheme();
+if (valid(requested)) {
+  current = requested;
+  automatic = false;
+  write('localStorage', preferenceKey, current);
+  pageUrl.searchParams.delete('skin');
+  history.replaceState(history.state, '', pageUrl);
+}
 let scene: GlitchScene | undefined;
+let layout: DaylightLayout | undefined;
 function apply() {
   document.documentElement.dataset.theme = current;
   if (current === 'glitch') scene ??= new GlitchScene();
   scene?.setActive(current === 'glitch');
+  layout?.setActive(current === 'glitch');
   document
     .querySelector('meta[name="theme-color"]')
-    ?.setAttribute('content', current === 'glitch' ? '#0b497c' : '#101014');
+    ?.setAttribute('content', current === 'glitch' ? '#1768ce' : '#101014');
   write('sessionStorage', sessionKey, current);
 }
 // Set the theme before main.ts builds the application. Never touches a player or room state.
 apply();
 
 export function setupAppearance(settings: HTMLElement) {
+  // main.ts creates the real voice and player controls synchronously after this call.
+  queueMicrotask(() => {
+    layout = new DaylightLayout();
+    layout.setActive(current === 'glitch');
+  });
   settings.querySelector('.dialog-heading')!.insertAdjacentHTML(
     'afterend',
     `
@@ -56,7 +74,7 @@ export function setupAppearance(settings: HTMLElement) {
       <div class="appearance-heading"><h3 id="appearance-title">界面皮肤</h3><span>仅本机</span></div>
       <fieldset class="theme-choices"><legend class="theme-sr-only">选择界面皮肤</legend>
         <label class="theme-choice"><input type="radio" name="appearance" value="classic"><span class="theme-swatch theme-swatch-classic" aria-hidden="true"><i></i><b></b><em></em></span><span class="theme-choice-name">暖夜 <small>原版</small></span></label>
-        <label class="theme-choice"><input type="radio" name="appearance" value="glitch"><span class="theme-swatch theme-swatch-glitch" aria-hidden="true"><i></i><b></b><em></em></span><span class="theme-choice-name">晴空故障 <small>Glitch Art</small></span></label>
+        <label class="theme-choice"><input type="radio" name="appearance" value="glitch"><span class="theme-swatch theme-swatch-glitch" aria-hidden="true"><i></i><b></b><em></em></span><span class="theme-choice-name">天光断层 <small>Glitch Art</small></span></label>
       </fieldset>
       <div class="appearance-auto"><span id="appearance-status" role="status"></span><button id="appearance-random" type="button" class="text-button" title="重新随机选择皮肤；未手动选择时，新标签页自动分配">随机选择</button></div>
     </section>`,

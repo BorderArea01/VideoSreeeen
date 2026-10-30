@@ -3,6 +3,8 @@
   "kind": "static-visual-concepts",
   "generator": "built-in image_gen",
   "implemented": false,
+  "selected": "A",
+  "implementation": "../../appearance-daylight-a.md",
   "images": [
     {
       "key": "A",
