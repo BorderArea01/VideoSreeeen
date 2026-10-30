@@ -20,6 +20,13 @@
 - `test:player-controls` 的实际 MP4 播放、预览、精细跳转、HLS 预览与全屏回归通过；`test:cache-window` 的双端首批解码、边播删盘、不可跳转区间、整片指纹与片尾清理通过。
 - 受控入口为 `scripts/controlled.ps1`，串行、Node 堆 384 MiB，合成测试物理输出静音，不访问用户麦克风。
 
-构建、补充边界回归及集中部署回执在本轮验证完成后补记。当前说明不等于已经部署。
+## 集中部署与公网复核
+
+- 运行时代码 `4086df8c5e28ab4057e16eb34f51dc8d476e9f79`；[GitHub Verify](https://github.com/BorderArea01/VideoSreeeen/actions/runs/41097793706) 已通过。没有触发客户端构建工作流或发布新客户端。
+- 同一免费 Worker 版本 `4091586b-6275-4ba8-9be5-bd2c680a3e92`；Pages 部署 `630bd808`。正式入口仍为 <https://videosreeeen.pages.dev>，既有房间和服务器地址不变。
+- 已核对线上 HTML 和 6 个 JS / CSS / 存储线程 / 语音线程 / Service Worker / 助手 ZIP 与本地成品一致。入口 `assets/index-BEAVEf4b.js`，SHA-256 `9b084d22a832d3adecea69d6c9f1512cd6911f691750999bbe126515ab610916`；回执 `.local/next-start-public-assets.json`。
+- `VS_PUBLIC_URL=https://videosreeeen.pages.dev npm run test:next-start` 的三端隔离公网房间通过：观众冷加载时保持新片 0 秒、收到起播时三个客户端均已提交首帧、最长等待后健康成员继续、慢端恢复、手动暂停取消旧续播。证据 `.local/next-start-public-evidence.json`。测试视频 / 取源响应为隔离 fixture，房间状态走真实公网 WSS；真实 AL 的原站实播证据与此分开记录，不冒充手机真机或全线路验证。
+
+全员在本轮观看结束后刷新原房间页面即可使用新起播流程，不需要重新建房。旧客户端不支持首帧确认时保持兼容；要完整使用这次修正，需要相关成员使用新版网页。
 
 参考：[HTML 视频帧回调](https://developer.mozilla.org/en-US/docs/Web/API/HTMLVideoElement/requestVideoFrameCallback)、[hls.js 起播与初始化时序](https://github.com/video-dev/hls.js/blob/master/src/controller/stream-controller.ts)。没有修改原站权限、CDN 签名或画质选择。
