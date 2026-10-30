@@ -1,36 +1,72 @@
 (() => {
   const profiles = {
     A: {
-      name: '像素断流',
-      subtitle: '横向排序 / 蓝天被拉成数据流',
-      character: 'PIXEL SORTING',
-      background: '照片被抽成细密横向像素流；扫过后断层在原处扩张、拉长、散去。',
-      surface: '深蓝主体完整；仅外围 15% 横向切片，断口透出天空，少量碎块脱离。',
-      button: '文字与中心完整，外围 15% 碎条拉伸，轻微青红偏移。',
+      name: '云隙细切',
+      subtitle: 'B1 / 云白面板 · 短促细切',
+      character: 'FINE CLOUD CUTS',
+      background: '晴空中细密的短切片在经过处展开，留出完整的视频区域。',
+      surface: '云白面板 90% 不透明，外围约 8% 细切，主体与文字完整。',
+      button: '短而细的边缘错位，低幅度收束。',
+      seed: 37.8,
+      palette: ['#e4f5ff', '#f1faff', '#c5e1f1', '#a7ccdf'],
+      accent: '#316f9e',
+      density: 8,
+      backgroundCount: 20,
+      band: 5,
+      motion: 0.38,
+      duration: 1050,
+      group: 1,
     },
     B: {
-      name: '悬浮碎层',
-      subtitle: '悬空切片 / 云白结构解体',
-      character: 'SUSPENDED FRAGMENTS',
-      background: '云层断成水平长片，带着独立惯性散开，保留晴空与自然日光。',
-      surface: '云白主体保持连续；外围 15% 薄片悬浮，断口集中在轮廓附近。',
-      button: '白蓝边缘薄片漂移重组，按钮中心与文字保持完整。',
+      name: '浮云叠片',
+      subtitle: 'B2 / 云白面板 · 薄片悬浮',
+      character: 'FLOATING LAYERS',
+      background: '几片较宽的云层带着惯性上下错开，不侵入视频画面。',
+      surface: '云白面板 90% 不透明，外围约 8% 以宽薄片轻轻分离。',
+      button: '两三组薄片延迟浮起后合拢，保留清楚轮廓。',
+      seed: 96.2,
+      palette: ['#eef7fd', '#ffffff', '#d3e5ef', '#acc9dc'],
+      accent: '#3e7296',
+      density: 13,
+      backgroundCount: 12,
+      band: 11,
+      motion: 0.46,
+      duration: 1450,
+      group: 3,
     },
     C: {
-      name: '数据熔合',
-      subtitle: '帧间拖影 / 数字文件损坏',
-      character: 'DATAMOSH',
-      background: '局部像素被重复拉伸、黏连成宽幅拖影，旧画面像损坏帧一样滞留。',
-      surface: '墨蓝主体完整，青紫拖影只在外围 15% 拉伸熔合，不穿过正文。',
-      button: '中心完整，边缘碎条拉成长尾、熔接后收束。',
+      name: '冰蓝拖影',
+      subtitle: 'B3 / 冰蓝面板 · 横向熔合',
+      character: 'ICY DATA TRAILS',
+      background: '少量云层像素拉成细长拖影，轻微青蓝色偏。',
+      surface: '冰蓝面板 90% 不透明，外围约 8% 保留更长、更淡的熔合尾迹。',
+      button: '边缘短暂拉长后缓慢回收，文字不移动。',
+      seed: 57.9,
+      palette: ['#dff3fa', '#edfaff', '#b8dfeb', '#91bfd3'],
+      accent: '#2d738e',
+      density: 7,
+      backgroundCount: 18,
+      band: 6,
+      motion: 0.4,
+      duration: 1550,
+      group: 1,
     },
     D: {
-      name: '错帧崩解',
-      subtitle: '水平撕裂 / 碎片离轨',
-      character: 'FRAME RUPTURE',
-      background: '宽窄交错的断帧横贯天空，碎块沿不同方向脱离，带轻微 RGB 偏移。',
-      surface: '主体轮廓清楚；外围 15% 成组错层，少量横条滑脱形成参差断口。',
-      button: '边缘成组碎层错帧跳开，中心与文字不参与切片。',
+      name: '晴空散页',
+      subtitle: 'B4 / 淡紫云白 · 成组错层',
+      character: 'SCATTERED CLOUD SHEETS',
+      background: '疏密交错的宽窄云片分组移动，零散像素在外侧散开。',
+      surface: '淡紫云白面板 90% 不透明，外围约 8% 成组错开，碎块更稀疏。',
+      button: '边缘小组错帧、轻微上浮，然后各自归位。',
+      seed: 18.5,
+      palette: ['#e9effc', '#f6f8ff', '#ccd9ed', '#adbddd'],
+      accent: '#586f9a',
+      density: 11,
+      backgroundCount: 14,
+      band: 8,
+      motion: 0.44,
+      duration: 1250,
+      group: 2,
     },
   };
   const root = document.documentElement;
@@ -56,6 +92,8 @@
     previous = { x: 0, y: 0, t: 0 };
   const pieces = [],
     cues = new Set();
+  const EDGE_AREA = 0.08;
+  const VIDEO_CLEARANCE = 12;
   const isEmbed = new URLSearchParams(location.search).has('embed');
   if (isEmbed)
     for (const s of ['.review-bar', '.design-notes', 'footer'])
@@ -100,15 +138,17 @@
   }
   // Fixed corruption is cut from the actual photograph, not drawn as border dots.
   function tear(c, x, y, seed, energy, age = 0) {
-    const count = variant === 'A' ? 32 : variant === 'B' ? 16 : variant === 'C' ? 25 : 23;
+    const style = profiles[variant],
+      count = style.backgroundCount;
+    seed += style.seed;
     for (let i = 0; i < count; i++) {
       const r = noise(seed + i * 3),
         sign = i % 3 === 0 ? -1 : 1;
-      const sh = (variant === 'B' ? 5 + r * 15 : 2 + r * 8) * scale;
-      const sy = clamp(y + (i - count / 2) * (variant === 'B' ? 10 : 5) * scale, 0, height - sh);
-      const length = (80 + noise(i + seed + 5) * 260) * scale * (0.7 + energy * 0.5);
+      const sh = (2 + r * style.band) * scale;
+      const sy = clamp(y + (i - count / 2) * style.band * scale, 0, height - sh);
+      const length = (45 + noise(i + seed + 5) * 160) * scale * (0.7 + energy * 0.3);
       const sx = clamp(x - length * 0.35 + sign * r * 50 * scale, 0, width - 1);
-      const slide = sign * (12 + r * (variant === 'D' ? 100 : 65)) * energy * scale;
+      const slide = sign * (8 + r * 45) * energy * scale * style.motion;
       const stretch = variant === 'A' || variant === 'C';
       c.globalAlpha = clamp((0.58 + r * 0.35) * energy, 0, 1);
       blit(
@@ -138,16 +178,29 @@
   function paint(now) {
     ctx.globalAlpha = 1;
     ctx.drawImage(base, 0, 0);
+    // Decoration never paints inside the video or its 12px clearance, even behind it.
+    const film = document.querySelector('.screen').getBoundingClientRect();
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(0, 0, width, height);
+    ctx.rect(
+      (film.left - VIDEO_CLEARANCE) * scale,
+      (film.top - VIDEO_CLEARANCE) * scale,
+      (film.width + VIDEO_CLEARANCE * 2) * scale,
+      (film.height + VIDEO_CLEARANCE * 2) * scale,
+    );
+    ctx.clip('evenodd');
     tear(ctx, width * 0.015, height * 0.22, 13, 0.83);
     tear(ctx, width * 0.85, height * 0.64, 31, 0.87);
     tear(ctx, width * 0.46, height * 0.9, 64, 0.6);
-    if (reduced.matches) return;
-    for (const p of impulses) {
-      const age = (now - p.t) / 1800;
-      if (age < 0 || age > 1) continue;
-      const e = Math.sin(Math.PI * Math.min(1, age * 1.65)) * (1 - age * 0.65) * p.amp;
-      tear(ctx, p.x + p.dx * age * 45 * scale, p.y, p.seed, Math.max(0, e), age);
-    }
+    if (!reduced.matches)
+      for (const p of impulses) {
+        const age = (now - p.t) / 1800;
+        if (age < 0 || age > 1) continue;
+        const e = Math.sin(Math.PI * Math.min(1, age * 1.65)) * (1 - age * 0.65) * p.amp;
+        tear(ctx, p.x + p.dx * age * 45 * scale, p.y, p.seed, Math.max(0, e), age);
+      }
+    ctx.restore();
   }
   function spawn(x, y, vx = 0, vy = 0, force = false) {
     if (reduced.matches) return;
@@ -165,7 +218,7 @@
     if (impulses.length > 5) impulses.shift();
     wake();
   }
-  // Only a 15% perimeter band may break. The center and text backings stay intact.
+  // Only an 8% perimeter band may break. The center and text backings stay intact.
   // Hit targets and accessible text remain real DOM, independent of decoration.
   function fitPiece(p) {
     const b = p.el.getBoundingClientRect();
@@ -193,6 +246,14 @@
     p.c.height = Math.ceil((p.h + 80) * dpr);
     p.c.style.width = `${p.w + 96}px`;
     p.c.style.height = `${p.h + 80}px`;
+    const film = document.querySelector('.screen').getBoundingClientRect();
+    const canvasBox = p.c.getBoundingClientRect();
+    p.videoCut = {
+      x: film.left - canvasBox.left - VIDEO_CLEARANCE,
+      y: film.top - canvasBox.top - VIDEO_CLEARANCE,
+      w: film.width + VIDEO_CLEARANCE * 2,
+      h: film.height + VIDEO_CLEARANCE * 2,
+    };
     p.g.setTransform(dpr, 0, 0, dpr, 0, 0);
     drawPiece(p, 0, 0);
   }
@@ -200,23 +261,18 @@
     const { g, w, h, button } = p;
     if (w < 1 || h < 1) return;
     g.clearRect(0, 0, w + 96, h + 80);
-    const light = variant === 'B',
+    const light = true,
       primary = p.el.classList.contains('primary');
-    const palette = light
-      ? ['#e4f5ff', '#f1faff', '#c5e1f1', '#a7ccdf']
-      : variant === 'C'
-        ? ['#192d42', '#3b415a', '#40506b', '#746b83']
-        : variant === 'D'
-          ? ['#101e35', '#172d44', '#1c354d', '#24435b']
-          : ['#102d47', '#163d59', '#214e6a', '#325f7d'];
-    const accent = light ? '#316f9e' : variant === 'C' ? '#b8c2eb' : '#b2e9fa';
-    const density = variant === 'A' ? 5 : variant === 'B' ? 11 : variant === 'D' ? 9 : 7;
+    const style = profiles[variant],
+      palette = style.palette,
+      accent = style.accent;
+    const density = style.density;
     const strips = button ? 13 : Math.max(22, Math.min(46, Math.round(h / density)));
-    const seed = p.seed + variant.charCodeAt(0) * 3;
+    const seed = p.seed + style.seed;
     const heights = Array.from({ length: strips }, (_, i) => 0.5 + noise(seed + i * 2.7) * 1.8);
     const total = heights.reduce((a, b) => a + b, 0);
     let cursor = 0;
-    const power = (variant === 'D' ? 1.2 : variant === 'B' ? 0.9 : 1) * (0.32 + energy);
+    const power = style.motion * (0.25 + energy);
     g.save();
     g.translate(48, 40);
     const body = primary
@@ -233,8 +289,7 @@
     g.globalAlpha = 1;
     g.fillStyle = body;
     g.fillRect(0, 0, w, h);
-    // 15% of face AREA, rather than 15% on each side (which would cut 51%).
-    const edge = (w + h - Math.sqrt((w + h) ** 2 - 0.6 * w * h)) / 4;
+    const edge = (w + h - Math.sqrt((w + h) ** 2 - 4 * EDGE_AREA * w * h)) / 4;
     const edgeX = edge,
       edgeY = edge;
     g.save();
@@ -246,23 +301,24 @@
     for (let i = 0; i < strips; i++) {
       const r = noise(seed + i * 1.7),
         sign = i % 2 ? 1 : -1;
-      const group = variant === 'D' ? Math.floor(i / 3) : i;
+      const group = Math.floor(i / style.group);
       const fault = i % 7 === 1 || i % 7 === 2 || i % 11 === 6;
       const shear =
         energy *
         Math.sin(group * 1.7 + phase * 5 + (p.burstSeed || 0)) *
-        (button ? 5 : 18) *
+        (button ? 3 : 9) *
+        style.motion *
         (p.dir || 1);
       const shift =
         Math.sin(group * 4.3 + seed) * (button ? 11 : 29) * power * (fault ? 1 : 0.18) +
         (fault ? shear : 0);
-      const inset = i < 2 || i > strips - 3 ? 7 + r * 12 : r * 3;
-      const gap = fault ? (button ? 0.7 : 2.4) + energy * 1.1 : -0.3;
+      const inset = i < 2 || i > strips - 3 ? 3 + r * 7 : r * 2;
+      const gap = fault ? (button ? 0.5 : 1.8) + energy * 0.5 : -0.3;
       const stripHeight = (heights[i] / total) * h;
-      const yy = cursor + (variant === 'B' && fault ? sign * energy * 3 : 0);
+      const yy = cursor + (style.group > 1 && fault ? sign * energy * 1.5 : 0);
       cursor += stripHeight;
       const hh = Math.max(0.8, stripHeight - gap),
-        tail = (i % 6 === 1 ? (button ? 8 : variant === 'C' ? 58 : 37) : 0) * power;
+        tail = (i % 6 === 1 ? (button ? 4 : variant === 'C' ? 28 : 16) : 0) * power;
       g.globalAlpha = 1;
       g.fillStyle = button ? body : palette[fault && i % 3 === 1 ? 1 : 0];
       g.fillRect(inset + shift, yy, w - inset * 2 + tail, hh);
@@ -295,12 +351,12 @@
         g.fillStyle = smear;
         g.fillRect(shift + w * 0.2, yy, w * 0.8 + tail, hh);
       }
-      if (i % (button ? 4 : 5) === 2) {
+      if (i % (button ? 6 : 8) === 2) {
         const side = i % 3 ? 1 : -1,
-          distance = (button ? 6 : 12) + r * 12 + energy * (15 + r * 15);
-        const px = side > 0 ? w + distance : -distance - (button ? 7 : 15);
-        const pw = button ? 3 + r * 8 : 8 + r * 21,
-          py = yy + sign * (3 + energy * 8);
+          distance = (button ? 3 : 5) + r * 4 + energy * (4 + r * 5);
+        const px = side > 0 ? w + distance : -distance - (button ? 4 : 8);
+        const pw = button ? 2 + r * 4 : 4 + r * 8,
+          py = yy + sign * (2 + energy * 3);
         g.globalAlpha = 0.7 - energy * 0.08;
         g.fillStyle = primary ? accent : palette[2];
         g.fillRect(px, py, pw, Math.max(2, hh * 0.6));
@@ -312,10 +368,10 @@
             height * r,
             9,
             9,
-            px + side * 9,
-            py - 9 - phase * 6,
-            5 + r * 6,
-            5 + r * 6,
+            px + side * 4,
+            py - 4 - phase * 3,
+            3 + r * 3,
+            3 + r * 3,
           );
         }
       }
@@ -331,15 +387,24 @@
     for (const r of p.protected || []) g.fillRect(r.x, r.y, r.w, r.h);
     g.restore();
     g.restore();
+    // Clear overhang from every card/button, regardless of DOM stacking order.
+    const cut = p.videoCut;
+    if (cut)
+      g.clearRect(
+        Math.floor(cut.x),
+        Math.floor(cut.y),
+        Math.ceil(cut.x + cut.w) - Math.floor(cut.x),
+        Math.ceil(cut.y + cut.h) - Math.floor(cut.y),
+      );
     g.globalAlpha = 1;
     p.c.dataset.fragments = String(strips);
     p.c.dataset.energy = energy.toFixed(3);
-    p.c.dataset.edgeRatio = '0.15';
+    p.c.dataset.edgeRatio = String(EDGE_AREA);
   }
   function feedback(p) {
     if (reduced.matches || !p) return;
     p.t = performance.now();
-    p.duration = variant === 'C' ? 1550 : variant === 'B' ? 1350 : 1100;
+    p.duration = profiles[variant].duration;
     p.force = clamp(Math.hypot(previous.vx || 0, previous.vy || 0) * 0.2 + 0.8, 0.8, 1.3);
     p.burstSeed = Math.random() * 12;
     p.dir = previous.vx < 0 ? -1 : 1;
@@ -434,9 +499,12 @@
     root.dataset.variant = variant;
     cancelAll();
     const p = profiles[variant];
+    root.style.setProperty('--accent', p.accent);
+    root.style.setProperty('--panel', p.palette[0]);
     document.getElementById('direction-title').textContent = p.name;
     document.getElementById('direction-subtitle').textContent = p.subtitle;
-    document.getElementById('notes-title').textContent = `${variant} / ${p.name}`;
+    document.getElementById('notes-title').textContent =
+      `B${Object.keys(profiles).indexOf(variant) + 1} / ${p.name}`;
     document.getElementById('character').textContent = p.character;
     document.getElementById('chapter').textContent = String(
       Object.keys(profiles).indexOf(variant) + 1,

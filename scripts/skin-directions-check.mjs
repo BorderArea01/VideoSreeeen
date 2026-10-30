@@ -70,6 +70,49 @@ try {
       for (let i = 0; i < p.length; i += 256) hash = Math.imul(hash ^ p[i], 16777619);
       return hash;
     });
+  const protectedFingerprint = () =>
+    page.evaluate(() => {
+      const c = document.querySelector('#sky'),
+        r = document.querySelector('.screen').getBoundingClientRect();
+      const b = c.getBoundingClientRect(),
+        scale = c.width / b.width;
+      const p = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+      let hash = 2166136261;
+      for (let y = Math.max(0, r.top + 2); y < Math.min(innerHeight, r.bottom - 2); y += 11)
+        for (let x = r.left + 2; x < r.right - 2; x += 11) {
+          const i = (Math.floor(y * scale) * c.width + Math.floor(x * scale)) * 4;
+          for (let k = 0; k < 3; k++) hash = Math.imul(hash ^ p[i + k], 16777619);
+        }
+      return hash;
+    });
+  const videoGuard = () =>
+    page.evaluate(() => {
+      const film = document.querySelector('.screen').getBoundingClientRect();
+      let samples = 0,
+        unsafePixels = 0;
+      for (const c of document.querySelectorAll('.fracture-canvas')) {
+        const r = c.getBoundingClientRect();
+        const left = Math.max(r.left, film.left - 12),
+          top = Math.max(r.top, film.top - 12);
+        const right = Math.min(r.right, film.right + 12),
+          bottom = Math.min(r.bottom, film.bottom + 12);
+        if (left >= right || top >= bottom) continue;
+        const pixels = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+        const sx = c.width / r.width,
+          sy = c.height / r.height;
+        for (let y = top + 1; y < bottom - 1; y += 2)
+          for (let x = left + 1; x < right - 1; x += 2) {
+            samples++;
+            if (
+              pixels[
+                (Math.floor((y - r.top) * sy) * c.width + Math.floor((x - r.left) * sx)) * 4 + 3
+              ] !== 0
+            )
+              unsafePixels++;
+          }
+      }
+      return { samples, unsafePixels };
+    });
   await page.goto(origin + '/index.html');
   await page.waitForFunction(() => document.querySelector('#sky').width > 1);
   await page.waitForTimeout(300);
@@ -79,10 +122,26 @@ try {
     await page.mouse.move(2, 190);
     await page.waitForTimeout(2200);
     const before = await fingerprint();
+    const protectedBefore = await protectedFingerprint();
     await page.locator('#demonstrate').click();
     await page.waitForTimeout(500);
     const during = await fingerprint();
     assert.notEqual(before, during, `${variant} background has no response`);
+    assert.equal(
+      await protectedFingerprint(),
+      protectedBefore,
+      `${variant} background distortion entered video`,
+    );
+    const guard = await videoGuard();
+    assert.ok(
+      guard.samples > 0 && guard.unsafePixels === 0,
+      `${variant} fragments entered video: ${JSON.stringify(guard)}`,
+    );
+    assert.equal(
+      await page.locator('.source > .fracture-canvas').evaluate((c) => getComputedStyle(c).opacity),
+      '0.9',
+    );
+    assert.equal(await page.locator('.source').evaluate((c) => getComputedStyle(c).opacity), '1');
     const material = await page.locator('.source > .fracture-canvas').evaluate((c) => {
       const pixels = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
       const box = c.parentElement.getBoundingClientRect();
@@ -90,7 +149,7 @@ try {
       const edge =
         (box.width +
           box.height -
-          Math.sqrt((box.width + box.height) ** 2 - 0.6 * box.width * box.height)) /
+          Math.sqrt((box.width + box.height) ** 2 - 0.32 * box.width * box.height)) /
         4;
       let gaps = 0,
         coreSamples = 0,
@@ -103,7 +162,7 @@ try {
           coreSamples++;
           if (alpha(48 + x, 40 + y) !== 255) damagedCore++;
         }
-      for (let y = 0; y < box.height; y++) if (alpha(48 + 8, 40 + y) < 10) gaps++;
+      for (let y = 0; y < box.height; y++) if (alpha(48 + 2, 40 + y) < 10) gaps++;
       return {
         active: c.dataset.active,
         fragments: Number(c.dataset.fragments),
@@ -117,7 +176,7 @@ try {
     });
     assert.equal(material.active, 'true', `${variant} body fragments not animated`);
     assert.ok(material.fragments >= 22 && material.energy > 0.1);
-    assert.ok(material.intactAreaFraction >= 0.849);
+    assert.ok(material.intactAreaFraction >= 0.919);
     assert.ok(
       material.gaps > 5 && material.coreSamples > 100 && material.damagedCore === 0,
       `${variant} breaks the core or lacks edge cuts: ${JSON.stringify(material)}`,
@@ -183,6 +242,8 @@ try {
       );
       const canvas = await page.locator('#sky').boundingBox();
       assert.ok(canvas.width >= width - 1);
+      const resizedGuard = await videoGuard();
+      assert.equal(resizedGuard.unsafePixels, 0, `${variant} fragments overlap video at ${width}`);
       if (width === 390)
         await page.screenshot({
           path: `.local/screenshots/skin-${variant}-mobile.png`,
@@ -199,6 +260,8 @@ try {
     evidence.variants[variant] = {
       liveBackground: true,
       surfaceFragments: material,
+      videoGuard: guard,
+      containerOpacity: 0.9,
       buttonFeedback: true,
       settles: true,
       reducedMotion: true,

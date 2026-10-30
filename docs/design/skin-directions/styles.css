@@ -834,7 +834,7 @@ footer {
   }
 }
 
-/* The surfaces themselves are fragmented. No intact rectangle sits beneath them. */
+/* B-family variations: translucent cloud-white material, with restrained edge fragments. */
 html,
 body {
   overflow-x: clip;
@@ -843,14 +843,6 @@ body {
   overflow-x: clip;
 }
 html[data-variant] {
-  --ink: #eff8ff;
-  --muted: #b2c9d9;
-  --accent: #b2e9fa;
-  --accent-ink: #12344a;
-  --line: #a9d9f82b;
-  --radius: 2px;
-}
-html[data-variant='B'] {
   --ink: #173d57;
   --muted: #456b85;
   --accent: #316f9e;
@@ -858,11 +850,8 @@ html[data-variant='B'] {
   --line: #497b9b32;
   --panel-deep: #d4e9f5c9;
   --panel: #e7f5ff;
+  --radius: 2px;
   color-scheme: light;
-}
-html[data-variant='C'] {
-  --accent: #b8c2eb;
-  --accent-ink: #252e4c;
 }
 html[data-variant] .surface.fractured,
 html[data-variant] .action.fractured,
@@ -888,6 +877,9 @@ html[data-variant] .surface.fractured::after {
   z-index: -1;
   pointer-events: none;
   max-width: none;
+}
+.surface.fractured > .fracture-canvas {
+  opacity: 0.9;
 }
 html[data-variant] .fractured > .material {
   display: none;
@@ -919,6 +911,7 @@ html[data-variant] .hint {
   border-radius: 0;
 }
 html[data-variant] .screen {
+  z-index: 3;
   border: 1px solid #15394b;
   border-radius: 3px;
   overflow: hidden;
