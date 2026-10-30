@@ -414,7 +414,8 @@ try {
       const yEnd = Math.min(innerHeight, r.bottom);
       for (let y = Math.max(0, r.top); y < yEnd; y += 7)
         for (let x = Math.max(0, r.left); x < Math.min(innerWidth, r.right); x += 7)
-          if (context.getImageData(Math.floor(x * scale), Math.floor(y * scale), 1, 1).data[3]) return false;
+          if (context.getImageData(Math.floor(x * scale), Math.floor(y * scale), 1, 1).data[3])
+            return false;
     }
     return true;
   });

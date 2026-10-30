@@ -47,4 +47,10 @@ Edit target: the attached DAYLIGHT RUPTURE reference screenshot. Create the prod
 
 ## 验收回执
 
-待最终构建、公网独立预览验收后填写。本段不是部署完成声明。
+- 源码提交 `8c4f8c0`；2026-10-31 已部署到独立 Pages 预览 `ab7dacdf`，固定地址 <https://ab7dacdf.videosreeeen.pages.dev/?skin=glitch>，别名 <https://daylight-a.videosreeeen.pages.dev/?skin=glitch>。仅此预览更新，正式入口未切换。
+- 最终构建通过，116 项单元测试通过；本地与公网 `test:appearance` 均通过。真实两端 MP4 播放、双向文字聊天、拖拽 / 停靠、外观选择与记忆正常；换肤保持同一 video、0 次 loadstart、无暂停和房间控制。语音已加入收听后跨皮肤切换保持同一面板与连接，未开启物理麦克风。
+- 1536×1024 的实际布局：播放器 `(79.86, 204)`，`968.77×503.75`；聊天室 `(1068.63, 204)`，`387.52×503.75`；底栏 `(79.86, 727.75)`，`1376.28×96`。截图为真实房间与示例视频，不将概念稿充作运行画面。
+- A 皮肤下 `VS_TEST_SKIN=glitch npm run test:player-controls` 通过：实际 MP4 / HLS 预览、暂停、跳转、精细定位、网页 / 系统全屏、约 1 秒闲置隐藏、窄屏与触摸仿真。错误列表为空；不代表手机真机验收。
+- 动效实录 `.local/daylight-motion.webm`，5.45 秒、1152×768、517,358 字节：从独立浏览器的真实页面捕获，不是概念图动画或电影录屏。仅含本机合成房间、CC0 示例视频和鼠标引发的材质动效，没有用户房间或账号。
+- 核对预览 HTML、6 个 JS / CSS / WebP 资源和预览别名，均与本地成品逐字节一致。入口 `index-CKShY03F.js` SHA-256 `8614eaef15847dae4dd295304b09bfe4566ea97bfa3fdcfaffe9f106c5fa18c4`；CSS `index-89MxgkNv.css` SHA-256 `e6083501d7b3313738980a0529db364cbc47774c409ea09096ac3cad48b69775`；背景 SHA-256 `c074b0268270f486e5e6215a4721e242e62b79f98a5c2673c5fe2a1f9acde887`。本机回执 `.local/daylight-public-assets.json`。
+- 正式入口仍加载 `assets/index-ByAASs3a.js`，核对未改变；房间 Worker、Durable Objects、原站取源和已发布客户端未更新。没有创建新付费资源，没有启用 TURN，没有新增安装包、Release、标签或回退版本。当前 dist 约 1.18 MiB，Pages 上传目录约 1.19 MiB，仍沿用 `.local/rollback/manifest.json` 定位的唯一回退。
