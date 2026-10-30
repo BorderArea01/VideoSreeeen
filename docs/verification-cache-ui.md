@@ -20,4 +20,10 @@
 
 ## 部署
 
-本轮仅更新 Pages 静态网页，房间 Worker 与 Durable Objects 保持原版本。上线与公网复核回执在完成后补记。
+- 运行时代码 `29da1dece509755f3f5998e2e682e1f25b4170e9`；Pages 部署 `b1a527f1`，正式入口仍为 <https://videosreeeen.pages.dev>。
+- 本轮仅更新 Pages 静态网页；房间 Worker 保持 `4091586b-6275-4ba8-9be5-bd2c680a3e92`，没有重新部署或迁移 Durable Objects。
+- 新入口 `assets/index-Dw3gj2-w.js`，SHA-256 `4bb47a0c9c68c33850c9791ac892e8246e8c0c999078ebff664589f03a38cc3e`；CSS `assets/index-D5GE4kub.css`，SHA-256 `6cf53a65d849be2ec9c29a72b7b67c433a26a1919defa5b5d84dfbbe248283ed`。已核对线上 HTML 引用，以及入口、CSS、缓存线程、语音线程、Service Worker 和助手 ZIP 共六项产物与本地一致；回执 `.local/cache-ui-public-assets.json`。
+- 公网隔离房间的界面、目录显示、条件选择、模式开关、启用锁定、关闭恢复和 390px / 320px 布局检查通过。视频使用受控 MP4 fixture，房间状态走真实公网 WSS，不代表原站全线路或手机真机验证。证据 `.local/cache-ui-public-evidence.json`。
+- [GitHub Verify](https://github.com/BorderArea01/VideoSreeeen/actions/runs/41101845315) 已触发；记录时仍在等待 GitHub runner，本地 116 项、构建和缓存回归已通过。没有触发客户端发布工作流或修改 Release。
+
+唯一回退版本仍按 `.local/rollback/manifest.json` 定位，没有为本轮建立额外历史构建目录。当前前端构建及 Pages 上传目录各不足 1 MiB，未新增安装包或大体积编译中间产物。
