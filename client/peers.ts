@@ -201,7 +201,11 @@ export class RoomPeers {
       p.sending = p.sending
         .then(async () => {
           await this.drain(p);
-          this.emit(p, { type: 'have', key: this.planKey, blocks: batch });
+          this.emit(p, {
+            type: 'have',
+            key: this.planKey,
+            blocks: batch.filter((h) => this.inventory.has(keyOf(h.file, h.offset))),
+          });
         })
         .catch(() => {});
     }
@@ -237,7 +241,14 @@ export class RoomPeers {
       return;
     }
     if (!this.planKey || m.key !== this.planKey || p.key !== this.planKey || !this.read) return;
-    if (m.type === 'have' && Array.isArray(m.blocks) && m.blocks.length <= 64) {
+    if (m.type === 'drop' && Array.isArray(m.blocks) && m.blocks.length <= 64) {
+      for (const h of m.blocks)
+        if (this.validBlock(h.file, h.offset)) {
+          p.have.delete(keyOf(h.file, h.offset));
+          if (p.pending && p.pending.file === h.file && p.pending.offset === h.offset)
+            this.resolve(p, null);
+        }
+    } else if (m.type === 'have' && Array.isArray(m.blocks) && m.blocks.length <= 64) {
       for (const h of m.blocks)
         if (
           this.validBlock(h.file, h.offset) &&
@@ -378,6 +389,20 @@ export class RoomPeers {
     this.inventory.set(keyOf(file, offset), h);
     for (const p of this.peers.values())
       this.emit(p, { type: 'have', key: this.planKey, blocks: [h] });
+  }
+  forget(file: number, offsets: number[]) {
+    for (const offset of offsets) this.inventory.delete(keyOf(file, offset));
+    const planKey = this.planKey;
+    for (const p of this.peers.values())
+      for (let i = 0; i < offsets.length; i += 64) {
+        const blocks = offsets.slice(i, i + 64).map((offset) => ({ file, offset }));
+        p.sending = p.sending
+          .then(async () => {
+            await this.drain(p);
+            if (this.planKey === planKey) this.emit(p, { type: 'drop', key: planKey, blocks });
+          })
+          .catch(() => {});
+      }
   }
   async get(file: number, offset: number, wait = 0): Promise<Uint8Array | null> {
     if (!this.enabled) return null;

@@ -359,6 +359,123 @@ try {
   assert.equal((await invalid.next('error')).code, 'invalid_invite');
   assert.equal((await fetch(origin + '/media/ABC234/anything/video')).status, 501);
   evidence.noSourceVideoProxy = true;
+  // The vote and revoked credential must survive an actual Durable Object wake-up.
+  const c = await client('ABC234');
+  c.send({ type: 'join', name: 'vote target', invite: welcome.room.invite, protocol: 1 });
+  const cw = await c.next('welcome');
+  a.clear();
+  a.send({ type: 'kick-vote', action: 'start', target: cw.memberId });
+  const poll = await a.next('state');
+  assert.equal(poll.room.kickVote.required, 2);
+  await runtime.unsafeEvictDurableObject('videosreeeen-test', 'WatchRoom', {
+    name: 'ABC234',
+    webSockets: 'hibernate',
+  });
+  a.clear();
+  a.send({ type: 'snapshot' });
+  assert.equal((await a.next('state')).room.kickVote.id, poll.room.kickVote.id);
+  replacement.send({ type: 'kick-vote', action: 'yes', voteId: poll.room.kickVote.id });
+  await c.next('kicked');
+  await new Promise((r) => setTimeout(r, 100));
+  await runtime.unsafeEvictDurableObject('videosreeeen-test', 'WatchRoom', {
+    name: 'ABC234',
+    webSockets: 'hibernate',
+  });
+  const denied = await client('ABC234');
+  denied.send({
+    type: 'join',
+    name: 'cannot resume',
+    invite: welcome.room.invite,
+    resume: cw.resume,
+    protocol: 1,
+  });
+  assert.equal((await denied.next('error')).code, 'kicked');
+  evidence.vote = {
+    hibernationPreservesPoll: true,
+    majorityKick: true,
+    revokedCredentialSurvivesWake: true,
+  };
+
+  const caps = ['latency-v1', 'cache-parts-v1', 'cache-window-v1'];
+  const d = await client('ACD235');
+  d.send({ type: 'create', name: 'window owner', protocol: 1, capabilities: caps });
+  const dw = await d.next('welcome');
+  const e = await client('ACD235');
+  e.send({
+    type: 'join',
+    name: 'window viewer',
+    invite: dw.room.invite,
+    protocol: 1,
+    capabilities: caps,
+  });
+  await e.next('welcome');
+  d.clear();
+  d.send({ type: 'snapshot' });
+  let state = (await d.next('state')).room;
+  d.clear();
+  d.send({
+    type: 'media',
+    base: state.revision,
+    op: 'window-media',
+    media: {
+      provider: 'direct',
+      title: 'fixture',
+      url: 'https://example.com/window.mp4',
+      source: { kind: 'file', video: 'https://example.com/window.mp4' },
+    },
+  });
+  state = (await d.next('state')).room;
+  d.clear();
+  d.send({
+    type: 'mode',
+    base: state.revision,
+    op: 'window-mode',
+    mode: 'cache',
+    cacheParts: 3,
+    sliding: true,
+  });
+  state = (await d.next('state')).room;
+  for (const client of [d, e])
+    client.send({
+      type: 'cache',
+      mediaId: state.media.id,
+      epoch: state.epoch,
+      state: 'downloading',
+      progress: 0.7,
+      bytes: 1000,
+      parts: ['a'.repeat(64), 'b'.repeat(64)],
+      window: { start: 5, end: 9 },
+      released: 1,
+      retainedBytes: 500,
+    });
+  for (let i = 0; i < 10; i++) {
+    const next = (await d.next('state')).room;
+    if (next.cacheReady) {
+      state = next;
+      break;
+    }
+  }
+  assert.equal(state.cacheReady, true);
+  assert.deepEqual(state.cacheWindow, { start: 5, end: 9 });
+  await runtime.unsafeEvictDurableObject('videosreeeen-test', 'WatchRoom', {
+    name: 'ACD235',
+    webSockets: 'hibernate',
+  });
+  d.clear();
+  d.send({ type: 'snapshot' });
+  state = (await d.next('state')).room;
+  assert.equal(state.cacheSliding, true);
+  assert.deepEqual(state.cacheWindow, { start: 5, end: 9 });
+  d.clear();
+  d.send({ type: 'control', base: state.revision, op: 'gray-seek', action: 'seek', position: 0 });
+  assert.equal((await d.next('error')).code, 'cache_range');
+  d.send({ type: 'control', base: state.revision, op: 'valid-seek', action: 'seek', position: 6 });
+  assert.equal((await d.next('state')).room.playback.position, 6);
+  evidence.cacheWindow = {
+    hibernationPreservesWindow: true,
+    outOfWindowRejected: true,
+    retainedSeekAccepted: true,
+  };
   await mkdir('.local', { recursive: true });
   await writeFile('.local/worker-evidence.json', JSON.stringify(evidence, null, 2));
   console.log(JSON.stringify(evidence, null, 2));

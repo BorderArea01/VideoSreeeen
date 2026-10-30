@@ -24,6 +24,7 @@ class BlockCache {
         read: async (offset, signal) => {
           const deadline = Date.now() + 30000;
           while (!file.blocks.has(offset)) {
+            if (file.removed?.has(offset)) throw new Error('该缓存片段已清理');
             if (signal.aborted || this.jobs.get(id) !== job || Date.now() > deadline)
               throw new Error('缓存分块尚未就绪');
             await new Promise((resolve) => setTimeout(resolve, 50));
@@ -59,7 +60,7 @@ class BlockCache {
       for (const f of p.files) {
         if (!nameOK(f.name) || !Number.isSafeInteger(f.size) || f.size <= 0 || files.has(f.name))
           throw new Error('分块文件无效');
-        files.set(f.name, { size: f.size, blocks: new Set() });
+        files.set(f.name, { size: f.size, blocks: new Set(), removed: new Set() });
       }
       if (!files.has(p.entry) || (p.audio && !files.has(p.audio))) throw new Error('缓存入口无效');
       await fs.mkdir(dir, { recursive: true });
@@ -72,11 +73,35 @@ class BlockCache {
         entry: p.entry,
         audio: p.audio,
         progressive: p.progressive === true,
+        sliding: p.sliding === true,
       });
       return {};
     }
     const job = this.jobs.get(p.jobId);
     if (!job) throw new Error('缓存任务已取消');
+    if (p.action === 'drop') {
+      const f = job.files.get(p.name);
+      if (
+        !job.sliding ||
+        !f ||
+        !Array.isArray(p.offsets) ||
+        p.offsets.length > 256 ||
+        p.offsets.some(
+          (offset) =>
+            !Number.isSafeInteger(offset) || offset < 0 || offset % BLOCK || offset >= f.size,
+        )
+      )
+        throw new Error('缓存清理范围无效');
+      let bytes = 0;
+      for (const offset of new Set(p.offsets))
+        if (f.blocks.has(offset)) {
+          await fs.unlink(path.join(dir, p.name + '.' + offset + '.part'));
+          f.blocks.delete(offset);
+          f.removed.add(offset);
+          bytes += Math.min(BLOCK, f.size - offset);
+        }
+      return bytes;
+    }
     if (p.action === 'finish') {
       const hashes = [];
       let bytes = 0;
@@ -115,6 +140,13 @@ class BlockCache {
       if (typeof p.data !== 'string' || p.data.length > 350000) throw new Error('分块过大');
       const data = Buffer.from(p.data, 'base64');
       if (data.length !== length) throw new Error('分块长度不符');
+      if (job.sliding) {
+        if (f.removed.has(p.offset)) throw new Error('该缓存片段已清理');
+        await fs.writeFile(path.join(dir, p.name + '.' + p.offset + '.part'), data);
+        if (this.jobs.get(p.jobId) !== job) throw new Error('缓存任务已取消');
+        f.blocks.add(p.offset);
+        return {};
+      }
       let handle;
       try {
         handle = await fs.open(file, 'r+');
@@ -131,6 +163,11 @@ class BlockCache {
       return {};
     }
     if (p.action === 'get' && f.blocks.has(p.offset)) {
+      if (job.sliding) {
+        const data = await fs.readFile(path.join(dir, p.name + '.' + p.offset + '.part'));
+        if (data.length !== length) throw new Error('缓存片段读取不完整');
+        return data.toString('base64');
+      }
       const handle = await fs.open(file, 'r');
       try {
         const data = Buffer.alloc(length);

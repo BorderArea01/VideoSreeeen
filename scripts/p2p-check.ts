@@ -75,6 +75,9 @@ const browser = await chromium.launch({
   args: ['--mute-audio', '--js-flags=--max-old-space-size=256', '--disable-extensions'],
 });
 const context = await browser.newContext({ viewport: { width: 1440, height: 1080 } });
+await context.addInitScript(() =>
+  Object.defineProperty(window, 'showDirectoryPicker', { value: undefined }),
+);
 const failures: string[] = [],
   evidence: Record<string, unknown> = {};
 const invites = new WeakMap<Page, string>();
@@ -241,7 +244,7 @@ try {
     await receiver.locator('#cache-button').click();
     await ready(page);
     await ready(receiver);
-    assert.ok((await page.locator('video').getAttribute('src'))?.startsWith('vs-cache:'));
+    assert.ok((await page.locator('#video').getAttribute('src'))?.startsWith('vs-cache:'));
     const received = await receiver.locator('#cache-description').textContent();
     assert.match(received!, /源站 0\.0 MiB/);
     evidence.windowsToBrowser = { description: received };
@@ -270,7 +273,7 @@ try {
     await ready(page);
     const diskReceived = await page.locator('#cache-description').textContent();
     assert.match(diskReceived!, /源站 0\.0 MiB/);
-    assert.ok((await page.locator('video').getAttribute('src'))?.startsWith('vs-cache:'));
+    assert.ok((await page.locator('#video').getAttribute('src'))?.startsWith('vs-cache:'));
     evidence.browserToWindows = { description: diskReceived };
     rejectSource = false;
     await page.locator('#leave-button').click();

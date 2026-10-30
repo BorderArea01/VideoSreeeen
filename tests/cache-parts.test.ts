@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
-import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
@@ -12,6 +12,124 @@ const require = createRequire(import.meta.url);
 const { DiskCache } = require('../desktop/cache.cjs');
 const { BlockCache } = require('../desktop/blocks.cjs');
 const { cacheRoot, saveCacheRoot } = require('../desktop/cache-location.cjs');
+
+test('分批窗口取全员交集：未缓存及已清理不能跳转，旧客户端不暗中启用清理', () => {
+  const socket = () => ({ readyState: 1, send() {}, close() {} });
+  const rooms = new Rooms(),
+    { room, seat: a } = rooms.create('A', socket()),
+    { seat: b } = rooms.join(`${room.code}:${room.token}`, 'B', socket());
+  a.cachePartsSupported = b.cachePartsSupported = true;
+  const act = (message: any, seat = a) =>
+    rooms.act(room, seat, { base: room.revision, op: randomUUID(), ...message });
+  act({
+    type: 'media',
+    media: {
+      provider: 'direct',
+      title: 'fixture',
+      url: 'https://example.com/a.mp4',
+      source: { kind: 'file', video: 'https://example.com/a.mp4' },
+    },
+  });
+  act({ type: 'mode', mode: 'cache', cacheParts: 3 });
+  assert.equal(room.cacheSliding, false);
+  assert.throws(
+    () => act({ type: 'mode', mode: 'cache', cacheParts: 3, sliding: true }),
+    /刷新|更新/,
+  );
+  a.cacheWindowSupported = b.cacheWindowSupported = true;
+  act({ type: 'mode', mode: 'cache', cacheParts: 3, sliding: true });
+  const status = (seat: typeof a, start: number, end: number) =>
+    act(
+      {
+        type: 'cache',
+        mediaId: room.media!.id,
+        epoch: room.epoch,
+        state: 'downloading',
+        progress: 0.7,
+        bytes: 999,
+        parts: ['a'.repeat(64), 'b'.repeat(64)],
+        window: { start, end },
+        released: start ? 1 : 0,
+        retainedBytes: 666,
+      },
+      seat,
+    );
+  status(a, 5, 12);
+  status(b, 3, 10);
+  assert.deepEqual(rooms.snapshot(room).cacheWindow, { start: 5, end: 10 });
+  const revision = room.playback.revision;
+  for (const position of [0, 4.99, 10, 100])
+    assert.throws(() => act({ type: 'control', action: 'seek', position }), /缓存|清理/);
+  assert.equal(room.playback.revision, revision);
+  act({ type: 'control', action: 'seek', position: 6 });
+  assert.equal(room.playback.position, 6);
+  status(b, 0, 0);
+  assert.equal(rooms.cacheReady(room), false);
+  status(b, 12, 15);
+  assert.equal(
+    rooms.cacheReady(room),
+    false,
+    'Disjoint local windows cannot open a common barrier',
+  );
+});
+
+test('Windows 逐批删除真实分块文件，撤销读取并保留其他块和相邻用户文件', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'vs-eviction-')),
+    cache = new DiskCache(root, () => {}),
+    blocks = new BlockCache(cache),
+    jobId = randomUUID();
+  try {
+    await cache.init();
+    await writeFile(join(root, 'user-video.mp4'), 'preserve');
+    await blocks.call({
+      action: 'init',
+      jobId,
+      entry: 'video.mp4',
+      progressive: true,
+      sliding: true,
+      files: [{ name: 'video.mp4', size: 3 * BLOCK_SIZE }],
+    });
+    for (const offset of [0, BLOCK_SIZE, 2 * BLOCK_SIZE])
+      await blocks.call({
+        action: 'put',
+        jobId,
+        name: 'video.mp4',
+        offset,
+        data: Buffer.alloc(BLOCK_SIZE, offset ? 2 : 1).toString('base64'),
+      });
+    assert.equal((await readdir(join(root, jobId))).length, 3);
+    assert.equal(
+      await blocks.call({ action: 'drop', jobId, name: 'video.mp4', offsets: [BLOCK_SIZE] }),
+      BLOCK_SIZE,
+    );
+    assert.equal((await readdir(join(root, jobId))).length, 2);
+    await assert.rejects(
+      blocks.call({ action: 'get', jobId, name: 'video.mp4', offset: BLOCK_SIZE }),
+      /不可用/,
+    );
+    await assert.rejects(
+      cache.partial(jobId, 'video.mp4').read(BLOCK_SIZE, new AbortController().signal),
+      /已清理/,
+    );
+    assert.equal(
+      Buffer.from(
+        await blocks.call({ action: 'get', jobId, name: 'video.mp4', offset: 0 }),
+        'base64',
+      )[0],
+      1,
+    );
+    await assert.rejects(
+      blocks.call({ action: 'drop', jobId, name: '../user-video.mp4', offsets: [0] }),
+      /无效/,
+    );
+    blocks.cancel(jobId);
+    await cache.clear(jobId);
+    assert.equal(await readFile(join(root, 'user-video.mp4'), 'utf8'), 'preserve');
+  } finally {
+    await cache.stop();
+    await rm(root, { recursive: true, force: true });
+  }
+});
 
 test('分批覆盖所有字节不重叠；尾部 moov 初始化单独获取，不下载中间 mdat', async () => {
   for (const size of [1, BLOCK_SIZE - 1, BLOCK_SIZE * 11 + 10])

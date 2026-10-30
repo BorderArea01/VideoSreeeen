@@ -35,7 +35,9 @@ const source = createServer((req, res) => {
 });
 source.listen(0, '127.0.0.1');
 await once(source, 'listening');
-const movieUrl = `http://127.0.0.1:${(source.address() as any).port}/sintel.mp4`;
+const movieUrl = process.env.VS_PUBLIC_URL
+  ? 'https://voice-fixture.videosreeeen.test/sintel.mp4'
+  : `http://127.0.0.1:${(source.address() as any).port}/sintel.mp4`;
 const app = process.env.VS_PUBLIC_URL ? undefined : createApp();
 if (app) {
   app.server.listen(0, '127.0.0.1');
@@ -62,6 +64,22 @@ const errors: string[] = [],
   controls: string[] = [];
 async function makePage(index: number) {
   const context = await browser.newContext({ viewport: { width: 1360, height: 1000 } });
+  if (process.env.VS_PUBLIC_URL)
+    await context.route(movieUrl, (route) => {
+      const range = /^bytes=(\d+)-(\d*)$/.exec(route.request().headers().range ?? ''),
+        start = Number(range?.[1] ?? 0),
+        end = Math.min(movie.length - 1, range?.[2] ? Number(range[2]) : movie.length - 1);
+      return route.fulfill({
+        status: range ? 206 : 200,
+        headers: {
+          'Content-Type': 'video/mp4',
+          'Access-Control-Allow-Origin': '*',
+          'Content-Length': String(end - start + 1),
+          ...(range ? { 'Content-Range': `bytes ${start}-${end}/${movie.length}` } : {}),
+        },
+        body: movie.subarray(start, end + 1),
+      });
+    });
   if (app)
     await context.route(origin + '/config', async (route) => {
       const response = await route.fetch();
@@ -69,7 +87,7 @@ async function makePage(index: number) {
     });
   // Raw JS avoids transpiler helpers in page-scope functions. No samples are recorded.
   await context.addInitScript(`(() => {
-    window.__micCalls = 0; window.__tracks = []; window.__voiceSockets = []; window.__lag = false;
+    window.__micCalls = 0; window.__tracks = []; window.__voiceSockets = []; window.__roomSockets = []; window.__lag = false;
     window.__inputRequests = []; window.__sinkCalls = []; window.__removedOutput = false;
     const device = (kind, deviceId, label) => ({ kind, deviceId, label, groupId: 'fixture', toJSON() { return { kind, deviceId, label }; } });
     navigator.mediaDevices.enumerateDevices = async () => [
@@ -91,7 +109,7 @@ async function makePage(index: number) {
     AudioContext.prototype.createGain = function() { const gain = nativeGain.call(this); if (this === window.__voiceContext && !window.__voiceGain) { window.__voiceGain = gain; const meter = this.createAnalyser(); meter.fftSize = 4096; meter.smoothingTimeConstant = 0; gain.connect(meter); window.__voiceOutputAnalyser = meter; } return gain; };
     const Socket = WebSocket;
     window.WebSocket = class extends Socket {
-      constructor(url, protocols) { super(url, protocols); this.isVoice = new URL(url).pathname === '/voice'; if (this.isVoice) window.__voiceSockets.push(this); }
+      constructor(url, protocols) { super(url, protocols); this.isVoice = new URL(url).pathname === '/voice'; if (this.isVoice) window.__voiceSockets.push(this); else if(new URL(url).pathname === '/ws') window.__roomSockets.push(this); }
       set onmessage(callback) {
         if (!this.isVoice) { super.onmessage = callback; return; }
         let next = 0;
@@ -119,6 +137,10 @@ async function makePage(index: number) {
       return destination.stream;
     };
     const Worklet = AudioWorkletNode;
+    if (window.AudioEncoder) {
+      const Encoder = AudioEncoder;
+      window.AudioEncoder = class extends Encoder { constructor(init) { super(init); window.__encoderFailure = init.error; } };
+    }
     window.AudioWorkletNode = class extends Worklet {
       constructor(context, name, options) { super(context, name, options); if (name === 'vs-voice-playout') { window.__voiceContext = context; window.__voiceGain = null; const analyser = context.createAnalyser(); analyser.fftSize = 4096; analyser.smoothingTimeConstant = 0; this.connect(analyser); window.__analyser = analyser; } }
     };
@@ -549,17 +571,68 @@ try {
   await ready(host, 2);
   assert.equal((await status(host)).codec, 'opus');
   await audio(host, 1);
-  // Force a reconnect. Consent is not reused to reopen the microphone.
+  // A transient connection reuses the still-live, explicitly enabled track.
+  const beforeReconnectMicCalls = await guest.evaluate('window.__micCalls');
   await guest.evaluate('window.__voiceSockets.at(-1).close(4001, "synthetic outage")');
   await guest.waitForFunction(
     () =>
       JSON.parse(document.querySelector<HTMLElement>('#voice-panel')!.dataset.voice!).ready &&
       (window as any).__voiceSockets.length > 1,
   );
-  assert.equal((await status(guest)).mic, false);
-  assert.equal(await guest.evaluate('window.__tracks.every(t => t.readyState === "ended")'), true);
+  assert.equal((await status(guest)).mic, true);
+  assert.equal(await guest.evaluate('window.__micCalls'), beforeReconnectMicCalls);
+  assert.equal(
+    await guest.evaluate('window.__tracks.some(t => t.readyState === "live" && t.enabled)'),
+    true,
+  );
+  await audio(host, 1);
   await audio(guest, 1);
   evidence.reconnect = await status(guest);
+  await guest.evaluate('window.__roomSockets.at(-1).close(4000, "synthetic room outage")');
+  await guest.waitForFunction(
+    () =>
+      (window as any).__roomSockets.length > 1 &&
+      JSON.parse(document.querySelector<HTMLElement>('#voice-panel')!.dataset.voice!).ready,
+  );
+  assert.equal((await status(guest)).mic, true);
+  assert.equal(await guest.evaluate('window.__micCalls'), beforeReconnectMicCalls);
+  await audio(host, 1);
+  evidence.roomReconnectPreservesMic = true;
+  await guest.evaluate('window.__voiceContext.suspend()');
+  await guest.waitForFunction(() =>
+    (window as any).__tracks
+      .filter((t: MediaStreamTrack) => t.readyState === 'live')
+      .every((t: MediaStreamTrack) => !t.enabled),
+  );
+  await guest.locator('#voice-sound').click();
+  await guest.waitForFunction(
+    () =>
+      (window as any).__voiceContext.state === 'running' &&
+      (window as any).__tracks.some((t: MediaStreamTrack) => t.readyState === 'live' && t.enabled),
+  );
+  assert.equal(await guest.evaluate('window.__micCalls'), beforeReconnectMicCalls);
+  await audio(host, 1);
+  evidence.audioContextRecoveryPreservesMic = true;
+  await guest.waitForFunction(() => typeof (window as any).__encoderFailure === 'function');
+  await guest.evaluate(
+    'window.__encoderFailure(new DOMException("synthetic encoder failure", "EncodingError"))',
+  );
+  await guest.waitForFunction(() => {
+    const d = JSON.parse(document.querySelector<HTMLElement>('#voice-panel')!.dataset.voice!);
+    return d.ready && d.codec === 'mulaw16' && d.mic;
+  });
+  assert.equal(await guest.evaluate('window.__micCalls'), beforeReconnectMicCalls);
+  await audio(host, 1);
+  await audio(guest, 1);
+  evidence.encoderFailureRecoversWithoutMicPermission = true;
+  await guest.locator('#voice-mic').click();
+  await guest.evaluate('window.__voiceSockets.at(-1).close(4001, "muted outage")');
+  await guest.waitForFunction(
+    () => JSON.parse(document.querySelector<HTMLElement>('#voice-panel')!.dataset.voice!).ready,
+  );
+  assert.equal((await status(guest)).mic, false);
+  assert.equal(await guest.evaluate('window.__micCalls'), beforeReconnectMicCalls);
+  evidence.mutedReconnectStaysMuted = true;
   await guest.evaluate('window.__delayMic = true');
   await guest.locator('#voice-mic').click();
   await guest.locator('#voice-leave').click();
@@ -627,7 +700,7 @@ try {
       jitter180ms: true,
       threeSimultaneousSpeakers: true,
       compatibility: true,
-      reconnectListenOnly: true,
+      reconnectPreservesLiveMicrophone: true,
       mixedToneDb: spectrum,
       microphoneReleased: true,
     }),

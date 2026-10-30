@@ -249,6 +249,7 @@ export class WatchRoom extends DurableObject<Env> {
         c.memberId = result.seat.id;
         result.seat.latencyEvents = msg.capabilities?.includes('latency-v1') === true;
         result.seat.cachePartsSupported = msg.capabilities?.includes('cache-parts-v1') === true;
+        result.seat.cacheWindowSupported = msg.capabilities?.includes('cache-window-v1') === true;
         this.rooms.send(socket, {
           type: 'welcome',
           memberId: result.seat.id,

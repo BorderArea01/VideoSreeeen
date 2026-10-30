@@ -20,6 +20,8 @@ import { BrowserDiskCache } from './disk-cache';
 import { cacheDirectory } from './cache-location';
 import { cacheStream } from './cache-stream';
 import { mp4Bootstrap, partOffsets, type CacheParts } from '../shared/cache-parts';
+import { cacheTimeline, type CacheTimeline } from '../shared/cache-timeline';
+import { sha256 } from '@noble/hashes/sha2.js';
 
 const PREFIX = 'videosreeeen-';
 export class DeviceCache {
@@ -31,6 +33,8 @@ export class DeviceCache {
   private disk: BrowserDiskCache | null = null;
   private sequential = new Set<string>();
   private parts: CacheParts = 1;
+  private sliding = false;
+  private release?: (position: number, ended: boolean) => Promise<void>;
   jobId = '';
   constructor(
     private progress: (event: NativeCache) => void,
@@ -66,10 +70,12 @@ export class DeviceCache {
     planPath: string,
     source: Source,
     parts: CacheParts = 1,
+    sliding = false,
   ) {
     await this.clear();
     this.jobId = jobId;
     this.parts = parts;
+    this.sliding = parts > 1 && sliding;
     this.controller = new AbortController();
     this.peerBytes = 0;
     this.sourceBytes = 0;
@@ -365,21 +371,49 @@ export class DeviceCache {
     const complete = files.map(() => new Map<number, string>());
     const pending = new Map<string, Promise<Uint8Array>>();
     const whole = new Map<number, { done: Promise<void>; failed?: unknown }>();
+    const removed = files.map(() => new Set<number>());
+    const hashers = files.map(() => sha256.create()),
+      hashed = files.map(() => 0),
+      hashQueues = files.map(() => Promise.resolve());
+    const layouts: CacheTimeline[] = [];
+    let released = 0,
+      freedBytes = 0,
+      attached = false,
+      finalFingerprint = '',
+      cleanupError = false;
+    let localUrl = (_name: string) => '';
+    const available = () => {
+      if (layouts.length !== files.length || !fingerprints.length || released >= this.parts)
+        return { start: 0, end: 0 };
+      const start = Math.max(...layouts.map((layout) => layout.lower[released]!)),
+        end = Math.min(...layouts.map((layout) => layout.upper[fingerprints.length]!));
+      return end > start ? { start, end } : { start: 0, end: 0 };
+    };
     let bytes = 0;
     const total = files.reduce((n, f) => n + f.size, 0);
     const fingerprints: string[] = [];
-    const report = (entry?: string, audio?: string) =>
+    const report = (entry?: string, audio?: string) => {
+      const window = available();
+      if (this.sliding && !attached && window.end > window.start && localUrl(plan.entry)) {
+        attached = true;
+        entry = localUrl(plan.entry);
+        audio = plan.audio ? localUrl(plan.audio) : undefined;
+      }
       this.progress({
-        state: 'downloading',
+        state: cleanupError ? 'error' : finalFingerprint ? 'ready' : 'downloading',
+        ...(cleanupError ? { error: '缓存片段清理失败，请关闭缓存后重试' } : {}),
         jobId,
         progress: bytes / total,
         bytes,
         peerBytes: this.peerBytes,
         sourceBytes: this.sourceBytes,
         parts: [...fingerprints],
+        ...(this.sliding ? { window, released, retainedBytes: bytes - freedBytes } : {}),
+        ...(finalFingerprint ? { fingerprint: finalFingerprint } : {}),
         ...(entry ? { entry } : {}),
         ...(audio ? { audio } : {}),
       });
+    };
     const store = async (index: number, offset: number, data: Uint8Array) => {
       const file = files[index]!;
       if (data.length !== Math.min(BLOCK_SIZE, file.size - offset))
@@ -399,6 +433,17 @@ export class DeviceCache {
       signal.throwIfAborted();
       complete[index]!.set(offset, hash);
       bytes += data.length;
+      if (this.sliding) {
+        hashQueues[index] = hashQueues[index]!.then(async () => {
+          while (complete[index]!.has(hashed[index]!)) {
+            signal.throwIfAborted();
+            const chunk = await read(index, hashed[index]!);
+            hashers[index]!.update(chunk);
+            hashed[index]! += chunk.length;
+          }
+        });
+        await hashQueues[index];
+      }
       this.peers.announce(index, offset, hash);
       report();
     };
@@ -458,7 +503,7 @@ export class DeviceCache {
       pending.set(key, task);
       return task;
     };
-    const localUrl = isNative
+    localUrl = isNative
       ? (name: string) => `vs-cache://${jobId}/${name}`
       : await cacheStream(
           jobId,
@@ -466,6 +511,7 @@ export class DeviceCache {
           async (name, offset, requestSignal) => {
             const index = files.findIndex((f) => f.name === name),
               deadline = Date.now() + 28000;
+            if (removed[index]?.has(offset)) throw new Error('该缓存片段已清理');
             while (!complete[index]?.has(offset)) {
               signal.throwIfAborted();
               requestSignal.throwIfAborted();
@@ -482,8 +528,59 @@ export class DeviceCache {
         );
     const bootstrap: number[][] = [];
     for (let i = 0; i < files.length; i++) {
-      bootstrap[i] = await mp4Bootstrap(files[i]!.size, (offset) => ensure(i, offset));
+      if (this.sliding) {
+        layouts[i] = await cacheTimeline(files[i]!.size, this.parts, (offset) => ensure(i, offset));
+        bootstrap[i] = layouts[i]!.protected;
+      } else bootstrap[i] = await mp4Bootstrap(files[i]!.size, (offset) => ensure(i, offset));
       for (const offset of bootstrap[i]!) await ensure(i, offset);
+    }
+    if (this.sliding) {
+      let busy = false;
+      this.release = async (position, ended) => {
+        if (busy || cleanupError || signal.aborted || !Number.isFinite(position)) return;
+        busy = true;
+        try {
+          while (released < this.parts) {
+            const next = released + 1;
+            if (fingerprints.length < Math.min(this.parts, next + 1)) break;
+            const lower = Math.max(...layouts.map((layout) => layout.lower[next]!));
+            if (!ended && (next >= this.parts || position < lower + 1 || lower >= available().end))
+              break;
+            for (let i = 0; i < files.length; i++) {
+              const offsets = partOffsets(files[i]!.size, next, this.parts).filter(
+                (offset) => !bootstrap[i]!.includes(offset) && !removed[i]!.has(offset),
+              );
+              for (let p = 0; p < offsets.length; p += 256) {
+                signal.throwIfAborted();
+                const batch = offsets.slice(p, p + 256);
+                if (batch.some((offset) => offset >= hashed[i]!))
+                  throw new Error('尚未完成内容校验，不能清理缓存');
+                const dropped = isNative
+                  ? await nativeCall('cacheIO', {
+                      action: 'drop',
+                      jobId,
+                      name: files[i]!.name,
+                      offsets: batch,
+                    })
+                  : await disk!.drop(files[i]!.name, batch);
+                signal.throwIfAborted();
+                freedBytes += dropped;
+                for (const offset of batch) removed[i]!.add(offset);
+                this.peers.forget(i, batch);
+              }
+            }
+            released = next;
+            report();
+          }
+        } catch (cause) {
+          if (!signal.aborted) {
+            cleanupError = true;
+            report();
+          }
+        } finally {
+          busy = false;
+        }
+      };
     }
     for (let part = 1; part <= this.parts; part++) {
       const hashes: unknown[] = [];
@@ -506,11 +603,22 @@ export class DeviceCache {
       fingerprints.push(await hexDigest(new TextEncoder().encode(JSON.stringify(hashes))));
       signal.throwIfAborted();
       report(
-        part === 1 ? localUrl(plan.entry) : undefined,
-        part === 1 && plan.audio ? localUrl(plan.audio) : undefined,
+        !this.sliding && part === 1 ? localUrl(plan.entry) : undefined,
+        !this.sliding && part === 1 && plan.audio ? localUrl(plan.audio) : undefined,
       );
     }
     await Promise.all([...whole.values()].map((task) => task.done));
+    if (this.sliding) {
+      await Promise.all(hashQueues);
+      if (hashed.some((value, i) => value !== files[i]!.size)) throw new Error('视频尚未完整校验');
+      const fileHashes = hashers.map((hash) =>
+        [...hash.digest()].map((byte) => byte.toString(16).padStart(2, '0')).join(''),
+      );
+      finalFingerprint = await hexDigest(new TextEncoder().encode(fileHashes.join('\n')));
+      signal.throwIfAborted();
+      report();
+      return;
+    }
     const ready = isNative
       ? await nativeCall('cacheIO', { action: 'finish', jobId })
       : {
@@ -537,6 +645,7 @@ export class DeviceCache {
         ...(plan.audio ? { audio: plan.audio } : {}),
         files,
         progressive: this.parts > 1,
+        sliding: this.sliding,
       });
       return null;
     }
@@ -555,13 +664,19 @@ export class DeviceCache {
     )
       throw new Error('浏览器可用存储不足');
     if (large || external || this.parts > 1) {
-      this.disk = await BrowserDiskCache.create(jobId, files, this.controller!.signal);
+      this.disk = await BrowserDiskCache.create(
+        jobId,
+        files,
+        this.controller!.signal,
+        this.sliding,
+      );
       return null;
     }
     this.browserName = PREFIX + Date.now() + '-' + jobId;
     return caches.open(this.browserName);
   }
   async clear() {
+    this.release = undefined;
     this.controller?.abort();
     this.controller = null;
     this.sequential.clear();
@@ -577,6 +692,9 @@ export class DeviceCache {
     if (disk) await disk.clear();
     if (isNative && previous) await nativeCall('cacheClear', { jobId: previous });
     if (name && 'caches' in window) await caches.delete(name);
+  }
+  advance(position: number, ended = false) {
+    void this.release?.(position, ended);
   }
   async sweep() {
     if (!isNative) await BrowserDiskCache.sweep();

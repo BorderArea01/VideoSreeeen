@@ -27,6 +27,9 @@ export interface NativeCache {
   peerBytes?: number;
   sourceBytes?: number;
   parts?: string[];
+  window?: { start: number; end: number };
+  released?: number;
+  retainedBytes?: number;
 }
 declare global {
   interface Window {

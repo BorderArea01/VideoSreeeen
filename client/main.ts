@@ -31,6 +31,7 @@ import {
   authorizeCacheDirectory,
 } from './cache-location';
 import { RoomVoice } from './voice';
+import { RoomModeration } from './moderation';
 import { MovieSound } from './audio-mix';
 import { PageFullscreen } from './page-fullscreen';
 import { FullscreenIdle } from './fullscreen-idle';
@@ -83,7 +84,7 @@ $('cache-options').insertAdjacentHTML(
   <div class="cache-settings">
     <label>开始播放的条件<select id="cache-parts"><option value="1">完整缓存后播放</option><option value="2">全员缓存首批 1/2 后播放</option><option value="3">全员缓存首批 1/3 后播放</option></select></label>
     <div class="cache-location-row"><span id="cache-location" class="dialog-note"></span><button id="cache-location-choose" type="button" class="button soft small">选择缓存目录</button></div>
-    <p class="dialog-note" title="按文件字节分批，另行下载播放器必需的初始化数据；不代表片长精确等分。后续下载赶不上播放时仍可能等待。">首批落盘并校验后开播，后台继续缓存；完整缓存最稳妥。</p>
+    <p class="dialog-note" title="按文件字节分批，依据视频索引保留解码所需数据；不代表片长精确等分。已清理和未缓存区域不能跳转，下载赶不上播放时仍会等待。">分批缓存边播边下载，看过一批清理一批；完整缓存保留回看。</p>
   </div>`,
 );
 function renderCacheLocation(path?: string) {
@@ -388,9 +389,11 @@ let nextAutoplay: { code: string; url: string } | null = null;
 const playbackHealth = new PlaybackHealth();
 const movieSound = new MovieSound(applyMovieSound);
 const voice = new RoomVoice($('chat-panel'), (active) => movieSound.voice(active));
+const moderation = new RoomModeration($('chat-messages'), (message) => send(message));
 const seekControls = new SeekControls(
   $<HTMLInputElement>('seek'),
   () => ({
+    window: room?.mode === 'cache' && room.cacheSliding ? room.cacheWindow : undefined,
     key: `${room?.media?.id ?? ''}:${room?.epoch ?? ''}:${playerGeneration}`,
     duration:
       room?.media?.duration ||
@@ -488,6 +491,16 @@ function operation(message: Record<string, unknown>) {
 function control(action: 'play' | 'pause' | 'seek' | 'rate', extra: Record<string, number> = {}) {
   // Screen capture has no access to the source player's timeline or controls.
   if (room?.media?.broadcast?.kind === 'screen' || hasPendingPreview()) return;
+  if (
+    action === 'seek' &&
+    room?.mode === 'cache' &&
+    room.cacheSliding &&
+    room.cacheWindow &&
+    (extra.position! < room.cacheWindow.start || extra.position! >= room.cacheWindow.end)
+  ) {
+    toast('该位置未缓存或已清理，不能跳转');
+    return;
+  }
   operation({ type: 'control', action, ...extra });
 }
 function currentPosition() {
@@ -575,7 +588,8 @@ async function connect(kind: 'create' | 'join', reconnect = false) {
   clearTimeout(reconnectTimer);
   ws?.close();
   connected = false;
-  voice.configure(null, '', '', '');
+  if (reconnect) voice.suspendRoom();
+  else voice.configure(null, '', '', '');
   playbackClock.reset();
   latencies.clear();
   connectionView(reconnect ? '正在重新连接' : '正在连接');
@@ -630,7 +644,9 @@ async function connect(kind: 'create' | 'join', reconnect = false) {
                 protocol: PROTOCOL,
                 capabilities: [
                   'latency-v1',
-                  ...(cachePartsSupported ? ['cache-parts-v1' as const] : []),
+                  ...(cachePartsSupported
+                    ? ['cache-parts-v1' as const, 'cache-window-v1' as const]
+                    : []),
                 ],
               }
             : {
@@ -639,7 +655,9 @@ async function connect(kind: 'create' | 'join', reconnect = false) {
                 protocol: PROTOCOL,
                 capabilities: [
                   'latency-v1',
-                  ...(cachePartsSupported ? ['cache-parts-v1' as const] : []),
+                  ...(cachePartsSupported
+                    ? ['cache-parts-v1' as const, 'cache-window-v1' as const]
+                    : []),
                 ],
                 invite,
                 ...(resume ? { resume } : {}),
@@ -671,6 +689,9 @@ async function connect(kind: 'create' | 'join', reconnect = false) {
         } else if (message.type === 'state') {
           pendingControl = false;
           adopt(message.room);
+        } else if (message.type === 'kicked') {
+          $('leave-button').click();
+          toast(message.message);
         } else if (message.type === 'error') {
           nextAutoplay = null;
           pendingControl = false;
@@ -758,13 +779,16 @@ async function connect(kind: 'create' | 'join', reconnect = false) {
       clearTimeout(timeout);
       if (ws !== socket) return;
       connected = false;
-      if (event.code === 4001) {
+      if (event.code === 4001 || event.code === 4004) {
         desiredSession = false;
         restoring = null;
         tabSessions.clear();
       }
-      voice.leave();
-      voice.configure(null, '', '', '');
+      if (desiredSession && (room || restoring)) voice.suspendRoom();
+      else {
+        voice.leave();
+        voice.configure(null, '', '', '');
+      }
       danmakuFeed.reset();
       window.__VS_Danmaku.clear();
       if (isNative && siteOpen)
@@ -1066,6 +1090,7 @@ function renderLiveStatus() {
   $('provide-status').textContent = text;
 }
 function render() {
+  moderation.configure(room, memberId, connected);
   renderDanmakuToggle();
   if (provideDialogMediaId && provideDialogMediaId !== room?.media?.id) closeProvider();
   const joined = !!room;
@@ -1288,6 +1313,22 @@ function render() {
     latency.className = `latency ${member.rtt !== null && member.rtt > 180 ? 'slow' : ''}`;
     latency.dataset.member = member.id;
     row.append(avatar, info, latency);
+    if (member.id !== memberId && member.online) {
+      const kick = document.createElement('button');
+      kick.className = 'member-kick';
+      kick.type = 'button';
+      kick.textContent = '⋯';
+      kick.title = `发起投票移出 ${member.name}（在线成员严格过半，至少 3 人）`;
+      kick.setAttribute('aria-label', `票选移出 ${member.name}`);
+      kick.dataset.kickTarget = member.id;
+      kick.disabled =
+        !connected ||
+        room!.members.filter((m) => m.online).length < 3 ||
+        !!room!.kickVote ||
+        (room!.kickCooldownMs ?? 0) > 0;
+      kick.onclick = () => moderation.start(member.id);
+      row.append(kick);
+    }
     members.append(row);
   }
   renderChat();
@@ -1351,6 +1392,9 @@ function render() {
       ` 已从成员接收 ${(mine.peerBytes / 1024 ** 2).toFixed(1)} MiB，源站 ${((mine.sourceBytes ?? 0) / 1024 ** 2).toFixed(1)} MiB。`;
   if (cacheNote && mine?.state === 'downloading')
     $('cache-description').textContent += ' ' + cacheNote;
+  if (room?.cacheSliding && mine?.retainedBytes !== undefined)
+    $('cache-description').textContent +=
+      ` 本机保留 ${(mine.retainedBytes / 1024 ** 2).toFixed(1)} MiB${mine.released ? `，已清理 ${mine.released} 批` : ''}。灰色进度不可跳转。`;
   $<HTMLButtonElement>('cache-button').disabled =
     clearingBusy || cacheStartBusy || mine?.state === 'downloading' || mine?.state === 'ready';
   $('cache-button').textContent = room?.finished
@@ -2214,6 +2258,7 @@ function configureBroadcast() {
 }
 setInterval(configureBroadcast, 3000);
 let lastProgressSend = 0;
+let lastCacheSignature = '';
 let cacheNote = '';
 function cacheProgress(event: NativeCache) {
   if (
@@ -2227,14 +2272,22 @@ function cacheProgress(event: NativeCache) {
     return;
   if (event.state === 'downloading' && event.error) cacheNote = event.error;
   const now = performance.now();
+  const signature = [
+    event.jobId,
+    event.state,
+    event.parts?.length ?? 0,
+    event.released ?? 0,
+    event.window?.start ?? '',
+    event.window?.end ?? '',
+  ].join(':');
   if (
     event.state !== 'downloading' ||
     event.entry ||
-    (event.parts?.length ?? 0) !==
-      (room.members.find((m) => m.id === memberId)?.cache.parts?.length ?? 0) ||
+    signature !== lastCacheSignature ||
     now - lastProgressSend > 800
   ) {
     lastProgressSend = now;
+    lastCacheSignature = signature;
     send({
       type: 'cache',
       mediaId: room.media.id,
@@ -2244,6 +2297,9 @@ function cacheProgress(event: NativeCache) {
       bytes: event.bytes,
       peerBytes: event.peerBytes,
       sourceBytes: event.sourceBytes,
+      ...(event.window
+        ? { window: event.window, released: event.released, retainedBytes: event.retainedBytes }
+        : {}),
       ...(event.parts ? { parts: event.parts } : {}),
       ...(event.fingerprint ? { fingerprint: event.fingerprint } : {}),
       ...(event.error ? { error: event.error } : {}),
@@ -2778,11 +2834,17 @@ $('mode-toggle').onclick = () =>
     type: 'mode',
     mode: room?.mode === 'cache' ? 'stream' : 'cache',
     cacheParts: Number($<HTMLSelectElement>('cache-parts').value) as 1 | 2 | 3,
+    sliding: Number($<HTMLSelectElement>('cache-parts').value) > 1,
   });
 $('cache-stream').onclick = () => operation({ type: 'mode', mode: 'stream' });
 $('cache-button').onclick = () => {
   if (room?.finished) {
-    operation({ type: 'mode', mode: 'cache' });
+    operation({
+      type: 'mode',
+      mode: 'cache',
+      cacheParts: room.cacheParts ?? 1,
+      sliding: room.cacheSliding === true,
+    });
     return;
   }
   void (async () => {
@@ -2811,6 +2873,7 @@ $('cache-button').onclick = () => {
         `/cache-plan/${room.code}/${room.mediaToken}`,
         room.media.source,
         room.cacheParts ?? 1,
+        room.cacheSliding === true,
       );
     } catch (e) {
       if (room?.media?.id === mediaId && room.epoch === epoch) {
@@ -2840,8 +2903,17 @@ const ended = () => {
       position: video.currentTime,
       duration: video.duration,
     });
+  if (loadedKind === 'cache' && room?.cacheSliding) cache.advance(video.currentTime, true);
 };
 video.onended = ended;
+video.addEventListener('timeupdate', () => {
+  if (loadedKind === 'cache' && room?.cacheSliding && !video.ended)
+    cache.advance(
+      audio.getAttribute('src')
+        ? Math.min(video.currentTime, audio.currentTime)
+        : video.currentTime,
+    );
+});
 video.onloadedmetadata = () => {
   applyPlayback(true);
   render();

@@ -50,6 +50,7 @@ globalThis.onmessage = (event: MessageEvent) => {
           );
           await marker.close();
         }
+        if (p.blocks) external = directory;
         for (const f of p.files) {
           if (
             !validName(f.name) ||
@@ -68,6 +69,30 @@ globalThis.onmessage = (event: MessageEvent) => {
               ).createSyncAccessHandle();
           files.set(f.name, { size: f.size, handle, access, blocks: new Set() });
         }
+      } else if (action === 'drop') {
+        const f = files.get(p.name);
+        if (
+          !external ||
+          !f ||
+          !Array.isArray(p.offsets) ||
+          p.offsets.length > 256 ||
+          p.offsets.some(
+            (offset: number) =>
+              !Number.isSafeInteger(offset) ||
+              offset < 0 ||
+              offset % BLOCK_SIZE ||
+              offset >= f.size,
+          )
+        )
+          throw new Error('缓存清理范围无效');
+        let bytes = 0;
+        for (const offset of new Set<number>(p.offsets))
+          if (f.blocks.has(offset)) {
+            await external.removeEntry(p.name + '.' + offset + '.part');
+            f.blocks.delete(offset);
+            bytes += Math.min(BLOCK_SIZE, f.size - offset);
+          }
+        value = bytes;
       } else if (action === 'finish') {
         const hashes: string[] = [];
         const buffer = new Uint8Array(BLOCK_SIZE);

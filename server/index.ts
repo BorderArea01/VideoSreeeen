@@ -319,6 +319,7 @@ export function createApp(
           seat = result.seat;
           seat.latencyEvents = msg.capabilities?.includes('latency-v1') === true;
           seat.cachePartsSupported = msg.capabilities?.includes('cache-parts-v1') === true;
+          seat.cacheWindowSupported = msg.capabilities?.includes('cache-window-v1') === true;
           probeState.nonce = undefined;
           probeState.probeAt = undefined;
           clearTimeout(authTimeout);

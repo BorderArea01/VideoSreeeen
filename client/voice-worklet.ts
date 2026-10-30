@@ -12,7 +12,14 @@ class Capture extends AudioWorkletProcessor {
   private overloaded = false;
   constructor() {
     super();
-    this.port.onmessage = () => {
+    this.port.onmessage = ({ data }) => {
+      if (data?.type === 'reset') {
+        this.pending = 0;
+        this.overloaded = false;
+        this.offset = 0;
+        this.samples = new Float32Array(960);
+        return;
+      }
       this.pending = Math.max(0, this.pending - 1);
     };
   }
@@ -50,6 +57,7 @@ class Playout extends AudioWorkletProcessor {
         this.peers.clear();
         this.resetActivity();
       }
+      if (data.type === 'drop') this.peers.delete(data.id);
       if (data.type === 'roster')
         for (const key of this.peers.keys()) if (!data.ids.includes(key)) this.peers.delete(key);
       if (data.type === 'frame') {

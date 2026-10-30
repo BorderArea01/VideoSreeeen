@@ -7,6 +7,9 @@ import { createApp } from '../server/index';
 import { closeInvitation, selectSource } from './room-ui';
 import { BLOCK_SIZE } from '../shared/cache-plan';
 import { partEnd, mp4Bootstrap } from '../shared/cache-parts';
+import { createHash } from 'node:crypto';
+
+const eviction = process.argv.includes('--eviction');
 
 const app = createApp();
 app.server.listen(0, '127.0.0.1');
@@ -15,8 +18,9 @@ const origin =
   process.env.VS_PUBLIC_URL || `http://127.0.0.1:${(app.server.address() as any).port}`;
 let data: Buffer;
 try {
-  data = await readFile('.local/flower.mp4');
+  data = await readFile(eviction ? '.local/cache-window-fixture.mp4' : '.local/flower.mp4');
 } catch {
+  if (eviction) throw new Error('Run scripts/cache-window-fixture.mjs first');
   const response = await fetch(
     'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4',
   );
@@ -31,6 +35,8 @@ const bootstrap = await mp4Bootstrap(data.length, async (offset) =>
 );
 let hold = true,
   waiting = 0;
+let holdTail = eviction;
+const releaseTail: (() => void)[] = [];
 const release: (() => void)[] = [];
 const source = createServer((request, response) => {
   response.setHeader('Access-Control-Allow-Origin', '*');
@@ -60,7 +66,18 @@ const source = createServer((request, response) => {
     !bootstrap.includes(start)
   ) {
     waiting++;
-    release.push(send);
+    release.push(() => {
+      if (holdTail && start >= partEnd(data.length, 2, parts)) releaseTail.push(send);
+      else send();
+    });
+  } else if (
+    holdTail &&
+    request.headers.origin &&
+    range &&
+    start >= partEnd(data.length, 2, parts) &&
+    !bootstrap.includes(start)
+  ) {
+    releaseTail.push(send);
   } else send();
 });
 source.listen(0, '127.0.0.1');
@@ -83,6 +100,7 @@ const proof: any = {
   realPhone: false,
   parts,
   sequential,
+  eviction,
 };
 let diagnostic = async () => ({});
 try {
@@ -112,6 +130,13 @@ try {
           waiting++;
           await new Promise<void>((resolve) => release.push(resolve));
         }
+        if (
+          holdTail &&
+          range &&
+          start >= partEnd(data.length, 2, parts) &&
+          !bootstrap.includes(start)
+        )
+          await new Promise<void>((resolve) => releaseTail.push(resolve));
         await route
           .fulfill({
             status: range ? 206 : 200,
@@ -155,6 +180,7 @@ try {
   const failures: string[] = [];
   for (const page of [owner, viewer]) page.on('pageerror', (e) => failures.push(e.message));
   let latest: any;
+  const controls: any[] = [];
   diagnostic = async () => ({
     title: await owner.locator('#cache-title').textContent(),
     description: await owner.locator('#cache-description').textContent(),
@@ -167,18 +193,26 @@ try {
             progress: m.cache.progress,
             parts: m.cache.parts?.length,
             error: m.cache.error,
+            window: m.cache.window,
+            released: m.cache.released,
           })),
         }
       : null,
   });
-  owner.on('websocket', (socket) =>
+  owner.on('websocket', (socket) => {
+    socket.on('framesent', (event) => {
+      try {
+        const message = JSON.parse(String(event.payload));
+        if (message.type === 'control') controls.push(message);
+      } catch {}
+    });
     socket.on('framereceived', (event) => {
       try {
         const message = JSON.parse(String(event.payload));
         if (message.room) latest = message.room;
       } catch {}
-    }),
-  );
+    });
+  });
   await owner.goto(origin);
   await owner.locator('#hero-create').click();
   await owner.locator('#name-input').fill('分段房主');
@@ -231,16 +265,96 @@ try {
   );
   hold = false;
   for (const done of release.splice(0)) done();
+  if (eviction) {
+    await owner.waitForFunction(
+      () =>
+        parseFloat(
+          document.querySelector<HTMLElement>('#seek')!.style.getPropertyValue('--cache-start'),
+        ) > 0,
+      {},
+      { timeout: 20000 },
+    );
+    assert.ok(latest.cacheSliding);
+    assert.ok(latest.cacheWindow.start > 0);
+    for (let n = 0; n < 80 && !latest.members.every((m: any) => m.cache.released > 0); n++)
+      await owner.waitForTimeout(100);
+    assert.ok(
+      latest.members.every(
+        (m: any) => m.cache.released > 0 && m.cache.parts.length === 2 && m.cache.progress < 1,
+      ),
+    );
+    proof.evictedBeforeFinalDownload = latest.members.map((m: any) => ({
+      bytes: m.cache.bytes,
+      retainedBytes: m.cache.retainedBytes,
+      window: m.cache.window,
+      released: m.cache.released,
+    }));
+    const disk = await owner.evaluate(async () => {
+      const root = await (
+        await (await navigator.storage.getDirectory()).getDirectoryHandle('chosen-drive-fixture')
+      ).getDirectoryHandle('videosreeeen-disk');
+      let bytes = 0,
+        files = 0;
+      for await (const dir of (root as any).values())
+        if (dir.kind === 'directory')
+          for await (const file of dir.values())
+            if (file.kind === 'file') {
+              bytes += (await file.getFile()).size;
+              files++;
+            }
+      return { bytes, files };
+    });
+    assert.ok(disk.bytes > 0 && disk.bytes < latest.members[0].cache.bytes);
+    proof.physicalDisk = disk;
+    const before = controls.length;
+    await owner.locator('#seek').evaluate((e: HTMLInputElement) => {
+      e.value = '0';
+      e.dispatchEvent(new Event('input', { bubbles: true }));
+      e.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    await owner.waitForTimeout(150);
+    assert.equal(controls.length, before);
+    assert.ok(await owner.locator('#video').evaluate((v: HTMLVideoElement) => v.currentTime > 2));
+    proof.unavailableSeekBlocked = true;
+    const valid = latest.cacheWindow.start + 0.5;
+    await owner.locator('#seek').evaluate((e: HTMLInputElement, value) => {
+      e.value = String(value);
+      e.dispatchEvent(new Event('change', { bubbles: true }));
+    }, valid);
+    for (let n = 0; n < 50 && controls.length === before; n++) await owner.waitForTimeout(50);
+    assert.equal(controls.length, before + 1);
+    proof.retainedSeekAccepted = true;
+    await owner.screenshot({ path: '.local/screenshots/cache-window.png', fullPage: true });
+    holdTail = false;
+    for (const done of releaseTail.splice(0)) done();
+  }
   await owner.waitForFunction(
     () => document.querySelector('#cache-title')?.textContent === '本机已准备好',
     {},
     { timeout: 25000 },
   );
   assert.equal(latest.cacheReady, true);
+  for (let n = 0; n < 100 && !latest.members.every((m: any) => m.cache.state === 'ready'); n++)
+    await owner.waitForTimeout(50);
   assert.ok(
     latest.members.every((m: any) => m.cache.progress === 1 && m.cache.parts.length === parts),
   );
   proof.fullDownload = true;
+  if (eviction) {
+    const inner = createHash('sha256').update(data).digest('hex');
+    const expected = createHash('sha256').update(inner).digest('hex');
+    assert.ok(latest.members.every((m: any) => m.cache.fingerprint === expected));
+    proof.wholeFingerprintAfterEviction = true;
+    await owner
+      .locator('#cache-title')
+      .filter({ hasText: '缓存已清理' })
+      .waitFor({ state: 'attached', timeout: 25000 });
+    await viewer
+      .locator('#cache-title')
+      .filter({ hasText: '缓存已清理' })
+      .waitFor({ state: 'attached', timeout: 25000 });
+    proof.endCleanup = true;
+  }
   await owner.locator('#mode-toggle').click();
   await owner.waitForTimeout(700);
   const entries = await owner.evaluate(async () => {
@@ -286,11 +400,15 @@ try {
   throw cause;
 } finally {
   hold = false;
+  holdTail = false;
   for (const done of release.splice(0)) done();
+  for (const done of releaseTail.splice(0)) done();
   for (const context of browser.contexts()) await context.unrouteAll({ behavior: 'ignoreErrors' });
   await mkdir('.local/screenshots', { recursive: true });
   await writeFile(
-    `.local/cache-parts-${parts}${sequential ? '-sequential' : ''}${process.env.VS_PUBLIC_URL ? '-public' : ''}-evidence.json`,
+    eviction
+      ? `.local/cache-window${process.env.VS_PUBLIC_URL ? '-public' : ''}-evidence.json`
+      : `.local/cache-parts-${parts}${sequential ? '-sequential' : ''}${process.env.VS_PUBLIC_URL ? '-public' : ''}-evidence.json`,
     JSON.stringify(proof, null, 2),
   );
   await browser.close();

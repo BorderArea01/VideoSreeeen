@@ -32,7 +32,7 @@ export class BrowserDiskCache {
   static supported() {
     return !!navigator.storage?.getDirectory && typeof Worker !== 'undefined' && !!navigator.locks;
   }
-  static async create(jobId: string, files: FileInfo[], signal: AbortSignal) {
+  static async create(jobId: string, files: FileInfo[], signal: AbortSignal, blocks = false) {
     await authorizeCacheDirectory();
     const store = new BrowserDiskCache(`${Date.now()}-${jobId}`);
     store.parent = cacheDirectory();
@@ -53,7 +53,7 @@ export class BrowserDiskCache {
           .catch(reject);
       });
       signal.throwIfAborted();
-      await store.call('init', { directory: store.directory, files, parent: store.parent });
+      await store.call('init', { directory: store.directory, files, parent: store.parent, blocks });
       signal.throwIfAborted();
       return store;
     } catch (cause) {
@@ -88,6 +88,9 @@ export class BrowserDiskCache {
   }
   async finish(assemble = true): Promise<string> {
     return this.call('finish', { assemble });
+  }
+  async drop(name: string, offsets: number[]): Promise<number> {
+    return this.call('drop', { name, offsets });
   }
   async file(name: string) {
     if (this.closed) throw new DOMException('缓存已取消', 'AbortError');

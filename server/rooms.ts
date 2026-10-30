@@ -1,4 +1,4 @@
-import { randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
+import { randomBytes, randomUUID, timingSafeEqual, createHash } from 'node:crypto';
 import {
   parseInvite,
   type CacheStatus,
@@ -45,6 +45,18 @@ export interface Room {
   ops: Map<string, true>;
   cleaned: boolean;
   cacheParts?: 1 | 2 | 3;
+  cacheSliding?: boolean;
+  kickVote?: {
+    id: string;
+    target: string;
+    startedBy: string;
+    yes: string[];
+    no: string[];
+    electorate: string[];
+    expires: number;
+  };
+  kickCooldownUntil?: number;
+  kickedResumes?: string[];
 }
 export type StoredRoom = Omit<Room, 'members' | 'ops'> & {
   members: Array<[string, Omit<Seat, 'socket'>]>;
@@ -87,6 +99,7 @@ export class Rooms {
       ops: new Map(saved.ops.map((id) => [id, true])),
     };
     this.rooms.set(room.code, room);
+    this.checkVote(room);
     this.pauseForBarrier(room);
     return room;
   }
@@ -137,6 +150,8 @@ export class Rooms {
     const room = parsed && this.rooms.get(parsed.code);
     if (!room || !same(room.token, parsed!.token))
       throw new RoomError('invalid_invite', '房间不存在、邀请不正确或服务已重启');
+    if (resume && room.kickedResumes?.includes(createHash('sha256').update(resume).digest('hex')))
+      throw new RoomError('kicked', '此成员已被房间票选移出');
     let seat = resume && [...room.members.values()].find((s) => same(s.resume, resume));
     if (seat) {
       seat.socket?.close(4001, 'session replaced');
@@ -148,6 +163,7 @@ export class Rooms {
       seat.cache = this.idleCache(room.epoch);
       seat.ended = false;
     } else seat = this.addSeat(room, name, socket);
+    this.checkVote(room);
     // A live screen has no pause button to resume it after a transport outage.
     // Only the returning publisher can restore its live state.
     if (
@@ -193,17 +209,28 @@ export class Rooms {
       const fullHashes = new Set(
         seats.filter((s) => s.cache.state === 'ready').map((s) => s.cache.fingerprint),
       );
+      const watching = seats.filter((s) => !s.ended);
+      const windowReady =
+        !room.cacheSliding ||
+        !watching.length ||
+        (watching.every((s) => !!s.cache.window) &&
+          Math.min(...watching.map((s) => s.cache.window!.end)) >
+            Math.max(...watching.map((s) => s.cache.window!.start)));
       return (
         !!room.media?.source &&
         !!first &&
         seats.length > 0 &&
         fullHashes.size <= 1 &&
+        windowReady &&
         seats.every(
           (s) =>
             s.online &&
             s.cachePartsSupported &&
             s.cache.epoch === room.epoch &&
             ['downloading', 'ready'].includes(s.cache.state) &&
+            (!room.cacheSliding ||
+              s.ended ||
+              (!!s.cache.window && s.cache.window.end > s.cache.window.start)) &&
             !!s.cache.parts?.length &&
             s.cache.parts.slice(0, minimum).every((hash, i) => hash === seats[0]!.cache.parts![i]),
         )
@@ -222,6 +249,75 @@ export class Rooms {
       new Set(seats.map((s) => s.cache.fingerprint)).size === 1
     );
   }
+  private checkVote(room: Room) {
+    const vote = room.kickVote;
+    if (!vote) return;
+    const online = [...room.members.values()]
+      .filter((s) => s.online)
+      .map((s) => s.id)
+      .sort();
+    if (vote.expires <= this.now() || online.join(',') !== [...vote.electorate].sort().join(',')) {
+      room.kickVote = undefined;
+      room.kickCooldownUntil = (vote.expires <= this.now() ? vote.expires : this.now()) + 30000;
+    }
+  }
+  private voteKick(room: Room, seat: Seat, message: Extract<ClientMessage, { type: 'kick-vote' }>) {
+    this.checkVote(room);
+    if (message.action === 'start') {
+      if (room.kickVote) throw new RoomError('vote_busy', '已有移出投票正在进行');
+      if ((room.kickCooldownUntil ?? 0) > this.now())
+        throw new RoomError('vote_cooldown', '请等待投票冷却结束');
+      const electorate = [...room.members.values()].filter((s) => s.online).map((s) => s.id);
+      if (electorate.length < 3)
+        throw new RoomError('vote_members', '至少 3 位在线成员才能票选移出');
+      if (
+        !message.target ||
+        message.target === seat.id ||
+        !room.members.get(message.target)?.online
+      )
+        throw new RoomError('vote_target', '请选择另一位在线成员');
+      room.kickVote = {
+        id: randomUUID(),
+        target: message.target,
+        startedBy: seat.id,
+        yes: [seat.id],
+        no: [],
+        electorate,
+        expires: this.now() + 60000,
+      };
+    } else {
+      const vote = room.kickVote;
+      if (!vote || vote.id !== message.voteId || !vote.electorate.includes(seat.id))
+        throw new RoomError('vote_stale', '这次投票已结束或失效');
+      if (vote.target === seat.id && message.action === 'yes')
+        throw new RoomError('vote_self', '不能投票移出自己');
+      vote.yes = vote.yes.filter((id) => id !== seat.id);
+      vote.no = vote.no.filter((id) => id !== seat.id);
+      if (message.action === 'yes') vote.yes.push(seat.id);
+      if (message.action === 'no') vote.no.push(seat.id);
+    }
+    const vote = room.kickVote!;
+    const required = Math.floor(vote.electorate.length / 2) + 1;
+    if (vote.yes.length >= required || vote.no.length >= required) {
+      room.kickVote = undefined;
+      room.kickCooldownUntil = this.now() + 30000;
+      if (vote.yes.length >= required) {
+        const target = room.members.get(vote.target);
+        if (target?.socket) {
+          room.kickedResumes = [
+            ...(room.kickedResumes ?? []),
+            createHash('sha256').update(target.resume).digest('hex'),
+          ].slice(-128);
+          const socket = target.socket;
+          this.send(socket, { type: 'kicked', message: '你已被房间多数成员票选移出' });
+          this.disconnect(room, target, socket, true);
+          socket.close(4004, 'removed by room vote');
+        }
+      }
+    }
+    room.touched = this.now();
+    this.broadcast(room);
+  }
   snapshot(room: Room): Snapshot {
     return {
       code: room.code,
@@ -235,6 +331,8 @@ export class Rooms {
       epoch: room.epoch,
       cacheReady: this.cacheReady(room),
       cacheParts: room.cacheParts ?? 1,
+      cacheSliding: room.cacheSliding === true,
+      ...(room.cacheSliding ? { cacheWindow: this.cacheWindow(room) } : {}),
       finished: room.cleaned,
       members: [...room.members.values()].map((seat) => ({
         ...this.latencySample(seat),
@@ -243,8 +341,23 @@ export class Rooms {
         cache: seat.cache,
         ended: seat.ended,
         cachePartsSupported: seat.cachePartsSupported === true,
+        cacheWindowSupported: seat.cacheWindowSupported === true,
       })),
       chat: room.chat,
+      ...(room.kickVote && room.kickVote.expires > this.now()
+        ? {
+            kickVote: {
+              id: room.kickVote.id,
+              target: room.kickVote.target,
+              startedBy: room.kickVote.startedBy,
+              yes: [...room.kickVote.yes],
+              no: [...room.kickVote.no],
+              required: Math.floor(room.kickVote.electorate.length / 2) + 1,
+              remainingMs: room.kickVote.expires - this.now(),
+            },
+          }
+        : {}),
+      kickCooldownMs: Math.max(0, (room.kickCooldownUntil ?? 0) - this.now()),
     };
   }
   clock(room: Room) {
@@ -254,6 +367,13 @@ export class Rooms {
       revision: room.playback.revision,
       ageMs: Math.max(0, this.now() - room.playback.at),
     };
+  }
+  private cacheWindow(room: Room) {
+    const seats = [...room.members.values()].filter((s) => s.online);
+    if (!seats.length || seats.some((s) => !s.cache.window)) return { start: 0, end: 0 };
+    const start = Math.max(...seats.map((s) => s.cache.window!.start));
+    const end = Math.min(...seats.map((s) => s.cache.window!.end));
+    return end > start ? { start, end } : { start: 0, end: 0 };
   }
   private latencySample(seat: Seat) {
     const age = seat.rttAt === undefined ? undefined : Math.max(0, this.now() - seat.rttAt);
@@ -307,6 +427,7 @@ export class Rooms {
     seat.cache = this.idleCache(room.epoch);
     if (room.media?.broadcast?.host === seat.id && !room.playback.paused) this.paused(room);
     if (leave) room.members.delete(seat.id);
+    this.checkVote(room);
     this.pauseForBarrier(room);
     this.finishIfEveryoneEnded(room);
     room.touched = this.now();
@@ -351,6 +472,10 @@ export class Rooms {
   act(room: Room, seat: Seat, message: ClientMessage) {
     if (!seat.online || !room.members.has(seat.id))
       throw new RoomError('not_in_room', '请重新加入房间');
+    if (message.type === 'kick-vote') {
+      this.voteKick(room, seat, message);
+      return;
+    }
     room.touched = this.now();
     if (message.type === 'signal') {
       // A cancelled generation may still have packets in flight. Drop them
@@ -466,9 +591,16 @@ export class Rooms {
           throw new RoomError('cache_format', 'HLS 暂保留完整缓存，分段缓存支持 MP4 / DASH');
         if (parts > 1 && [...room.members.values()].some((s) => !s.cachePartsSupported))
           throw new RoomError('cache_version', '分段缓存需要所有成员刷新到新版网页或更新客户端');
+        if (
+          parts > 1 &&
+          message.sliding &&
+          [...room.members.values()].some((s) => !s.cacheWindowSupported)
+        )
+          throw new RoomError('cache_version', '逐段清理需要全员刷新新版网页或更新客户端');
         this.broadcast(room, { type: 'cleanup', mediaId: room.media.id, epoch: room.epoch });
         room.mode = message.mode;
         room.cacheParts = parts;
+        room.cacheSliding = parts > 1 && message.sliding === true;
         room.epoch++;
         room.cleaned = false;
         for (const s of room.members.values()) {
@@ -494,6 +626,11 @@ export class Rooms {
         );
         if (message.action === 'seek') {
           if (message.position === undefined) throw new RoomError('invalid', '缺少目标进度');
+          if (room.mode === 'cache' && room.cacheSliding) {
+            const window = this.cacheWindow(room);
+            if (message.position < window.start || message.position >= window.end)
+              throw new RoomError('cache_range', '该位置尚未被全员缓存，或已经清理，不能跳转');
+          }
           position = message.position;
         }
         if (room.media.duration) position = Math.min(position, room.media.duration);
@@ -551,6 +688,9 @@ export class Rooms {
           peerBytes: message.peerBytes,
           sourceBytes: message.sourceBytes,
           parts: message.parts,
+          window: message.window,
+          released: message.released,
+          retainedBytes: message.retainedBytes,
         };
         this.pauseForBarrier(room);
         break;
@@ -599,6 +739,9 @@ export class Rooms {
   sweep() {
     for (const room of this.rooms.values()) {
       let changed = false;
+      const previousVote = room.kickVote;
+      this.checkVote(room);
+      if (previousVote && !room.kickVote) changed = true;
       for (const s of room.members.values())
         if (!s.online && this.now() - s.disconnectedAt > 30000) {
           room.members.delete(s.id);

@@ -55,6 +55,9 @@ export interface CacheStatus {
   peerBytes?: number;
   sourceBytes?: number;
   parts?: string[];
+  window?: { start: number; end: number };
+  released?: number;
+  retainedBytes?: number;
 }
 export interface Member {
   id: string;
@@ -65,6 +68,7 @@ export interface Member {
   cache: CacheStatus;
   ended: boolean;
   cachePartsSupported?: boolean;
+  cacheWindowSupported?: boolean;
 }
 export interface Chat {
   id: string;
@@ -87,9 +91,21 @@ export interface Snapshot {
   epoch: number;
   cacheReady: boolean;
   cacheParts?: 1 | 2 | 3;
+  cacheSliding?: boolean;
+  cacheWindow?: { start: number; end: number };
   finished: boolean;
   members: Member[];
   chat: Chat[];
+  kickVote?: {
+    id: string;
+    target: string;
+    startedBy: string;
+    yes: string[];
+    no: string[];
+    required: number;
+    remainingMs: number;
+  };
+  kickCooldownMs?: number;
 }
 const id = z.string().min(1).max(100);
 export const clientMessageSchema = z.discriminatedUnion('type', [
@@ -98,7 +114,7 @@ export const clientMessageSchema = z.discriminatedUnion('type', [
     name: z.string().trim().min(1).max(30),
     protocol: z.literal(PROTOCOL),
     capabilities: z
-      .array(z.enum(['latency-v1', 'cache-parts-v1']))
+      .array(z.enum(['latency-v1', 'cache-parts-v1', 'cache-window-v1']))
       .max(4)
       .optional(),
   }),
@@ -109,11 +125,17 @@ export const clientMessageSchema = z.discriminatedUnion('type', [
     resume: z.string().max(100).optional(),
     protocol: z.literal(PROTOCOL),
     capabilities: z
-      .array(z.enum(['latency-v1', 'cache-parts-v1']))
+      .array(z.enum(['latency-v1', 'cache-parts-v1', 'cache-window-v1']))
       .max(4)
       .optional(),
   }),
   z.object({ type: z.literal('leave') }),
+  z.object({
+    type: z.literal('kick-vote'),
+    action: z.enum(['start', 'yes', 'no', 'withdraw']),
+    target: z.string().uuid().optional(),
+    voteId: z.string().uuid().optional(),
+  }),
   z.object({ type: z.literal('unshare'), base: z.number().int().nonnegative(), op: id }),
   z.object({
     type: z.literal('media'),
@@ -135,6 +157,7 @@ export const clientMessageSchema = z.discriminatedUnion('type', [
     op: id,
     mode: z.enum(['stream', 'cache']),
     cacheParts: z.union([z.literal(1), z.literal(2), z.literal(3)]).optional(),
+    sliding: z.boolean().optional(),
   }),
   z.object({
     type: z.literal('cache'),
@@ -149,6 +172,15 @@ export const clientMessageSchema = z.discriminatedUnion('type', [
       .array(z.string().regex(/^[a-f0-9]{64}$/))
       .max(3)
       .optional(),
+    window: z
+      .object({
+        start: z.number().finite().min(0).max(604800),
+        end: z.number().finite().min(0).max(604800),
+      })
+      .refine((w) => w.end >= w.start)
+      .optional(),
+    released: z.number().int().min(0).max(3).optional(),
+    retainedBytes: z.number().int().min(0).max(17179869184).optional(),
     fingerprint: z
       .string()
       .regex(/^[a-f0-9]{64}$/)
@@ -196,6 +228,7 @@ export const clientMessageSchema = z.discriminatedUnion('type', [
 ]);
 export type ClientMessage = z.infer<typeof clientMessageSchema>;
 export type ServerMessage =
+  | { type: 'kicked'; message: string }
   | { type: 'welcome'; memberId: string; resume: string; room: Snapshot }
   | { type: 'state'; room: Snapshot }
   | { type: 'error'; code: string; message: string; room?: Snapshot }

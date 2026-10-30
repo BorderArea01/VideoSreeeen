@@ -54,6 +54,8 @@ export class RoomVoice {
   private retry?: ReturnType<typeof setTimeout>;
   private joined = false;
   private ready = false;
+  private roomAvailable = true;
+  private reconnects = 0;
   private busy = false;
   private generation = 0;
   private micGeneration = 0;
@@ -135,11 +137,17 @@ export class RoomVoice {
     this.joinButton.onclick = () => void this.join();
     this.micButton.onclick = () => void this.microphone();
     this.soundButton.onclick = () => {
-      if (this.context?.state === 'suspended') {
-        void this.context.resume().then(() => {
-          this.state = '已连接';
-          this.render();
-        });
+      if (this.context && this.context.state !== 'running' && this.context.state !== 'closed') {
+        void this.context
+          .resume()
+          .then(() => {
+            this.state = '已连接';
+            this.render();
+          })
+          .catch(() => {
+            this.state = '浏览器暂无法恢复声音，请检查系统音频';
+            this.render();
+          });
       } else {
         this.outputMuted = !this.outputMuted;
         this.state = this.outputMuted ? '接收已静音' : '已连接';
@@ -149,6 +157,13 @@ export class RoomVoice {
       this.render();
     };
     this.exitButton.onclick = () => this.leave();
+    const recover = () => {
+      if (!this.joined || document.hidden) return;
+      if (this.context?.state !== 'running') void this.context?.resume().catch(() => {});
+      if (!this.socket && this.roomAvailable) this.open();
+    };
+    window.addEventListener('online', recover);
+    document.addEventListener('visibilitychange', recover);
     get<HTMLInputElement>('voice-volume').oninput = () => this.volume();
     this.render();
   }
@@ -162,6 +177,26 @@ export class RoomVoice {
     this.me = me;
     this.secret = secret;
     this.server = server;
+    this.roomAvailable = !!room;
+    if (this.joined && !this.socket && this.roomAvailable) this.open();
+    this.render();
+  }
+  suspendRoom() {
+    this.roomAvailable = false;
+    this.ready = false;
+    clearTimeout(this.retry);
+    this.batch = [];
+    this.closeEncoder();
+    this.localActivity.reset();
+    this.stream?.getAudioTracks().forEach((track) => {
+      track.enabled = false;
+    });
+    const socket = this.socket;
+    this.socket = undefined;
+    socket?.close(1000, 'room reconnecting');
+    this.clearDecoders();
+    this.peers = [];
+    if (this.joined) this.state = '房间重连中，语音将自动恢复';
     this.render();
   }
   private volume() {
@@ -498,11 +533,22 @@ export class RoomVoice {
         if (!this.joined || this.context !== context) return;
         if (this.changingOutput) return;
         if (context.state !== 'running') {
-          this.stopMicrophone();
+          this.stream?.getAudioTracks().forEach((track) => {
+            track.enabled = false;
+          });
+          this.closeEncoder();
+          this.batch = [];
+          this.localActivity.reset();
           this.control({ type: 'mute', muted: true });
           this.clearDecoders();
           this.state = '声音已暂停，点击恢复声音';
-        } else this.state = this.ready ? '已连接' : '正在连接';
+        } else {
+          this.stream?.getAudioTracks().forEach((track) => {
+            track.enabled = this.ready;
+          });
+          if (this.ready && this.stream?.active) this.control({ type: 'mute', muted: false });
+          this.state = this.ready ? '已连接' : '正在连接';
+        }
         this.render();
       };
       this.opus = false;
@@ -547,7 +593,9 @@ export class RoomVoice {
     }
   }
   private open() {
-    if (!this.joined || !this.room) return;
+    if (!this.joined || !this.room || !this.roomAvailable || this.socket) return;
+    clearTimeout(this.retry);
+    this.closeEncoder();
     this.clearDecoders();
     this.ready = false;
     this.batch = [];
@@ -607,10 +655,18 @@ export class RoomVoice {
                 this.decoders.delete(key);
               }
             this.playout?.port.postMessage({ type: 'roster', ids: [...active] });
-            // Reconnection begins listen-only. Mic is never reopened without a click.
-            if (firstRoster)
+            // Resume only the still-live stream explicitly enabled in this tab.
+            if (firstRoster) {
+              this.reconnects = 0;
+              const liveMic = this.stream?.active && this.context?.state === 'running';
+              this.stream?.getAudioTracks().forEach((track) => {
+                track.enabled = !!liveMic;
+              });
+              this.capture?.port.postMessage({ type: 'reset' });
+              this.control({ type: 'mute', muted: !liveMic });
               this.state =
                 this.context?.state === 'running' ? '已连接' : '声音已暂停，点击恢复声音';
+            }
             this.render();
           }
           return;
@@ -650,7 +706,14 @@ export class RoomVoice {
                   }
                 },
                 error: () => {
-                  this.state = '语音解码中断，请重新加入';
+                  if (this.decoders.get(key)?.decoder === decoder) {
+                    try {
+                      decoder.close();
+                    } catch {}
+                    this.decoders.delete(key);
+                    this.playout?.port.postMessage({ type: 'drop', id: key });
+                  }
+                  this.state = '正在恢复成员语音';
                   this.render();
                 },
               });
@@ -659,7 +722,9 @@ export class RoomVoice {
               this.decoders.set(key, value);
             }
             if (value.decoder.decodeQueueSize > 50) {
-              this.socket?.close(4001, 'voice decoder overloaded');
+              value.decoder.close();
+              this.decoders.delete(key);
+              this.playout?.port.postMessage({ type: 'drop', id: key });
               return;
             }
             value.sequence.push(sequence);
@@ -683,16 +748,22 @@ export class RoomVoice {
       if (this.socket !== socket) return;
       this.socket = undefined;
       this.ready = false;
-      this.stopMicrophone();
+      this.closeEncoder();
+      this.batch = [];
+      this.localActivity.reset();
+      this.stream?.getAudioTracks().forEach((track) => {
+        track.enabled = false;
+      });
       this.clearDecoders();
       this.peers = [];
       if (!this.joined) return;
-      if ([4003, 4009].includes(event.code)) {
+      if (event.code === 4009 || (event.code === 4003 && this.reconnects >= 4)) {
         this.leave();
         this.state = event.code === 4009 ? '语音最多 8 人' : '语音身份已失效，请重新加入房间';
       } else {
-        this.state = '语音已断开，正在重连（麦克风已关闭）';
-        this.retry = setTimeout(() => this.open(), 1500 + Math.random() * 500);
+        this.state = this.stream ? '语音重连中，保留开麦状态' : '语音重连中';
+        const delay = Math.min(10000, 750 * 2 ** Math.min(this.reconnects++, 4));
+        if (this.roomAvailable) this.retry = setTimeout(() => this.open(), delay);
       }
       this.render();
     };
@@ -734,7 +805,8 @@ export class RoomVoice {
     // TCP cannot remove bytes already queued. Restart instead of replaying stale speech.
     if (this.socket.bufferedAmount > 16384) {
       this.socket.close(4001, 'voice uplink congested');
-      this.stopMicrophone();
+      this.closeEncoder();
+      this.batch = [];
       return;
     }
     this.socket.send(packet);
@@ -774,7 +846,8 @@ export class RoomVoice {
         this.capture?.port.postMessage('ack');
         if (!(data instanceof Float32Array)) {
           this.socket?.close(4001, 'voice capture overloaded');
-          this.stopMicrophone();
+          this.closeEncoder();
+          this.batch = [];
           return;
         }
         if (!this.ready || !this.stream) return;
@@ -793,9 +866,12 @@ export class RoomVoice {
                 this.sendFrame(bytes);
               },
               error: () => {
-                this.stopMicrophone();
-                this.control({ type: 'mute', muted: true });
-                this.state = '麦克风编码失败，请重新开麦';
+                if (this.encoder !== encoder) return;
+                this.opus = false;
+                this.closeEncoder();
+                this.batch = [];
+                this.socket?.close(4001, 'voice codec recovery');
+                this.state = '正在切换兼容语音';
                 this.render();
               },
             });
@@ -804,7 +880,8 @@ export class RoomVoice {
           }
           if (this.encoder.encodeQueueSize > 12) {
             this.socket?.close(4001, 'voice encoder overloaded');
-            this.stopMicrophone();
+            this.closeEncoder();
+            this.batch = [];
             return;
           }
           const audio = new codecs.AudioData({
@@ -868,6 +945,7 @@ export class RoomVoice {
     this.joined = false;
     this.busy = false;
     this.ready = false;
+    this.reconnects = 0;
     clearTimeout(this.retry);
     clearInterval(this.timer);
     this.stopMicrophone();
@@ -892,7 +970,7 @@ export class RoomVoice {
     this.joinButton.hidden = this.joined;
     this.joinButton.disabled = !this.room || this.busy;
     this.micButton.hidden = this.soundButton.hidden = this.exitButton.hidden = !this.joined;
-    this.micButton.disabled = !this.ready || (this.busy && !this.stream);
+    this.micButton.disabled = (!this.ready && !this.stream) || (this.busy && !this.stream);
     this.inputSelect.disabled = this.busy;
     this.outputSelect.disabled =
       !this.outputSupported() || this.changingOutput || (this.busy && !this.joined);
@@ -905,7 +983,11 @@ export class RoomVoice {
     this.micButton.classList.toggle('active', !!this.stream);
     this.action(
       this.soundButton,
-      this.context?.state === 'suspended' ? '恢复声音' : this.outputMuted ? '恢复接收' : '静音接收',
+      this.context && this.context.state !== 'running'
+        ? '恢复声音'
+        : this.outputMuted
+          ? '恢复接收'
+          : '静音接收',
       this.outputMuted ? 'volume-off' : 'volume',
       true,
     );

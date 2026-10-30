@@ -5,6 +5,7 @@ import { resolve } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { BLOCK_SIZE } from '../shared/cache-plan';
 import { mp4Bootstrap, partOffsets } from '../shared/cache-parts';
+import { cacheTimeline } from '../shared/cache-timeline';
 
 const profile = await mkdtemp(resolve('.local/cache-location-profile-'));
 const selected = await mkdtemp(resolve('.local/cache-location-drive-'));
@@ -82,6 +83,80 @@ try {
     v.load();
     await window.desktop!.call('cacheClear', { jobId });
   }, jobId);
+  const slidingFile = await readFile('.local/cache-window-fixture.mp4');
+  const layout = await cacheTimeline(slidingFile.length, 3, async (offset) =>
+    slidingFile.subarray(offset, offset + BLOCK_SIZE),
+  );
+  const slidingId = randomUUID();
+  await page.evaluate((p) => window.desktop!.call('cacheIO', p), {
+    action: 'init',
+    jobId: slidingId,
+    entry: 'video.mp4',
+    progressive: true,
+    sliding: true,
+    files: [{ name: 'video.mp4', size: slidingFile.length }],
+  });
+  for (let offset = 0; offset < slidingFile.length; offset += BLOCK_SIZE)
+    await page.evaluate((p) => window.desktop!.call('cacheIO', p), {
+      action: 'put',
+      jobId: slidingId,
+      name: 'video.mp4',
+      offset,
+      data: slidingFile.subarray(offset, offset + BLOCK_SIZE).toString('base64'),
+    });
+  await page.evaluate(async (job) => {
+    const video = document.querySelector<HTMLVideoElement>('#video')!;
+    video.muted = true;
+    video.src = `vs-cache://${job}/video.mp4`;
+    video.currentTime = 6.5;
+    await video.play();
+  }, slidingId);
+  await page.waitForFunction(() => {
+    const v = document.querySelector<HTMLVideoElement>('#video')!;
+    return v.currentTime > 6.5 && v.videoWidth === 640 && !v.paused;
+  });
+  const deleted = partOffsets(slidingFile.length, 1, 3).filter(
+    (offset) => !layout.protected.includes(offset),
+  );
+  const freed = await page.evaluate((p) => window.desktop!.call('cacheIO', p), {
+    action: 'drop',
+    jobId: slidingId,
+    name: 'video.mp4',
+    offsets: deleted,
+  });
+  assert.equal(freed, deleted.length * BLOCK_SIZE);
+  await page.evaluate(() => {
+    document.querySelector<HTMLVideoElement>('#video')!.currentTime = 7;
+  });
+  await page.waitForFunction(() => {
+    const v = document.querySelector<HTMLVideoElement>('#video')!;
+    return v.currentTime > 7.2 && !v.paused && v.videoWidth === 640;
+  });
+  let unavailable = false;
+  try {
+    await page.evaluate((p) => window.desktop!.call('cacheIO', p), {
+      action: 'get',
+      jobId: slidingId,
+      name: 'video.mp4',
+      offset: deleted[0],
+    });
+  } catch {
+    unavailable = true;
+  }
+  assert.ok(unavailable);
+  await page.evaluate(async (job) => {
+    const v = document.querySelector<HTMLVideoElement>('#video')!;
+    v.pause();
+    v.removeAttribute('src');
+    v.load();
+    await window.desktop!.call('cacheClear', { jobId: job });
+  }, slidingId);
+  proof.slidingBlocks = {
+    actualNativePlayback: true,
+    safeDeletionBytes: freed,
+    retainedSeekContinues: true,
+    removedReadRejected: true,
+  };
   await app.close();
   assert.equal(await readFile(resolve(selected, 'user-file.txt'), 'utf8'), 'do not remove');
   app = await electron.launch({ args, timeout: 30000 });

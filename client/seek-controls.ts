@@ -5,6 +5,7 @@ export type SeekState = {
   duration: number;
   position: number;
   enabled: boolean;
+  window?: { start: number; end: number };
   source?: { src: string; hls: boolean };
 };
 const clamp = (value: number, duration: number) => Math.max(0, Math.min(duration, value));
@@ -137,6 +138,27 @@ export class SeekControls {
       this.key = state.key;
     }
     const available = state.enabled && Number.isFinite(state.duration) && state.duration > 0;
+    this.input.classList.toggle('cache-windowed', !!state.window);
+    if (state.window) {
+      const start = Math.max(
+        0,
+        Math.min(100, (state.window.start / Math.max(1, state.duration)) * 100),
+      );
+      const end = Math.max(
+        start,
+        Math.min(100, (state.window.end / Math.max(1, state.duration)) * 100),
+      );
+      this.input.style.setProperty('--cache-start', start + '%');
+      this.input.style.setProperty('--cache-end', end + '%');
+      this.input.setAttribute(
+        'aria-valuetext',
+        `${time(state.position)}；可跳转 ${time(state.window.start)} 至 ${time(state.window.end)}`,
+      );
+      this.input.title = '亮色为全员保留的缓存；灰色为未缓存或已清理，不能跳转';
+    } else {
+      this.input.removeAttribute('aria-valuetext');
+      this.input.title = '悬停预览 · 按住向上拖动可精细定位 · 松手同步';
+    }
     this.track.hidden = this.input.hidden;
     const skip = document.getElementById('skip-controls')!;
     skip.hidden = this.input.hidden;
@@ -145,7 +167,13 @@ export class SeekControls {
       ['skip-forward', '前进'],
     ] as const) {
       const button = skip.querySelector<HTMLButtonElement>('#' + id)!;
-      button.disabled = !available;
+      const target = clamp(
+        state.position + (id === 'skip-back' ? -this.step : this.step),
+        state.duration,
+      );
+      button.disabled =
+        !available ||
+        (!!state.window && (target < state.window.start || target >= state.window.end));
       button.title = `${direction} ${this.step} 秒`;
       button.setAttribute('aria-label', button.title);
     }
@@ -154,6 +182,11 @@ export class SeekControls {
   }
   private submit(value: number) {
     const s = this.state();
+    const target = clamp(value, s.duration);
+    if (s.window && (target < s.window.start || target >= s.window.end)) {
+      this.input.value = String(s.position);
+      return;
+    }
     if (s.enabled && Number.isFinite(value) && Number.isFinite(s.duration) && s.duration > 0)
       this.commit(clamp(value, s.duration));
   }
@@ -251,6 +284,12 @@ export class SeekControls {
     if (this.drag) this.input.value = String(value);
     this.picture.style.visibility = 'hidden';
     clearTimeout(this.timer);
+    const cacheWindow = this.state().window;
+    if (cacheWindow && (value < cacheWindow.start || value >= cacheWindow.end)) {
+      this.dispose();
+      this.hint.textContent = '未缓存或已清理，不能跳转';
+      return;
+    }
     this.timer = window.setTimeout(() => void this.load().catch(() => this.unavailable()), 120);
   }
   private hide() {
@@ -319,6 +358,8 @@ export class SeekControls {
   }
   private frame() {
     if (!this.visible || !this.picture.readyState || this.failed) return;
+    const window = this.state().window;
+    if (window && (this.target < window.start || this.target >= window.end)) return;
     const target = Math.min(this.target, Math.max(0, this.picture.duration - 0.05));
     if (Math.abs(this.picture.currentTime - target) > 0.3) {
       try {
