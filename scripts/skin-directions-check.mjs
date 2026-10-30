@@ -85,28 +85,42 @@ try {
     assert.notEqual(before, during, `${variant} background has no response`);
     const material = await page.locator('.source > .fracture-canvas').evaluate((c) => {
       const pixels = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
-      // Transparent cuts run through the body, not just around its perimeter.
-      const x = Math.floor(c.width / 2);
+      const box = c.parentElement.getBoundingClientRect();
+      const ratio = c.width / (box.width + 96);
+      const edge =
+        (box.width +
+          box.height -
+          Math.sqrt((box.width + box.height) ** 2 - 0.6 * box.width * box.height)) /
+        4;
       let gaps = 0,
-        body = 0;
-      for (let y = 60; y < c.height - 60; y++) {
-        const a = pixels[(y * c.width + x) * 4 + 3];
-        if (a < 10) gaps++;
-        else body++;
-      }
+        coreSamples = 0,
+        damagedCore = 0;
+      const alpha = (x, y) =>
+        pixels[(Math.floor(y * ratio) * c.width + Math.floor(x * ratio)) * 4 + 3];
+      // Core remains opaque and continuous while the outer band breaks.
+      for (let y = edge + 2; y < box.height - edge - 2; y += 3)
+        for (let x = edge + 2; x < box.width - edge - 2; x += 9) {
+          coreSamples++;
+          if (alpha(48 + x, 40 + y) !== 255) damagedCore++;
+        }
+      for (let y = 0; y < box.height; y++) if (alpha(48 + 8, 40 + y) < 10) gaps++;
       return {
         active: c.dataset.active,
         fragments: Number(c.dataset.fragments),
         energy: Number(c.dataset.energy),
         gaps,
-        body,
+        coreSamples,
+        damagedCore,
+        intactAreaFraction:
+          ((box.width - edge * 2) * (box.height - edge * 2)) / (box.width * box.height),
       };
     });
     assert.equal(material.active, 'true', `${variant} body fragments not animated`);
     assert.ok(material.fragments >= 22 && material.energy > 0.1);
+    assert.ok(material.intactAreaFraction >= 0.849);
     assert.ok(
-      material.gaps > 10 && material.body > 30,
-      `${variant} body lacks real transparent cuts: ${JSON.stringify(material)}`,
+      material.gaps > 5 && material.coreSamples > 100 && material.damagedCore === 0,
+      `${variant} breaks the core or lacks edge cuts: ${JSON.stringify(material)}`,
     );
     assert.equal(
       await page.locator('.source').evaluate((e) => getComputedStyle(e).backgroundColor),

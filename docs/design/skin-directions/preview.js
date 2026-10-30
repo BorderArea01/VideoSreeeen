@@ -5,32 +5,32 @@
       subtitle: '横向排序 / 蓝天被拉成数据流',
       character: 'PIXEL SORTING',
       background: '照片被抽成细密横向像素流；扫过后断层在原处扩张、拉长、散去。',
-      surface: '深蓝容器本体切成不等高碎条，间隙透出天空，侧边悬浮脱落块。',
-      button: '十余层横切片交错拉伸，青蓝与淡红通道轻微分离。',
+      surface: '深蓝主体完整；仅外围 15% 横向切片，断口透出天空，少量碎块脱离。',
+      button: '文字与中心完整，外围 15% 碎条拉伸，轻微青红偏移。',
     },
     B: {
       name: '悬浮碎层',
       subtitle: '悬空切片 / 云白结构解体',
       character: 'SUSPENDED FRAGMENTS',
       background: '云层断成水平长片，带着独立惯性散开，保留晴空与自然日光。',
-      surface: '云白实体切为多层悬浮薄片；断口、长条和离体碎块同时可见。',
-      button: '白蓝条带依次崩开，向上下错层漂移后重组。',
+      surface: '云白主体保持连续；外围 15% 薄片悬浮，断口集中在轮廓附近。',
+      button: '白蓝边缘薄片漂移重组，按钮中心与文字保持完整。',
     },
     C: {
       name: '数据熔合',
       subtitle: '帧间拖影 / 数字文件损坏',
       character: 'DATAMOSH',
       background: '局部像素被重复拉伸、黏连成宽幅拖影，旧画面像损坏帧一样滞留。',
-      surface: '墨蓝面板撕成条带，局部内容材质被抽长，青紫熔合残影穿过本体。',
-      button: '碎条先拉成长尾、相互熔接，再回到可辨认的按钮轮廓。',
+      surface: '墨蓝主体完整，青紫拖影只在外围 15% 拉伸熔合，不穿过正文。',
+      button: '中心完整，边缘碎条拉成长尾、熔接后收束。',
     },
     D: {
       name: '错帧崩解',
       subtitle: '水平撕裂 / 碎片离轨',
       character: 'FRAME RUPTURE',
       background: '宽窄交错的断帧横贯天空，碎块沿不同方向脱离，带轻微 RGB 偏移。',
-      surface: '深色容器大范围错层；多组横条从本体滑脱，留出参差断口。',
-      button: '成组碎层错帧跳开，离体像素短暂悬浮，最后收束。',
+      surface: '主体轮廓清楚；外围 15% 成组错层，少量横条滑脱形成参差断口。',
+      button: '边缘成组碎层错帧跳开，中心与文字不参与切片。',
     },
   };
   const root = document.documentElement;
@@ -165,12 +165,29 @@
     if (impulses.length > 5) impulses.shift();
     wake();
   }
-  // The panel has no rectangular CSS fill: its body is separated, transparent slices.
-  // Hit targets and accessible text remain real DOM, independent of the visual pieces.
+  // Only a 15% perimeter band may break. The center and text backings stay intact.
+  // Hit targets and accessible text remain real DOM, independent of decoration.
   function fitPiece(p) {
     const b = p.el.getBoundingClientRect();
     p.w = b.width;
     p.h = b.height;
+    p.protected = [];
+    const walker = document.createTreeWalker(p.el, NodeFilter.SHOW_TEXT);
+    while (walker.nextNode()) {
+      const node = walker.currentNode;
+      if (!node.textContent.trim() || node.parentElement.closest('.fractured') !== p.el) continue;
+      const range = document.createRange();
+      range.selectNodeContents(node);
+      for (const r of range.getClientRects())
+        if (r.width && r.height)
+          p.protected.push({
+            x: r.left - b.left - 4,
+            y: r.top - b.top - 2,
+            w: r.width + 8,
+            h: r.height + 4,
+          });
+      range.detach();
+    }
     const dpr = Math.min(devicePixelRatio || 1, 1.25);
     p.c.width = Math.ceil((p.w + 96) * dpr);
     p.c.height = Math.ceil((p.h + 80) * dpr);
@@ -202,6 +219,30 @@
     const power = (variant === 'D' ? 1.2 : variant === 'B' ? 0.9 : 1) * (0.32 + energy);
     g.save();
     g.translate(48, 40);
+    const body = primary
+      ? accent
+      : button
+        ? light
+          ? p.el.classList.contains('active')
+            ? '#c0dcec'
+            : '#d4e9f5'
+          : p.el.classList.contains('active')
+            ? '#315c76'
+            : '#1d3b53'
+        : palette[0];
+    g.globalAlpha = 1;
+    g.fillStyle = body;
+    g.fillRect(0, 0, w, h);
+    // 15% of face AREA, rather than 15% on each side (which would cut 51%).
+    const edge = (w + h - Math.sqrt((w + h) ** 2 - 0.6 * w * h)) / 4;
+    const edgeX = edge,
+      edgeY = edge;
+    g.save();
+    g.beginPath();
+    g.rect(-48, -40, w + 96, h + 80);
+    g.rect(edgeX, edgeY, w - edgeX * 2, h - edgeY * 2);
+    g.clip('evenodd');
+    g.clearRect(-48, -40, w + 96, h + 80);
     for (let i = 0; i < strips; i++) {
       const r = noise(seed + i * 1.7),
         sign = i % 2 ? 1 : -1;
@@ -223,7 +264,7 @@
       const hh = Math.max(0.8, stripHeight - gap),
         tail = (i % 6 === 1 ? (button ? 8 : variant === 'C' ? 58 : 37) : 0) * power;
       g.globalAlpha = 1;
-      g.fillStyle = primary ? accent : palette[fault && i % 3 === 1 ? 1 : 0];
+      g.fillStyle = button ? body : palette[fault && i % 3 === 1 ? 1 : 0];
       g.fillRect(inset + shift, yy, w - inset * 2 + tail, hh);
       if ((!button && i % 5 === 1) || (button && i % 5 === 3)) {
         g.globalAlpha = primary ? 0.22 : light ? 0.25 : 0.32;
@@ -280,9 +321,20 @@
       }
     }
     g.restore();
+    // Protect text even when a label sits in the outer band (e.g. a panel heading).
+    g.globalAlpha = 1;
+    g.fillStyle = body;
+    g.save();
+    g.beginPath();
+    g.rect(0, 0, w, h);
+    g.clip();
+    for (const r of p.protected || []) g.fillRect(r.x, r.y, r.w, r.h);
+    g.restore();
+    g.restore();
     g.globalAlpha = 1;
     p.c.dataset.fragments = String(strips);
     p.c.dataset.energy = energy.toFixed(3);
+    p.c.dataset.edgeRatio = '0.15';
   }
   function feedback(p) {
     if (reduced.matches || !p) return;
@@ -437,6 +489,8 @@
     while (messages.children.length > 8) messages.firstElementChild.remove();
     input.value = '';
     messages.scrollTop = messages.scrollHeight;
+    const chatPiece = pieces.find((p) => p.el.matches('.chat'));
+    if (chatPiece) fitPiece(chatPiece);
   };
   window.addEventListener('hashchange', selectVariant);
   window.addEventListener('resize', resize);
