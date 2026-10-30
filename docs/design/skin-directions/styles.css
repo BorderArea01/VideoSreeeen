@@ -195,34 +195,6 @@ nav a[aria-current='true'] {
   background: color-mix(in srgb, var(--panel) 80%, transparent);
   border: 1px solid var(--line);
 }
-.action .button-material {
-  position: absolute;
-  inset: -30%;
-  pointer-events: none;
-  z-index: -1;
-  background: linear-gradient(110deg, transparent 25%, #fff5 48%, transparent 65%);
-  opacity: 0;
-  transform: translateX(-50%);
-}
-.action .stratum {
-  position: absolute;
-  left: 0;
-  right: 0;
-  height: 34%;
-  pointer-events: none;
-  z-index: -1;
-  background: var(--accent);
-  filter: brightness(1.08);
-}
-.stratum.s0 {
-  top: 0;
-}
-.stratum.s1 {
-  top: 33%;
-}
-.stratum.s2 {
-  top: 66%;
-}
 main {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 288px;
@@ -685,146 +657,6 @@ footer {
   box-shadow: 0 10px 50px #0002;
   font-size: 11px;
 }
-/* A: broad material faults and a calm navy glass surface. */
-html[data-variant='A'] .material {
-  background: linear-gradient(
-    0deg,
-    transparent 30%,
-    #d9f5ff20 42% 55%,
-    #cb9ccc10 56% 59%,
-    transparent 65%
-  );
-}
-html[data-variant='A'] .room-heading {
-  text-shadow: 0 2px 14px #06254377;
-}
-/* B: light, substantial glass, with a wide soft refraction rather than edge noise. */
-html[data-variant='B'] {
-  --ink: #183b54;
-  --muted: #52718a;
-  --panel: #f0f8ffde;
-  --panel-deep: #f7fbffb5;
-  --line: #5382a12d;
-  --accent: #245f89;
-  --accent-ink: #f3fbff;
-  --tint: #fff;
-  --radius: 21px;
-  --shadow: 0 20px 55px #14537e22;
-  --bg: #7bc4eb;
-  color-scheme: light;
-}
-html[data-variant='B'] .surface {
-  backdrop-filter: blur(16px);
-  border-color: #ffffffa1;
-  box-shadow:
-    0 20px 55px #14537e22,
-    inset 0 1px #fff;
-}
-html[data-variant='B'] .surface::after {
-  box-shadow: inset 0 0 18px #fff3;
-}
-html[data-variant='B'] .action {
-  border-radius: 11px;
-}
-.primary:hover {
-  filter: brightness(1.04);
-}
-html[data-variant='B'] .brand-icon {
-  background: #eff9ffb8;
-  color: #2c5f87;
-  box-shadow: 0 6px 22px #1d507b15;
-}
-html[data-variant='B'] .material {
-  background: radial-gradient(ellipse at 30% 20%, #ffffffbf, transparent 70%);
-  mix-blend-mode: soft-light;
-}
-html[data-variant='B'] .screen {
-  border: 6px solid #f5fbffdb;
-  box-shadow: 0 20px 60px #0a3c5e30;
-}
-html[data-variant='B'] :is(.room-heading p, .eyebrow, .preview-label) {
-  color: #224a68;
-}
-html[data-variant='B'] .hint {
-  background: #edf8ffdc;
-  border-radius: 12px;
-  padding: 12px;
-}
-html[data-variant='B'] footer {
-  color: #173c57;
-}
-/* C: matte film stock, deep quiet shadows and warm, short exposure trails. */
-html[data-variant='C'] {
-  --ink: #e4e8e8;
-  --muted: #9fadb3;
-  --panel: #17242bef;
-  --panel-deep: #111c23;
-  --line: #c5d2d41f;
-  --accent: #e2bf91;
-  --accent-ink: #312b23;
-  --tint: #deb484;
-  --radius: 6px;
-  --shadow: 0 15px 45px #030b1740;
-}
-html[data-variant='C'] .surface {
-  border: 1px solid #b7c6ca23;
-  box-shadow:
-    0 18px 45px #05101940,
-    inset 0 1px #dde4df06;
-}
-html[data-variant='C'] .action,
-html[data-variant='C'] .mode {
-  border-radius: 4px;
-}
-html[data-variant='C'] .material {
-  background: linear-gradient(100deg, transparent 15%, #f2d4a526 48%, transparent 75%);
-}
-html[data-variant='C'] .room-heading {
-  text-shadow: 0 2px 12px #06172399;
-}
-html[data-variant='C'] .eyebrow {
-  color: #d2bd9d;
-}
-/* D: large planes, layered volume and deliberate geometric cuts. */
-html[data-variant='D'] {
-  --ink: #eef0ff;
-  --muted: #afb6d9;
-  --panel: #131d38ed;
-  --panel-deep: #0c142c;
-  --line: #aab9ef29;
-  --accent: #c4c7ff;
-  --accent-ink: #232848;
-  --tint: #b1c5ff;
-  --radius: 4px;
-  --shadow: 8px 10px 0 -4px #10204066, 0 22px 55px #020d2b66;
-}
-html[data-variant='D'] .source,
-html[data-variant='D'] .design-notes,
-html[data-variant='D'] aside .surface {
-  border-radius: 3px 20px 3px 20px;
-}
-html[data-variant='D'] .surface::after {
-  box-shadow:
-    inset 0 1px #aabfff30,
-    inset -1px 0 #c79dd920;
-}
-html[data-variant='D'] .action {
-  border-radius: 3px 10px 3px 10px;
-  box-shadow: 3px 4px 0 #9e86ce20;
-}
-html[data-variant='D'] .material {
-  background: linear-gradient(
-    140deg,
-    transparent 15%,
-    #d5e3ff22 46%,
-    #9c97e826 47% 58%,
-    transparent 59%
-  );
-  clip-path: polygon(0 0, 100% 0, 85% 100%, 0 100%);
-}
-html[data-variant='D'] .room-heading {
-  text-shadow: 0 2px 14px #050f32;
-}
 @media (min-width: 1550px) {
   main {
     padding-top: 20px;
@@ -1000,4 +832,122 @@ html[data-variant='D'] .room-heading {
   .material {
     opacity: 0 !important;
   }
+}
+
+/* The surfaces themselves are fragmented. No intact rectangle sits beneath them. */
+html,
+body {
+  overflow-x: clip;
+}
+.app {
+  overflow-x: clip;
+}
+html[data-variant] {
+  --ink: #eff8ff;
+  --muted: #b2c9d9;
+  --accent: #b2e9fa;
+  --accent-ink: #12344a;
+  --line: #a9d9f82b;
+  --radius: 2px;
+}
+html[data-variant='B'] {
+  --ink: #173d57;
+  --muted: #456b85;
+  --accent: #316f9e;
+  --accent-ink: #fff;
+  --line: #497b9b32;
+  --panel-deep: #d4e9f5c9;
+  --panel: #e7f5ff;
+  color-scheme: light;
+}
+html[data-variant='C'] {
+  --accent: #b8c2eb;
+  --accent-ink: #252e4c;
+}
+html[data-variant] .surface.fractured,
+html[data-variant] .action.fractured,
+html[data-variant] .mode.fractured {
+  background: transparent;
+  border-color: transparent;
+  border-radius: 0;
+  box-shadow: none;
+  backdrop-filter: none;
+  overflow: visible;
+}
+.mode.fractured {
+  position: relative;
+  isolation: isolate;
+}
+html[data-variant] .surface.fractured::after {
+  display: none;
+}
+.fracture-canvas {
+  position: absolute;
+  left: -48px;
+  top: -40px;
+  z-index: -1;
+  pointer-events: none;
+  max-width: none;
+}
+html[data-variant] .fractured > .material {
+  display: none;
+}
+html[data-variant] .action.primary {
+  color: var(--accent-ink);
+}
+html[data-variant] .action.ghost {
+  color: var(--ink);
+}
+html[data-variant] .action:hover {
+  filter: none;
+}
+html[data-variant] .room-heading,
+html[data-variant] .room-heading p,
+html[data-variant] .eyebrow,
+html[data-variant] .chapter,
+html[data-variant] .chapter b,
+html[data-variant] .preview-label,
+html[data-variant] .brand,
+html[data-variant] footer {
+  color: #103b59;
+  text-shadow: 0 1px 12px #e5f5ffa6;
+}
+html[data-variant] .hint {
+  background: #e4f4ffb8;
+  color: #1d4d6c;
+  padding: 12px;
+  border-radius: 0;
+}
+html[data-variant] .screen {
+  border: 1px solid #15394b;
+  border-radius: 3px;
+  overflow: hidden;
+  box-shadow: 0 14px 40px #123b5d40;
+}
+html[data-variant] .mode {
+  border-radius: 2px;
+}
+html[data-variant] .source-form {
+  border-radius: 2px;
+}
+html[data-variant] .brand-icon {
+  border-radius: 0;
+  box-shadow: none;
+  background: #d9f1ff;
+  color: #214e6b;
+}
+html[data-variant] .design-notes {
+  margin-top: 30px;
+}
+html[data-variant] .source {
+  margin-top: 30px;
+}
+html[data-variant] aside {
+  gap: 30px;
+}
+html[data-variant] .chat > .panel-heading {
+  flex: 0 0 auto;
+}
+.chat #chat-messages {
+  overscroll-behavior: contain;
 }

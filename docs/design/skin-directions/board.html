@@ -33,6 +33,15 @@
         color: #9aafc3;
         font-size: 11px;
       }
+      button {
+        cursor: pointer;
+        color: #e8f2fa;
+        background: #203c54;
+        border: 1px solid #66849e;
+        padding: 10px 15px;
+        font: inherit;
+        font-size: 12px;
+      }
       a {
         color: inherit;
         text-decoration: none;
@@ -87,29 +96,42 @@
   <body>
     <header>
       <h1>VideoSreeeen / 四个交互方向</h1>
-      <small>点击标题进入完整交互预览 · 同一布局，不同材质与动作</small>
+      <small>点击标题进入完整交互预览 · 四版都保留强烈破碎 · 点击进入动态预览</small>
+      <button id="play-all" type="button">同时演示破碎动效 ↗</button>
     </header>
     <div class="grid">
       <section class="proposal">
-        <a class="label" href="index.html#A"><b>A · 晴空断层</b><small>故障感 / 平衡 ↗</small></a>
-        <div class="viewport"><iframe title="A 晴空断层" src="index.html?embed=1#A"></iframe></div>
+        <a class="label" href="index.html#A"
+          ><b>A · 像素断流</b><small>像素排序 / 细密撕裂 ↗</small></a
+        >
+        <div class="viewport"><iframe title="A 像素断流" src="index.html?embed=1#A"></iframe></div>
       </section>
       <section class="proposal">
-        <a class="label" href="index.html#B"><b>B · 云层浮玻璃</b><small>轻盈 / 舒适 ↗</small></a>
+        <a class="label" href="index.html#B"
+          ><b>B · 悬浮碎层</b><small>悬浮切片 / 云白解体 ↗</small></a
+        >
         <div class="viewport">
-          <iframe title="B 云层浮玻璃" src="index.html?embed=1#B"></iframe>
+          <iframe title="B 悬浮碎层" src="index.html?embed=1#B"></iframe>
         </div>
       </section>
       <section class="proposal">
-        <a class="label" href="index.html#C"><b>C · 胶片回声</b><small>安静 / 电影感 ↗</small></a>
-        <div class="viewport"><iframe title="C 胶片回声" src="index.html?embed=1#C"></iframe></div>
+        <a class="label" href="index.html#C"
+          ><b>C · 数据熔合</b><small>损坏帧 / 拉伸熔合 ↗</small></a
+        >
+        <div class="viewport"><iframe title="C 数据熔合" src="index.html?embed=1#C"></iframe></div>
       </section>
       <section class="proposal">
-        <a class="label" href="index.html#D"><b>D · 棱镜折面</b><small>层次 / 个性 ↗</small></a>
-        <div class="viewport"><iframe title="D 棱镜折面" src="index.html?embed=1#D"></iframe></div>
+        <a class="label" href="index.html#D"
+          ><b>D · 错帧崩解</b><small>大幅错层 / 碎片离轨 ↗</small></a
+        >
+        <div class="viewport"><iframe title="D 错帧崩解" src="index.html?embed=1#D"></iframe></div>
       </section>
     </div>
     <script>
+      document.getElementById('play-all').onclick = () => {
+        for (const frame of document.querySelectorAll('iframe'))
+          frame.contentDocument?.getElementById('demonstrate')?.click();
+      };
       new ResizeObserver(() => {
         for (const p of document.querySelectorAll('.viewport')) {
           const s = p.clientWidth / 1400;

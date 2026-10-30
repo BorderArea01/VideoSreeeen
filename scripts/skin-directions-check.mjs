@@ -83,10 +83,35 @@ try {
     await page.waitForTimeout(500);
     const during = await fingerprint();
     assert.notEqual(before, during, `${variant} background has no response`);
-    const material = await page
-      .locator('.source .material')
-      .evaluate((e) => e.getAnimations().some((a) => a.playState === 'running'));
-    assert.equal(material, true, `${variant} full-surface material not animated`);
+    const material = await page.locator('.source > .fracture-canvas').evaluate((c) => {
+      const pixels = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+      // Transparent cuts run through the body, not just around its perimeter.
+      const x = Math.floor(c.width / 2);
+      let gaps = 0,
+        body = 0;
+      for (let y = 60; y < c.height - 60; y++) {
+        const a = pixels[(y * c.width + x) * 4 + 3];
+        if (a < 10) gaps++;
+        else body++;
+      }
+      return {
+        active: c.dataset.active,
+        fragments: Number(c.dataset.fragments),
+        energy: Number(c.dataset.energy),
+        gaps,
+        body,
+      };
+    });
+    assert.equal(material.active, 'true', `${variant} body fragments not animated`);
+    assert.ok(material.fragments >= 22 && material.energy > 0.1);
+    assert.ok(
+      material.gaps > 10 && material.body > 30,
+      `${variant} body lacks real transparent cuts: ${JSON.stringify(material)}`,
+    );
+    assert.equal(
+      await page.locator('.source').evaluate((e) => getComputedStyle(e).backgroundColor),
+      'rgba(0, 0, 0, 0)',
+    );
     await page.screenshot({ path: `.local/screenshots/skin-${variant}-motion.png` });
     await page.waitForTimeout(2500);
     const settled = await fingerprint();
@@ -102,8 +127,8 @@ try {
     await page.waitForTimeout(100);
     assert.equal(
       await button
-        .locator('.button-material')
-        .evaluate((e) => e.getAnimations().some((a) => a.playState === 'running')),
+        .locator('.fracture-canvas')
+        .evaluate((e) => e.dataset.active === 'true' && Number(e.dataset.fragments) >= 12),
       true,
     );
     await button.click();
@@ -159,7 +184,7 @@ try {
     await page.emulateMedia({ reducedMotion: 'no-preference' });
     evidence.variants[variant] = {
       liveBackground: true,
-      surfaceMaterial: true,
+      surfaceFragments: material,
       buttonFeedback: true,
       settles: true,
       reducedMotion: true,
@@ -169,6 +194,14 @@ try {
   await page.goto(origin + '/board.html');
   await page.waitForTimeout(500);
   assert.equal(await page.locator('iframe').count(), 4);
+  await page.locator('#play-all').click();
+  await page.waitForTimeout(500);
+  for (const frame of page.frames().slice(1)) {
+    assert.equal(
+      await frame.locator('.source > .fracture-canvas').getAttribute('data-active'),
+      'true',
+    );
+  }
   await page.screenshot({ path: '.local/screenshots/skin-directions-board.png', fullPage: true });
   assert.deepEqual(failures, []);
   assert.ok(
