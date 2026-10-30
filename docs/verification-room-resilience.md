@@ -23,6 +23,13 @@
 
 ## 构建和部署
 
-运行时代码和集中部署回执待本轮完整回归通过后补记；本段在此时不代表已经上线。语音与影片仍使用原有免费服务，不启用收费 TURN 或第三方视频代理。
+- 运行时代码：`ae680a4d79b53f4baa297c30a9a9bdc283c594f0`；[GitHub Verify](https://github.com/BorderArea01/VideoSreeeen/actions/runs/41094600089) 已通过，客户端构建工作流未触发。
+- 同一免费 Worker `videosreeeen` 已更新，版本 `409f3c0c-038c-44fb-ba1e-636376abd957`；Pages 部署 `6911eed4`，正式入口仍为 <https://videosreeeen.pages.dev>，没有分叉房间服务。
+- 正式入口 HTML 与 6 项 JS / CSS / 存储线程 / 语音线程 / Service Worker / 助手 ZIP 均经实际下载核对本地产物。入口 `assets/index-PdzjSF5T.js`，SHA-256 `43d4f1080279f8a8fb016805af970fc2fedecb4fbbaaa7a0f42c9b7ca5d8f6ec`；回执 `.local/room-resilience-public-assets.json`。
+- 部署后 `VS_PUBLIC_URL=https://videosreeeen.pages.dev` 的 `test:moderation`、`test:voice`、`test:cache-window` 全部通过，使用新建公网房间与隔离资料。三方真实 WSS 语音、音频上下文和编码器恢复、保留开麦 / 静音状态、票选移出、分批实际删盘、灰色跳转拒绝、保留范围跳转、整片校验及片尾清理均复验；没有刷新或控制用户的房间。视频为测试请求提供的合成 / CC0 字节，房间与语音走正式服务；不据此声称原站下载、手机硬件或跨运营商长时通话通过。
+- 公网证据 `.local/moderation-public-evidence.json`、`.local/voice-public-evidence.json`、`.local/cache-window-public-evidence.json`；本地 1/2 分批无公开范围头的顺序下载回归也通过。
+- v0.4.6 的八项 GitHub Release 资产 ID、大小和更新时间逐项一致；本地 Windows 安装包 SHA-256 仍为 `1246e3e0df1577dc27d4074ee67b613cad7398f3c977b94efeceb2517683adc9`，网页助手仍为 0.1.1。没有重新发布客户端或安装到手机。
+
+语音与影片仍使用原有免费服务，不启用收费 TURN 或第三方视频代理。保留唯一已有回退基线；旧构建目录清理被工具自动审批拒绝（只返回“策略阻止”），本轮未绕过拒绝或删除这些旧目录。
 
 实现参考：[ISO BMFF 随机访问与初始化段](https://www.w3.org/TR/mse-byte-stream-format-isobmff/)、[MP4Box.js 的增量解析与样本释放设计](https://github.com/gpac/mp4box.js)、[AudioContext 状态](https://developer.mozilla.org/en-US/docs/Web/API/BaseAudioContext/state)、[WebSocket 积压](https://developer.mozilla.org/en-US/docs/Web/API/WebSocket/bufferedAmount)。仅参考格式与资源管理设计，没有导入 MP4Box.js 源码。
