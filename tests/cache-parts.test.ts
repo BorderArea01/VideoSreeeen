@@ -91,6 +91,28 @@ test('分段门槛核对全员已落盘内容；后续不一致、断线、新�
   status(first, ['a'.repeat(64)], 0.5);
   status(second, ['a'.repeat(64)], 0.5);
   assert.equal(rooms.cacheReady(room), true);
+  for (const [seat, fingerprint] of [
+    [first, 'd'.repeat(64)],
+    [second, 'e'.repeat(64)],
+  ] as const)
+    act(
+      {
+        type: 'cache',
+        mediaId: room.media!.id,
+        epoch: room.epoch,
+        state: 'ready',
+        progress: 1,
+        bytes: 999,
+        parts: ['a'.repeat(64), 'b'.repeat(64)],
+        fingerprint,
+      },
+      seat,
+    );
+  assert.equal(
+    rooms.cacheReady(room),
+    false,
+    'Full-file mismatch must still close a segmented barrier',
+  );
   rooms.disconnect(room, second, second.socket!);
   assert.equal(rooms.cacheReady(room), false);
   rooms.join(`${room.code}:${room.token}`, 'C', socket());

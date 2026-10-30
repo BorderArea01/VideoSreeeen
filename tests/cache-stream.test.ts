@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import { readFile } from 'node:fs/promises';
 import { MessageChannel } from 'node:worker_threads';
+import { cacheStream } from '../client/cache-stream';
 
 test('缓存虚拟文件只读当前网页的落盘块，严格处理 Range；不访问网络或别的标签页', async () => {
   const handlers: Array<(event: any) => void> = [];
@@ -75,4 +76,58 @@ test('缓存虚拟文件只读当前网页的落盘块，严格处理 Range；�
   clientUrl = 'https://other.example/';
   assert.equal((await request()).status, 404);
   assert.equal(network, 0);
+});
+
+test('已有旧版 Service Worker 切换至新版时重新检查缓存播放能力，不需要再刷新一次', async () => {
+  const original = new Map(
+    ['window', 'navigator', 'location', 'MessageChannel'].map((key) => [
+      key,
+      Object.getOwnPropertyDescriptor(globalThis, key),
+    ]),
+  );
+  const workers = new EventTarget() as any;
+  workers.controller = { postMessage() {} };
+  workers.register = async () => ({});
+  workers.ready = Promise.resolve();
+  Object.defineProperty(globalThis, 'window', {
+    configurable: true,
+    value: { isSecureContext: true },
+  });
+  Object.defineProperty(globalThis, 'navigator', {
+    configurable: true,
+    value: { serviceWorker: workers },
+  });
+  Object.defineProperty(globalThis, 'location', {
+    configurable: true,
+    value: new URL('https://videosreeeen.pages.dev/'),
+  });
+  Object.defineProperty(globalThis, 'MessageChannel', {
+    configurable: true,
+    value: MessageChannel,
+  });
+  const controller = new AbortController();
+  try {
+    const result = cacheStream(
+      '00000000-0000-0000-0000-000000000000',
+      [{ name: 'video.mp4', size: 1 }],
+      async () => new Uint8Array(1),
+      controller.signal,
+    );
+    setTimeout(() => {
+      workers.controller = {
+        postMessage(_message: unknown, ports: any[]) {
+          ports[0].postMessage({ version: 1 });
+          ports[0].close();
+        },
+      };
+      workers.dispatchEvent(new Event('controllerchange'));
+    }, 20);
+    assert.match((await result)('video.mp4'), /__vs_disk__/);
+  } finally {
+    controller.abort();
+    for (const [key, descriptor] of original) {
+      if (descriptor) Object.defineProperty(globalThis, key, descriptor);
+      else Reflect.deleteProperty(globalThis, key);
+    }
+  }
 });

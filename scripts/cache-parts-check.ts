@@ -84,6 +84,7 @@ const proof: any = {
   parts,
   sequential,
 };
+let diagnostic = async () => ({});
 try {
   const ownerContext = await browser.newContext(),
     viewerContext = await browser.newContext();
@@ -135,10 +136,16 @@ try {
     });
     await context.route(origin + '/cache-plan/**', async (route) => {
       const response = await route.fetch();
+      if (response.status() !== 200) {
+        await route.fulfill({ response });
+        return;
+      }
       const plan = await response.json();
       for (const file of plan.files) {
-        file.url = file.directUrl;
-        delete file.directUrl;
+        if (file.directUrl) {
+          file.url = file.directUrl;
+          delete file.directUrl;
+        }
       }
       await route.fulfill({ response, json: plan });
     });
@@ -148,6 +155,22 @@ try {
   const failures: string[] = [];
   for (const page of [owner, viewer]) page.on('pageerror', (e) => failures.push(e.message));
   let latest: any;
+  diagnostic = async () => ({
+    title: await owner.locator('#cache-title').textContent(),
+    description: await owner.locator('#cache-description').textContent(),
+    room: latest
+      ? {
+          cacheReady: latest.cacheReady,
+          cacheParts: latest.cacheParts,
+          members: latest.members.map((m: any) => ({
+            state: m.cache.state,
+            progress: m.cache.progress,
+            parts: m.cache.parts?.length,
+            error: m.cache.error,
+          })),
+        }
+      : null,
+  });
   owner.on('websocket', (socket) =>
     socket.on('framereceived', (event) => {
       try {
@@ -256,10 +279,15 @@ try {
   await owner.screenshot({ path: '.local/screenshots/cache-parts.png', fullPage: true });
   proof.passed = true;
 } catch (cause) {
+  proof.diagnostic = await diagnostic();
+  console.log(JSON.stringify(proof.diagnostic));
   proof.passed = false;
   proof.error = String(cause);
   throw cause;
 } finally {
+  hold = false;
+  for (const done of release.splice(0)) done();
+  for (const context of browser.contexts()) await context.unrouteAll({ behavior: 'ignoreErrors' });
   await mkdir('.local/screenshots', { recursive: true });
   await writeFile(
     `.local/cache-parts-${parts}${sequential ? '-sequential' : ''}${process.env.VS_PUBLIC_URL ? '-public' : ''}-evidence.json`,

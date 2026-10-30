@@ -473,7 +473,10 @@ export class DeviceCache {
               await new Promise((resolve) => setTimeout(resolve, 50));
             }
             signal.throwIfAborted();
-            return read(index, offset);
+            const data = await read(index, offset);
+            if ((await hexDigest(data)) !== complete[index]!.get(offset))
+              throw new Error('缓存分块内容已变化，请重新缓存');
+            return data;
           },
           signal,
         );

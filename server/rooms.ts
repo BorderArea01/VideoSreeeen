@@ -190,10 +190,14 @@ export class Rooms {
     if ((room.cacheParts ?? 1) > 1) {
       const first = seats[0]?.cache.parts?.[0];
       const minimum = Math.min(...seats.map((s) => s.cache.parts?.length ?? 0));
+      const fullHashes = new Set(
+        seats.filter((s) => s.cache.state === 'ready').map((s) => s.cache.fingerprint),
+      );
       return (
         !!room.media?.source &&
         !!first &&
         seats.length > 0 &&
+        fullHashes.size <= 1 &&
         seats.every(
           (s) =>
             s.online &&

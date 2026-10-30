@@ -97,17 +97,27 @@ export async function cacheStream(
     });
   signal.throwIfAborted();
   await new Promise<void>((resolve, reject) => {
-    const channel = new MessageChannel();
+    let channel: MessageChannel | undefined;
+    const dispose = () => {
+      channel?.port1.close();
+      workers.removeEventListener('controllerchange', probe);
+    };
     const timer = setTimeout(() => {
-      channel.port1.close();
+      dispose();
       reject(new Error('缓存播放组件需要刷新页面后更新'));
     }, 8000);
-    channel.port1.onmessage = ({ data }) => {
-      clearTimeout(timer);
-      channel.port1.close();
-      data.version === 1 ? resolve() : reject(new Error('缓存播放组件版本不兼容'));
+    const probe = () => {
+      channel?.port1.close();
+      channel = new MessageChannel();
+      channel.port1.onmessage = ({ data }) => {
+        clearTimeout(timer);
+        dispose();
+        data.version === 1 ? resolve() : reject(new Error('缓存播放组件版本不兼容'));
+      };
+      workers.controller?.postMessage({ type: 'vs-disk-probe' }, [channel.port2]);
     };
-    workers.controller!.postMessage({ type: 'vs-disk-probe' }, [channel.port2]);
+    workers.addEventListener('controllerchange', probe);
+    probe();
   });
   return (name: string) => new URL(`/__vs_disk__/${jobId}/${name}`, location.origin).href;
 }
