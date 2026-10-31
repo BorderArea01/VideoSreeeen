@@ -1,6 +1,8 @@
 # 0.4.0 验证记录
 
-2026-10-31 缓存中途被要求重来、removeEntry 文件占用异常的调查与隔离修复，见[缓存恢复验收](verification-cache-recovery.md)。当前为待上线源码，按用户正在观影的要求，本轮不更新或重启线上。
+2026-11-01 B 站大合集视频响应超过 512 KiB 限制的调查、助手 0.1.2 修复及验证，见[大合集响应大小验收](verification-bilibili-metadata-size.md)。
+
+2026-10-31 缓存中途被要求重来、removeEntry 文件占用异常的调查与隔离修复，见[缓存恢复验收](verification-cache-recovery.md)。之后经用户同意只发布网页，房间 Worker 未更新，正式入口独立双端回归已通过。
 
 2026-10-31 紫电全界面主题字体、更多霓虹文字、聊天输入留白及链接图标对齐，见[字体与输入框验收](verification-signal-typography.md)。
 

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { once } from 'node:events';
-import { mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises';
-import { resolve } from 'node:path';
+import { mkdir, mkdtemp, readFile, writeFile, rm } from 'node:fs/promises';
+import { resolve, relative } from 'node:path';
 import { chromium } from 'playwright';
 import { createApp } from '../server/index';
 import { closeInvitation, selectSource, choosePlayback } from './room-ui';
@@ -49,32 +49,55 @@ let release = () => {};
 let room: any;
 let upstreamCalls = 0;
 let sourceCommands = 0;
+let oversizedView = false;
+const viewMetadata = {
+  code: 0,
+  data: {
+    bvid: 'BV1R6xN66Exx',
+    title: 'B 站 · 大合集扩展共同播放',
+    rights: { pay: 0 },
+    pages: [
+      { page: 1, cid: 123, duration: 70 },
+      { page: 2, cid: 456, duration: 70 },
+    ],
+    ugc_season: {
+      sections: [
+        {
+          episodes: Array.from({ length: 366 }, (_, id) => ({ id, title: '合集目录'.repeat(150) })),
+        },
+      ],
+    },
+  },
+};
+proof.largeViewBytes = Buffer.byteLength(JSON.stringify(viewMetadata));
+assert.ok(proof.largeViewBytes > 512 * 1024);
 try {
   const worker =
     hostContext.serviceWorkers()[0] ||
     (await hostContext.waitForEvent('serviceworker', { timeout: 15000 }));
   assert.ok(worker.url().startsWith('chrome-extension://'));
   proof.actualExtensionLoaded = true;
+  proof.helperVersion = await worker.evaluate(
+    () => (globalThis as any).chrome.runtime.getManifest().version,
+  );
+  assert.equal(proof.helperVersion, '0.1.2');
+  await hostContext.addInitScript(() => localStorage.setItem('videosreeeen.appearance', 'classic'));
   await hostContext.route('https://api.bilibili.com/**', async (route) => {
     upstreamCalls++;
     const url = new URL(route.request().url());
     let data;
     if (url.pathname.endsWith('/nav'))
       data = { code: loggedIn ? 0 : -101, data: { isLogin: loggedIn } };
-    else if (url.pathname.endsWith('/view'))
-      data = {
-        code: 0,
-        data: {
-          bvid: 'BV1R6xN66Exx',
-          title: 'B 站 · 扩展共同播放',
-          rights: { pay: 0 },
-          pages: [
-            { page: 1, cid: 123, duration: 70 },
-            { page: 2, cid: 456, duration: 70 },
-          ],
-        },
-      };
-    else {
+    else if (url.pathname.endsWith('/view')) {
+      if (oversizedView) {
+        await route.fulfill({
+          body: ' '.repeat(8 * 1024 * 1024 + 1),
+          contentType: 'application/json',
+        });
+        return;
+      }
+      data = viewMetadata;
+    } else {
       if (hold) await hold;
       data = {
         code: 0,
@@ -158,7 +181,7 @@ try {
   await worker.evaluate(() => {
     const runtime = (globalThis as any).chrome.runtime;
     (globalThis as any).__vsOriginalManifest = runtime.getManifest;
-    runtime.getManifest = () => ({ version: '0.1.0' });
+    runtime.getManifest = () => ({ version: '0.1.1' });
   });
   const beforeOldHelper = upstreamCalls;
   await selectSource(host, pageUrl);
@@ -176,6 +199,9 @@ try {
     .filter({ hasText: '当前：共同播放' })
     .waitFor({ timeout: 25000 });
   assert.equal(room.media.source.bilibiliDirect, true);
+  assert.ok(!JSON.stringify(room.media).includes('ugc_season'));
+  assert.ok(Buffer.byteLength(JSON.stringify(room.media)) < 2048);
+  proof.largeCollectionNotForwarded = true;
   await guest.locator('#play-button').click();
   for (const page of [host, guest])
     await page.waitForFunction(
@@ -230,6 +256,16 @@ try {
   proof.nextPart = true;
   const before = sourceCommands,
     previous = room.media.id;
+  oversizedView = true;
+  await selectSource(host, pageUrl);
+  await host
+    .locator('#link-error')
+    .filter({ hasText: 'B 站视频信息响应超过安全大小限制' })
+    .waitFor();
+  assert.equal(room.media.id, previous);
+  assert.equal(sourceCommands, before);
+  proof.oversizedResponseKeepsMedia = true;
+  oversizedView = false;
   hold = new Promise<void>((done) => {
     release = done;
   });
@@ -268,6 +304,16 @@ try {
   await hostContext.close();
   await viewerBrowser.close();
   await app.close();
+  const localProfile = relative(resolve('.local'), profile);
+  if (
+    !localProfile.startsWith('extension-check-') ||
+    localProfile.includes('..') ||
+    localProfile.includes('/') ||
+    localProfile.includes('\\')
+  )
+    throw new Error('Unexpected isolated profile path');
+  await rm(profile, { recursive: true, force: true });
+  proof.isolatedProfileRemoved = true;
   await writeFile('.local/extension-evidence.json', JSON.stringify(proof, null, 2));
   console.log(JSON.stringify(proof));
 }

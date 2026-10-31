@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "VideoSreeeen · 视频源助手",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "房主粘贴 B 站链接，复用本浏览器的正常登录会话取高清源；观众只需网页。",
   "host_permissions": ["https://api.bilibili.com/*"],
   "background": { "service_worker": "background.js", "type": "module" },

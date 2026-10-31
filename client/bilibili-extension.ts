@@ -3,7 +3,7 @@ import type { MediaInput } from '../shared/protocol';
 export function supportsBilibiliExtension(version: unknown) {
   if (typeof version !== 'string' || !/^\d{1,4}\.\d{1,4}\.\d{1,4}$/.test(version)) return false;
   const [major, minor, patch] = version.split('.').map(Number);
-  return major! > 0 || minor! > 1 || (minor === 1 && patch! >= 1);
+  return major! > 0 || minor! > 1 || (minor === 1 && patch! >= 2);
 }
 export class BilibiliExtensionError extends Error {
   constructor(
@@ -87,7 +87,7 @@ export class BilibiliExtension {
     if (!supportsBilibiliExtension(helper?.version))
       throw new BilibiliExtensionError(
         'UPDATE_REQUIRED',
-        '请更新视频源助手至 0.1.1 或更新版本，在扩展管理页重新加载后刷新放映厅。观众无需安装。',
+        '请更新视频源助手至 0.1.2 或更新版本，在扩展管理页重新加载后刷新放映厅。观众无需安装。',
       );
     const result = (await this.call('resolve', media.url, signal)).media;
     if (

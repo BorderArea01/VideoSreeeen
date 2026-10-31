@@ -38,7 +38,7 @@ _本地双端实播截图，使用 MDN CC0 示例视频；昵称和消息为演�
 
 助手只负责取源，不读取或导出 Cookie，不把账号会话交给网页或服务器。选择正常权限下完整的 **720p / 1080p AVC 与 AAC 轨道**，可加载后才发布；失败或取消保留当前影片，不降级到游客低画质。旧的游客取源、服务端扫码实验和客户端专用登录入口均已删除。
 
-**助手当前为 0.1.1**，修正部分视频在观众端无法加载的问题。已安装 0.1.0 的房主请从[网页入口下载更新](https://videosreeeen.pages.dev/downloads/VideoSreeeen-SourceHelper.zip)，覆盖解压目录并重新加载，然后在原房间重新同步链接；观众无需安装。[修正与实播记录](docs/verification-bilibili-html5.md)。
+**助手当前为 0.1.2**，修正大合集视频报“B 站响应超过大小限制”的问题，并保留 0.1.1 的正常 HTML5 高清取源。已安装旧版的房主请从[网页入口下载更新](https://videosreeeen.pages.dev/downloads/VideoSreeeen-SourceHelper.zip)，覆盖解压目录，在扩展管理页重新加载；结束当前观看后刷新放映厅，再同步链接。观众无需安装。[大合集修复记录](docs/verification-bilibili-metadata-size.md) · [高清取源实播记录](docs/verification-bilibili-html5.md)。
 
 独立扩展已通过实际加载、真实账号与正式公网房间双端 1080p 播放；合成检查另覆盖下一分 P、取消和登录失效，见[扩展取源验证](docs/verification-browser-extension.md)。安装包尚未上架扩展商店，当前提供约 18 KB 的开源 ZIP；[一次性安装步骤](docs/browser-extension.md)。
 

@@ -19,9 +19,9 @@ const id = '11111111-1111-4111-8111-111111111111';
 const page = 'https://www.bilibili.com/video/BV1R6xN66Exx/';
 
 test('旧取源助手必须先更新，观众端不要求助手；版本判断支持后续补丁和小版本', () => {
-  for (const version of [undefined, null, '', '0.1.0', '0.0.99', '0.1.1-beta', 'invalid'])
+  for (const version of [undefined, null, '', '0.1.0', '0.1.1', '0.0.99', '0.1.2-beta', 'invalid'])
     assert.equal(supportsBilibiliExtension(version), false);
-  for (const version of ['0.1.1', '0.1.10', '0.2.0', '1.0.0'])
+  for (const version of ['0.1.2', '0.1.10', '0.2.0', '1.0.0'])
     assert.equal(supportsBilibiliExtension(version), true);
 });
 function environment(fetcher: typeof fetch) {
@@ -110,6 +110,58 @@ test('未登录时仅检查登录状态，凭据由浏览器处理，不发游�
   assert.equal(result.code, 'LOGIN_REQUIRED');
   assert.deepEqual(requests, ['https://api.bilibili.com/x/web-interface/nav']);
   assert.ok(!JSON.stringify(result).includes('never-return'));
+});
+
+test('大合集超过旧限额仍可取高清源和下一分 P，只返回紧凑的已校验结果', async () => {
+  const largeInfo = {
+    code: 0,
+    data: {
+      bvid: 'BV1R6xN66Exx',
+      title: '大合集',
+      rights: { pay: 0 },
+      pages: [
+        { page: 1, cid: 123, duration: 70 },
+        { page: 2, cid: 456, duration: 70 },
+      ],
+      ugc_season: {
+        sections: [
+          {
+            episodes: Array.from({ length: 366 }, (_, i) => ({ id: i, title: '目录'.repeat(500) })),
+          },
+        ],
+      },
+    },
+  };
+  assert.ok(Buffer.byteLength(JSON.stringify(largeInfo)) > 512 * 1024);
+  const deadline = Math.floor(Date.now() / 1000) + 3600;
+  const video = `https://fixture.mcdn.bilivideo.cn/public/video.m4s?deadline=${deadline}`;
+  const audio = video.replace('video.m4s', 'audio.m4s');
+  const e = environment(async (raw) => {
+    const url = new URL(String(raw));
+    return Response.json(
+      url.pathname.endsWith('/nav')
+        ? { code: 0, data: { isLogin: true } }
+        : url.pathname.endsWith('/view')
+          ? largeInfo
+          : {
+              code: 0,
+              data: {
+                timelength: 70000,
+                dash: {
+                  duration: 70,
+                  video: [{ width: 1920, height: 1080, codecs: 'avc1.640032', baseUrl: video }],
+                  audio: [{ codecs: 'mp4a.40.2', baseUrl: audio }],
+                },
+              },
+            },
+    );
+  });
+  const result = await e.call({ action: 'resolve', url: page });
+  assert.equal(result.media.source.video, video);
+  assert.equal(result.media.source.audio, audio);
+  assert.ok(JSON.stringify(result).length < 2048);
+  assert.ok(!JSON.stringify(result).includes('ugc_season'));
+  assert.equal((await e.call({ action: 'next', url: page })).next.url, page + '?p=2');
 });
 
 test('扩展取源支持取消、导航销毁、状态码保真和异常脱敏', async () => {

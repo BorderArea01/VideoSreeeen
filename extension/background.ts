@@ -3,6 +3,7 @@ import {
   resolveAccountBilibiliPage,
   nextBilibiliPage,
 } from '../shared/bilibili';
+import { readBilibiliMetadata } from './metadata';
 declare const chrome: any;
 const tasks = new Map<number, { id: string; controller: AbortController }>();
 function allowedSender(sender: any) {
@@ -18,37 +19,6 @@ function allowedSender(sender: any) {
   } catch {
     return false;
   }
-}
-async function boundedText(response: Response, signal: AbortSignal) {
-  if (!response.body) throw new Error('B 站响应为空');
-  const reader = response.body.getReader();
-  const chunks: Uint8Array[] = [];
-  let length = 0;
-  const cancel = () => {
-    void reader.cancel().catch(() => {});
-  };
-  signal.addEventListener('abort', cancel, { once: true });
-  try {
-    while (true) {
-      signal.throwIfAborted();
-      const { done, value } = await reader.read();
-      signal.throwIfAborted();
-      if (done) break;
-      length += value.length;
-      if (length > 512 * 1024) throw new Error('B 站响应超过大小限制');
-      chunks.push(value);
-    }
-  } finally {
-    signal.removeEventListener('abort', cancel);
-    await reader.cancel().catch(() => {});
-  }
-  const bytes = new Uint8Array(length);
-  let offset = 0;
-  for (const chunk of chunks) {
-    bytes.set(chunk, offset);
-    offset += chunk.length;
-  }
-  return new TextDecoder().decode(bytes);
 }
 chrome.runtime.onMessage.addListener(
   (message: any, sender: any, reply: (result: unknown) => void) => {
@@ -90,7 +60,7 @@ chrome.runtime.onMessage.addListener(
             await response.body?.cancel();
             throw new Error(`B 站接口暂不可用（HTTP ${response.status}）`);
           }
-          return boundedText(response, signal);
+          return readBilibiliMetadata(response, url, signal);
         };
         if (typeof message.url !== 'string' || message.url.length > 2048)
           throw new Error('B 站链接无效');
