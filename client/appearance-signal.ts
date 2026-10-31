@@ -65,6 +65,19 @@ export class SignalScene {
       if (event.target instanceof HTMLElement && event.target.matches('.signal-control'))
         this.burst(event.target);
     });
+    // Native click also covers keyboard activation. Hover/focus decorate only
+    // the control or panel; the page background flashes on button activation.
+    document.addEventListener(
+      'click',
+      (event) => {
+        if (!event.isTrusted || !(event.target instanceof Element)) return;
+        const button = event.target.closest(
+          'button,[role="button"],summary,a.button,input[type="button"],input[type="submit"],input[type="reset"]',
+        );
+        if (button && !button.matches(':disabled,[aria-disabled="true"]')) this.burst(this.field);
+      },
+      { capture: true, passive: true },
+    );
     document.addEventListener(
       'pointermove',
       (event) => {
@@ -81,7 +94,7 @@ export class SignalScene {
           const rect = panel.getBoundingClientRect(),
             y = event.clientY - rect.top;
           if (y < 20 || y > rect.height - 20) this.burst(panel);
-        } else if (!event.target.closest('button,a,summary')) this.burst(this.field);
+        }
       },
       { passive: true },
     );

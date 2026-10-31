@@ -124,12 +124,49 @@ try {
     await owner.evaluate(() => localStorage.getItem('videosreeeen.appearance')),
     'signal',
   );
+  await owner.mouse.move(740, 75);
+  await owner.waitForTimeout(1100);
+  await owner.mouse.move(800, 95, { steps: 6 });
+  assert.equal(
+    await owner.locator('#signal-field').evaluate((el) => el.classList.contains('signal-active')),
+    false,
+  );
+  await owner.locator('#hero-create').hover();
+  assert.equal(
+    await owner.locator('#signal-field').evaluate((el) => el.classList.contains('signal-active')),
+    false,
+  );
+  await owner.locator('#hero-create').click();
+  assert.equal(
+    await owner.locator('#signal-field').evaluate((el) => el.classList.contains('signal-active')),
+    true,
+  );
+  await owner.waitForTimeout(1100);
+  assert.equal(
+    await owner.locator('#signal-field').evaluate((el) => el.classList.contains('signal-active')),
+    false,
+  );
+  await owner.locator('#dialog-close').focus();
+  await owner.keyboard.press('Enter');
+  assert.equal(
+    await owner.locator('#signal-field').evaluate((el) => el.classList.contains('signal-active')),
+    true,
+  );
+  evidence.backgroundOnlyOnButtonActivation = true;
   await owner.locator('#hero-create').click();
   await owner.locator('#name-input').fill('紫电验收');
   await owner.locator('#create-button').click();
   await owner.locator('#invite-dialog').waitFor();
   const invite = await owner.locator('#invite-link').inputValue();
   await closeInvitation(owner);
+  // The background uses all page buttons, independent of the decorative whitelist.
+  await owner.waitForTimeout(1100);
+  await owner.locator('#chat-toggle').click();
+  assert.equal(
+    await owner.locator('#signal-field').evaluate((el) => el.classList.contains('signal-active')),
+    true,
+  );
+  await owner.locator('#chat-restore').click();
   const guest = await context(0),
     viewer = await guest.newPage();
   await viewer.goto(invite);
