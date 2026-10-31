@@ -1,12 +1,12 @@
 // Optional asset maintenance, never executed by build or the running website.
 // Download fixed OFL Fontsource subsets; runtime requests remain same-origin.
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 
 const version = '5.3.0';
 const target = 'client/assets/fonts';
 const licenses = 'client/public/licenses/fonts';
-const headings = '聊天室房间语音播放方式共同本地视频缓存成员连接紫电噪讯邀请放映室多人观影';
+const previous = JSON.parse(await readFile(`${target}/SOURCES.json`, 'utf8').catch(() => '{}'));
 await mkdir(target, { recursive: true });
 await mkdir(licenses, { recursive: true });
 const records = [];
@@ -17,6 +17,7 @@ async function get(url) {
   return Buffer.from(await response.arrayBuffer());
 }
 for (const [name, family, weight, entry] of [
+  ['chakra-petch', 'Signal Tech', 400, '400.css'],
   ['chakra-petch', 'Signal Tech', 600, '600.css'],
   ['zcool-qingke-huangyou', 'Signal Tube', 400, 'index.css'],
 ]) {
@@ -25,31 +26,27 @@ for (const [name, family, weight, entry] of [
   const license = await get(base + 'LICENSE');
   if (!license.toString().includes('SIL OPEN FONT LICENSE')) throw new Error('Unverified license');
   await writeFile(`${licenses}/${name}-OFL.txt`, license);
-  const wanted = new Set([...headings].map((c) => c.codePointAt(0)));
   for (const match of css.matchAll(/@font-face\s*\{([^}]+)\}/g)) {
     const block = match[1];
     const file = /url\(\.\/files\/([^()]+\.woff2)\)/.exec(block)?.[1];
     const range = /unicode-range:\s*([^;]+)/.exec(block)?.[1];
     if (!file || !range) continue;
-    let subset = range;
+    // Preserve native color emoji; this face supplies text, not pictographs.
+    const subset = range
+      .split(',')
+      .filter((part) => {
+        const point = parseInt(part.trim().slice(2), 16);
+        return point < 0x1f000 || point >= 0x20000;
+      })
+      .join(',');
+    if (!subset) continue;
     if (name === 'chakra-petch') {
       if (file !== `chakra-petch-latin-${weight}-normal.woff2`) continue;
-    } else {
-      const points = [...wanted].filter((point) =>
-        range.split(',').some((part) => {
-          const [lo, hi = lo] = part
-            .trim()
-            .slice(2)
-            .split('-')
-            .map((s) => parseInt(s, 16));
-          return point >= lo && point <= hi;
-        }),
-      );
-      if (!points.length) continue;
-      subset = points.map((p) => `U+${p.toString(16)}`).join(',');
-      for (const p of points) wanted.delete(p);
     }
-    const bytes = await get(base + 'files/' + file);
+    let bytes = await readFile(`${target}/${file}`).catch(() => null);
+    const prior = previous.version === version && previous.fonts?.find((f) => f.file === file);
+    if (!bytes || !prior || createHash('sha256').update(bytes).digest('hex') !== prior.sha256)
+      bytes = await get(base + 'files/' + file);
     if (bytes.subarray(0, 4).toString() !== 'wOF2') throw new Error('Invalid WOFF2');
     await writeFile(`${target}/${file}`, bytes);
     records.push({
@@ -64,7 +61,6 @@ for (const [name, family, weight, entry] of [
       `@font-face {font-family:'${family}';font-style:normal;font-weight:${weight};font-display:swap;src:url('./assets/fonts/${file}') format('woff2');unicode-range:${subset};}`,
     );
   }
-  if (name !== 'chakra-petch' && wanted.size) throw new Error('Missing heading characters');
 }
 await writeFile(
   'client/signal-fonts.css',
@@ -74,7 +70,15 @@ await writeFile(
 );
 await writeFile(
   `${target}/SOURCES.json`,
-  JSON.stringify({ version, headings, fonts: records }, null, 2) + '\n',
+  JSON.stringify(
+    {
+      version,
+      coverage: 'Full upstream text subsets; color emoji use system fallback',
+      fonts: records,
+    },
+    null,
+    2,
+  ) + '\n',
 );
 console.log(
   JSON.stringify({ files: records.length, bytes: records.reduce((sum, r) => sum + r.bytes, 0) }),

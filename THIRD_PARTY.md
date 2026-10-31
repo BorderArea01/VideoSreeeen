@@ -6,7 +6,7 @@
 - AndroidX WebKit：Android WebView 跨 frame 的文档开始脚本与只读播放器探测；Apache-2.0。
 - hls.js：HLS 播放；Apache-2.0。
 - @noble/hashes 2.4.0：浏览器磁盘文件流式 SHA-256 校验；MIT，完整许可随网页的 `licenses/noble-hashes.txt` 分发，源文件见 `client/public/licenses/noble-hashes.txt`。
-- Chakra Petch（品牌英文）与 ZCOOL QingKe HuangYou（固定中文标题）：OFL-1.1，从 Fontsource 5.3.0 获取 WOFF2 子集，保留原文件及完整许可证，网站同源分发，不向字体服务发送用户文字。来源与 SHA-256 见 `client/assets/fonts/SOURCES.json`，许可随网页 `licenses/fonts/` 分发；可用 `scripts/fetch-theme-fonts.mjs` 重新获取固定版本资源。字体只用于紫电主题，动态房间名、聊天正文及播放数字使用可读的系统字体。
+- Chakra Petch 与 ZCOOL QingKe HuangYou：OFL-1.1，从 Fontsource 5.3.0 获取 WOFF2 Unicode 分片，保留原文件及完整许可证，网站同源分发，不向字体服务发送用户文字。来源与 SHA-256 见 `client/assets/fonts/SOURCES.json`，许可随网页 `licenses/fonts/` 分发；可用 `scripts/fetch-theme-fonts.mjs` 重新获取固定版本资源。紫电主题全界面使用主题中英文字体，浏览器按实际文字加载分片；Emoji 使用系统彩色字体，字体不支持的字符保留系统回退。
 - ws、Zod、ipaddr.js：WebSocket、消息校验与 IP 地址校验；MIT。
 - TypeScript、Vite、tsx、esbuild、Playwright：开发与验证工具，依原包许可证使用。
 - Wrangler、Miniflare、Cloudflare Workers Types：Cloudflare 构建、本地 workerd 验证和类型；MIT / Apache-2.0，依各包 LICENSE 保留。P2P 使用浏览器 WebRTC API 自行实现，没有将 WebTorrent 或公共 Tracker 打包进客户端。

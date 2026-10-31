@@ -33,8 +33,14 @@
   --signal-surface: linear-gradient(120deg, #211729, #261a31);
   --signal-travel: 48px;
   --signal-duration: 680ms;
-  --signal-ui-font: 'Bahnschrift', 'Segoe UI', 'Microsoft YaHei UI', 'PingFang SC', sans-serif;
+  --signal-ui-font:
+    'Signal Tech', 'Signal Tube', 'Segoe UI', 'Microsoft YaHei UI', 'PingFang SC',
+    'Apple Color Emoji', 'Segoe UI Emoji', sans-serif;
   --signal-tube-glow: 0 0 1px #fff, 0 0 5px #e78cffb3, 0 0 13px #a849d866;
+  --signal-control-glow: 0 0 1px #f5d7ff80, 0 0 7px #bd6ae56b;
+  --signal-soft-glow: 0 0 6px #c67aeb26;
+  --signal-lime-glow: 0 0 2px #e4ffa680, 0 0 9px #c9ff4b59;
+  --signal-source-height: 48px;
   font-family: var(--signal-ui-font);
 }
 :root[data-theme='signal'] body {
@@ -316,10 +322,10 @@
   padding: 0;
   background: transparent;
   color: var(--text);
-  font-size: 12px;
-  line-height: 1.75;
-  font-family: 'Segoe UI', 'Microsoft YaHei UI', 'PingFang SC', sans-serif;
-  text-shadow: none;
+  font-size: 14px;
+  line-height: 1.8;
+  font-family: var(--signal-ui-font);
+  text-shadow: var(--signal-soft-glow);
 }
 :root[data-theme='signal'] .chat-compose {
   padding: 14px 19px 19px;
@@ -332,8 +338,16 @@
   border: 1px solid #594167;
   border-radius: 0;
   color: var(--text);
-  font-size: 12px;
-  font-family: 'Segoe UI', 'Microsoft YaHei UI', 'PingFang SC', sans-serif;
+  font-size: 14px;
+  font-family: var(--signal-ui-font);
+  line-height: 22px;
+  padding: 12px 14px;
+  min-height: 72px;
+  text-shadow: var(--signal-soft-glow);
+}
+:root[data-theme='signal'] .chat-compose textarea:focus {
+  border-color: #b688d2;
+  box-shadow: 0 0 0 2px #ad71da1a;
 }
 :root[data-theme='signal'] .chat-empty {
   color: var(--muted);
@@ -407,12 +421,28 @@
   gap: 12px;
 }
 :root[data-theme='signal'] .source-form input {
-  height: 48px;
+  height: var(--signal-source-height);
   background: #30203b;
   color: var(--text);
   border: 1px solid #594167;
   border-radius: 0;
-  font-size: 12px;
+  font-size: 13px;
+  line-height: 22px;
+  padding: 10px 14px 10px 42px;
+}
+:root[data-theme='signal'] .source-form .input-icon {
+  inset: 0 auto auto 12px;
+  width: 18px;
+  height: var(--signal-source-height);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+:root[data-theme='signal'] .source-form .input-icon svg {
+  display: block;
+  width: 18px;
+  height: 18px;
 }
 :root[data-theme='signal'] #source-form .button {
   min-width: 170px;
@@ -680,6 +710,86 @@
 :root[data-theme='signal'] .workspace:has(#sidebar[hidden]) {
   grid-template-columns: minmax(0, 1fr);
 }
+
+/* One theme face across real content, with stronger light only on emphasis. */
+:root[data-theme='signal']
+  :is(
+    .connection,
+    .message-meta,
+    .source-card > .section-heading,
+    .playback-copy,
+    .daylight-voice > summary,
+    .daylight-members > summary,
+    .daylight-utilities,
+    .daylight-utilities .screen-foot,
+    #sidebar-invite
+  ) {
+  font-size: 12px;
+}
+:root[data-theme='signal'] :is(.seek-preview strong, #seek-ruler) {
+  font-family: var(--signal-ui-font);
+  font-variant-numeric: tabular-nums;
+}
+:root[data-theme='signal'] :is(.time, .latency, .voice-volume, .message-meta) {
+  font-variant-numeric: tabular-nums;
+}
+:root[data-theme='signal']
+  :is(
+    .dialog-heading h2,
+    .welcome h2,
+    .appearance-heading h3,
+    .section-heading,
+    .cache-panel h3,
+    .cache-field > label,
+    .cache-field-label
+  ) {
+  text-shadow: var(--signal-tube-glow);
+  letter-spacing: 0.045em;
+}
+:root[data-theme='signal']
+  :is(
+    .button:not(.accent),
+    .text-button,
+    .advanced > summary,
+    .daylight-members > summary,
+    .cache-options > summary,
+    .member-info strong,
+    .voice-member strong,
+    .message-meta,
+    .room-tabs button:not([aria-pressed='true'])
+  ) {
+  text-shadow: var(--signal-control-glow);
+}
+:root[data-theme='signal']
+  :is(
+    .latency:not(.slow),
+    .welcome .tag,
+    #sidebar-invite,
+    .playback-tabs button[aria-selected='false']
+  ) {
+  text-shadow: var(--signal-lime-glow);
+}
+:root[data-theme='signal']
+  :is(
+    .accent,
+    .send-button,
+    .playback-tabs button[aria-selected='true'],
+    .room-tabs button[aria-pressed='true']
+  ) {
+  text-shadow: 0 0 1px #1c311c33;
+}
+:root[data-theme='signal']
+  :is(
+    .dialog-note,
+    .help-steps,
+    .voice-device-note,
+    .playback-copy,
+    .cache-field-note,
+    .cache-help,
+    input
+  ) {
+  text-shadow: var(--signal-soft-glow);
+}
 @media (max-width: 1160px) {
   :root[data-theme='signal'] .topbar {
     padding-inline: 28px;
@@ -776,6 +886,9 @@
   }
 }
 @media (max-width: 480px) {
+  :root[data-theme='signal'] {
+    --signal-source-height: 45px;
+  }
   :root[data-theme='signal'] .topbar {
     gap: 16px;
     padding: 22px 16px;
@@ -807,7 +920,7 @@
   :root[data-theme='signal'] .playback-tabs button {
     padding: 11px 5px;
     gap: 5px;
-    font-size: 10px;
+    font-size: 12px;
   }
   :root[data-theme='signal'] .playback-tabs button svg {
     width: 15px;
@@ -822,8 +935,7 @@
     min-height: 44px;
   }
   :root[data-theme='signal'] .source-form input {
-    font-size: 11px;
-    height: 45px;
+    font-size: 12px;
   }
   :root[data-theme='signal'] .chat-heading {
     padding: 17px;

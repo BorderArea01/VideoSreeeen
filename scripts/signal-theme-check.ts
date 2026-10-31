@@ -93,6 +93,37 @@ async function select(page: Page, value: string) {
   await page.locator('[data-close="settings-dialog"]').first().click();
   await page.evaluate(() => document.fonts.ready);
 }
+async function textFields(page: Page) {
+  await page.locator('#source-url').scrollIntoViewIfNeeded();
+  const spacing = await page.evaluate(() => {
+    const input = document.getElementById('source-url')!;
+    const icon = document.querySelector('#source-form .input-icon svg')!.getBoundingClientRect();
+    const box = input.getBoundingClientRect();
+    const message = document.querySelector<HTMLTextAreaElement>('#chat-input')!;
+    const style = getComputedStyle(message);
+    return {
+      padding: [style.paddingTop, style.paddingRight, style.paddingBottom, style.paddingLeft].map(
+        parseFloat,
+      ),
+      lines:
+        (message.clientHeight - parseFloat(style.paddingTop) - parseFloat(style.paddingBottom)) /
+        parseFloat(style.lineHeight),
+      iconCenterDifference: Math.abs(icon.y + icon.height / 2 - box.y - box.height / 2),
+      iconToTextGap: box.x + parseFloat(getComputedStyle(input).paddingLeft) - icon.right,
+      clickReachesInput:
+        document.elementFromPoint(icon.x + icon.width / 2, icon.y + icon.height / 2) === input,
+    };
+  });
+  assert.ok(
+    spacing.padding.every((n) => n >= 12),
+    JSON.stringify(spacing),
+  );
+  assert.ok(spacing.lines >= 2, JSON.stringify(spacing));
+  assert.ok(spacing.iconCenterDifference <= 1, JSON.stringify(spacing));
+  assert.ok(spacing.iconToTextGap >= 10, JSON.stringify(spacing));
+  assert.equal(spacing.clickReachesInput, true);
+  return spacing;
+}
 try {
   await mkdir('.local/screenshots', { recursive: true });
   const host = await context(2),
@@ -241,13 +272,22 @@ try {
   };
   evidence.typography = await owner.evaluate(async () => {
     await document.fonts.load('600 32px "Signal Tech"', 'VideoSreeeen');
-    await document.fonts.load('400 20px "Signal Tube"', '聊天室');
+    await document.fonts.load(
+      '400 20px "Signal Tube"',
+      '聊天内容，语音输入设备、缓存目录、网络波动与下一集。',
+    );
     const styles = Object.fromEntries(
       [
         ['brand', '.brand > span:last-child'],
         ['chatTitle', '.chat-heading > div:first-child'],
         ['bubble', '.bubble'],
         ['transport', '.transport'],
+        ['button', '#choose-link'],
+        ['sourceInput', '#source-url'],
+        ['chatInput', '#chat-input'],
+        ['member', '.member-info strong'],
+        ['settings', '#settings-title'],
+        ['cache', '#cache-options > summary'],
       ].map(([name, selector]) => {
         const style = getComputedStyle(document.querySelector(selector!)!);
         return [name, { font: style.fontFamily, glow: style.textShadow }];
@@ -255,7 +295,10 @@ try {
     );
     return {
       techLoaded: document.fonts.check('600 32px "Signal Tech"', 'VideoSreeeen'),
-      tubeLoaded: document.fonts.check('400 20px "Signal Tube"', '聊天室'),
+      tubeLoaded: document.fonts.check(
+        '400 20px "Signal Tube"',
+        '聊天内容，语音输入设备、缓存目录、网络波动与下一集。',
+      ),
       ...styles,
       sources: performance
         .getEntriesByType('resource')
@@ -269,10 +312,62 @@ try {
   assert.match(evidence.typography.chatTitle.font, /Signal Tube/);
   assert.notEqual(evidence.typography.brand.glow, 'none');
   assert.notEqual(evidence.typography.chatTitle.glow, 'none');
-  assert.equal(evidence.typography.bubble.glow, 'none');
+  assert.notEqual(evidence.typography.bubble.glow, 'none');
+  for (const name of [
+    'bubble',
+    'transport',
+    'button',
+    'sourceInput',
+    'chatInput',
+    'member',
+    'settings',
+    'cache',
+  ]) {
+    assert.match(evidence.typography[name].font, /Signal Tech/);
+    assert.match(evidence.typography[name].font, /Signal Tube/);
+  }
   assert.equal(evidence.typography.transport.glow, 'none');
   assert.ok(evidence.typography.sources.length > 0);
   assert.ok(evidence.typography.sources.every((s: string) => s === origin));
+  // Inspect actual rendered glyph providers, beyond a declared CSS font family.
+  const cdp = await host.newCDPSession(owner);
+  await cdp.send('DOM.enable');
+  await cdp.send('CSS.enable');
+  const doc = await cdp.send('DOM.getDocument');
+  const bubbleNode = await cdp.send('DOM.querySelector', {
+    nodeId: doc.root.nodeId,
+    selector: '.bubble',
+  });
+  const glyphs = await cdp.send('CSS.getPlatformFontsForNode', { nodeId: bubbleNode.nodeId });
+  assert.ok(
+    glyphs.fonts.some((f) => f.isCustomFont && /QingKe/i.test(f.familyName) && f.glyphCount >= 10),
+    JSON.stringify(glyphs),
+  );
+  assert.ok(
+    glyphs.fonts.some((f) => !f.isCustomFont && f.glyphCount > 0),
+    'Emoji keeps its native fallback',
+  );
+  evidence.typography.renderedChatFonts = glyphs.fonts;
+  await cdp.detach();
+  evidence.textFields = { desktop: await textFields(owner) };
+  await owner.locator('#chat-input').fill('第一行有留白\n第二行文字与表情 🟩');
+  await owner.locator('#chat-input').evaluate((e: HTMLTextAreaElement) => {
+    if (e.scrollHeight > e.clientHeight + 1)
+      throw new Error('Two chat lines should fit inside padding');
+  });
+  await owner
+    .locator('.chat-compose')
+    .screenshot({ path: '.local/screenshots/signal-chat-input.png' });
+  await owner.locator('#chat-input').fill('');
+  await owner
+    .locator('.chat-compose')
+    .screenshot({ path: '.local/screenshots/signal-chat-placeholder.png' });
+  const selectedURL = await owner.locator('#source-url').inputValue();
+  await owner.locator('#source-url').fill('');
+  await owner
+    .locator('#source-form')
+    .screenshot({ path: '.local/screenshots/signal-link-input.png' });
+  await owner.locator('#source-url').fill(selectedURL);
   await owner.evaluate(() => ((window as any).__glitchRoll = 0.5));
   await owner.locator('#source-url').hover();
   await owner.waitForTimeout(1200);
@@ -421,6 +516,7 @@ try {
   await owner.evaluate(() => document.exitFullscreen());
   for (const width of [390, 320]) {
     await owner.setViewportSize({ width, height: 844 });
+    evidence.textFields[width] = await textFields(owner);
     assert.equal(
       await owner.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
       true,
@@ -457,6 +553,12 @@ try {
     0,
   );
   await owner.emulateMedia({ reducedMotion: 'no-preference' });
+  await owner.emulateMedia({ forcedColors: 'active' });
+  assert.equal(
+    await owner.locator('.brand > span:last-child').evaluate((e) => getComputedStyle(e).textShadow),
+    'none',
+  );
+  await owner.emulateMedia({ forcedColors: 'none' });
   await owner.reload();
   assert.equal(await owner.locator('html').getAttribute('data-theme'), 'signal');
   assert.deepEqual(errors, []);
