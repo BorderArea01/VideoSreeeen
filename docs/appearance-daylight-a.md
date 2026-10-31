@@ -76,3 +76,14 @@ Edit this existing production photographic background. Preserve its exact photog
 - 公网 HTML、6 个资源及预览别名与本地构建逐字节一致。入口 `index-eqo0Z8D4.js` SHA-256 `7ad76bc3baaf3a8b00cdcfcb194c609886729a2f2fb37cfcdb86cf80fc48c089`；CSS `index-Ba_wyFUD.css` SHA-256 `36964723dad06c659c2a257154da243899f4a25a8962111a3382bcd74338b35d`；天空 SHA-256 `48e5b26cbf31428e23df58d83d4770edb5fdf4655f2dea3298e25e9f935cba69`。
 - 正式入口仍为 `assets/index-ByAASs3a.js`，未改房间 Worker / Durable Objects、用户房间状态、已发布客户端或助手，没有创建付费资源、TURN、标签或 Release。代码只推送现有开发分支，不触发手动客户端发布工作流。
 - dist 与 Pages 上传目录各约 3.18 MiB，比上一预览各减少约 2.09 MiB；服务端输出约 0.28 MiB。当前输出原位覆盖，继续使用 `.local/rollback/manifest.json` 中的唯一回退，没有新增候选安装包或备份目录。D 盘可用约 45.71 GiB。
+
+## 本次回执：按钮与原图分层切片
+
+- 运行时代码 `52ce2c5`；2026-10-31 已部署独立 Pages 预览 `b7bf764c`，固定地址 <https://b7bf764c.videosreeeen.pages.dev/?skin=glitch>，别名 <https://daylight-a.videosreeeen.pages.dev/?skin=glitch>。文章与动图参考下的最终合成层实现以此版本为准。
+- 构建、格式检查、本地与公网 `test:appearance` 通过；A 皮肤 `test:player-controls` 通过真实 MP4 / HLS、跳转与预览、精细定位、全屏与闲置隐藏，错误列表为空。视频和语音收听后换肤对象不变，聊天与拖拽 / 停靠正常；未访问物理麦克风，不代表手机真机验收。
+- 本地按钮标签 24px 高，实际活动为 8 行，图标有 8 个相同活动行及 10 个可见字形像素；公网同样为 8 个共享行、21 个可见图标字形像素。标签内容保持「同步此链接」，结束后装饰画布恢复透明。此检查覆盖 CSS 遮罩图标和标签，验证整层切片的共同运动。
+- 公网拖拽后旧边缘的深浅像素均为 0；实时采样测试底图得到 1,268 个同色碎片像素，未请求旧断层 PNG。视频、进度控件、输入和聊天正文仍避开装饰。
+- 实录 `.local/daylight-motion.webm` 为真实隔离页面捕获：5.4 秒、1152×768、588,567 字节；参考与输出的逐帧诊断图片检查后已清理，原始附件不变。README 中静止 / 活动截图已更新。
+- 公网 HTML、6 个资源和预览别名与本地构建逐字节一致。入口 `index-DcNDC8G6.js` SHA-256 `e8411ff1580f6dddb844b198f748ce85027735df54dec56305bc891f55bbaff3`；CSS `index-B9jvsOT-.css` SHA-256 `eac9a98faa270cc693340ea2870d5107592a69b8f216d4350948ad3fcd19dded`。背景资产保持原哈希。
+- 正式入口仍为 `assets/index-ByAASs3a.js`，房间 Worker / Durable Objects 未更换，没有影响正在观看的房间，没有新客户端包、标签、Release、付费资源或 TURN。代码和说明只推送当前开发分支。
+- dist 与 Pages 上传目录仍各约 3.18 MiB，服务端约 0.28 MiB，沿用唯一回退，没有新增备份或安装包；本轮结束 D 盘可用约 45.54 GiB。
