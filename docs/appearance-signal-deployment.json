@@ -1,0 +1,64 @@
+{
+  "at": "2026-10-31T10:00:35.802Z",
+  "url": "https://videosreeeen.pages.dev",
+  "entry": "./assets/index-BUyJWr3n.js",
+  "healthOK": true,
+  "bytes": 3359516,
+  "assets": [
+    {
+      "asset": "assets/daylight-sky-CuDSnB5C.png",
+      "bytes": 2403754,
+      "sha256": "48e5b26cbf31428e23df58d83d4770edb5fdf4655f2dea3298e25e9f935cba69"
+    },
+    {
+      "asset": "assets/disk-cache-worker-tARWS97h.js",
+      "bytes": 9062,
+      "sha256": "3df281cea431ab46b525e51292d665c6f3a825ee4b0e6cdfd1d9373562b0d597"
+    },
+    {
+      "asset": "assets/hls-fKiPGt_L.js",
+      "bytes": 592559,
+      "sha256": "6b4baffabedbc882577d7f69ecc7241c9f44c65ee9275c5d211bcdde90a2e0da"
+    },
+    {
+      "asset": "assets/index-B2i2qJGR.css",
+      "bytes": 78597,
+      "sha256": "82a925321cd7e2abb5e08c78367d249f64316b3d39962700e107e9b4ca841299"
+    },
+    {
+      "asset": "assets/index-BUyJWr3n.js",
+      "bytes": 245517,
+      "sha256": "a342af9ae9a740a0e2cad1ee72e61b496d8ed79d8343931d7b37eddc5f6ca032"
+    },
+    {
+      "asset": "assets/voice-worklet-CXYuCvEA.js",
+      "bytes": 4333,
+      "sha256": "bc3bb1f45329f025ba9ee6078125df5f37e52df201df618642455b9b52691401"
+    },
+    {
+      "asset": "downloads/VideoSreeeen-SourceHelper.zip",
+      "bytes": 18483,
+      "sha256": "4c94b6e9c51934513326402fd1d34a21d42da72f3a3052349113f85b38a13307"
+    },
+    {
+      "asset": "icon.svg",
+      "bytes": 387,
+      "sha256": "49ca5d04cc87f5431a96efc6f87beba6a6b5d8ce7e81c8c38e6868f4e6859f28"
+    },
+    {
+      "asset": "index.html",
+      "bytes": 542,
+      "sha256": "acdb728ccab65bd7dd059c1e957c3a03a9fec10fff3626b6c04df874e1152985"
+    },
+    {
+      "asset": "licenses/noble-hashes.txt",
+      "bytes": 1109,
+      "sha256": "4f221aee6e072336700c408c68ab3b96a3fc09f6aebe6f48f1bd99e5ef13faec"
+    },
+    {
+      "asset": "public-video-sw.js",
+      "bytes": 5173,
+      "sha256": "9dd4de83289652bbbe58ff7a987699ad7c0bdfb2c3a8b76cc885e450cd8639a1"
+    }
+  ]
+}

@@ -1,0 +1,806 @@
+@import './signal-motion.css';
+
+:root[data-theme='signal'] .signal-active > .signal-copy {
+  animation: signal-control-cut var(--signal-duration) steps(1, end);
+}
+:root[data-theme='signal'] .signal-active > .signal-counter {
+  animation: signal-control-counter var(--signal-duration) steps(1, end);
+}
+:root[data-theme='signal'] .signal-active > .signal-panel-fragments > .signal-panel-inverse {
+  animation: signal-panel-cut var(--signal-duration) steps(1, end);
+}
+:root[data-theme='signal'] .signal-active > .signal-panel-fragments > .signal-panel-counter {
+  animation: signal-panel-counter var(--signal-duration) steps(1, end);
+}
+:root[data-theme='signal'] #signal-field.signal-active > .signal-field-inverse {
+  animation: signal-field-cut var(--signal-duration) steps(1, end);
+}
+:root[data-theme='signal'] #signal-field.signal-active > .signal-field-counter {
+  animation: signal-field-counter var(--signal-duration) steps(1, end);
+}
+
+/* C · selected flat purple / acid-green study. No photograph or player decoration. */
+:root[data-theme='signal'] {
+  color-scheme: dark;
+  --bg: #18111f;
+  --panel: #211729;
+  --line: #594167;
+  --text: #f3e9ff;
+  --muted: #b9a8c6;
+  --orange: #c9ff4b;
+  --accent: #c9ff4b;
+  --signal-surface: linear-gradient(120deg, #211729, #261a31);
+  --signal-travel: 48px;
+  --signal-duration: 680ms;
+}
+:root[data-theme='signal'] body {
+  background: #18111f;
+}
+:root[data-theme='signal'] #app {
+  position: relative;
+  z-index: 1;
+}
+#signal-field {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: clip;
+  contain: strict;
+}
+#signal-field > span {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: #18111f;
+  background-image:
+    linear-gradient(125deg, transparent 0 72%, #ad71da0a 72% 86%, transparent 86%),
+    linear-gradient(0deg, transparent calc(100% - 1px), #ac7ac018 1px);
+  background-size:
+    100% 100%,
+    100% 104px;
+}
+#signal-field .signal-field-inverse {
+  opacity: 0;
+  filter: invert(1);
+}
+#signal-field .signal-field-counter {
+  opacity: 0;
+  background: #f3e9ff;
+  background-image: none;
+}
+:root[data-theme='signal'] .topbar {
+  max-width: 1644px;
+  height: 136px;
+  margin: auto;
+  padding: 26px 52px;
+  gap: 24px;
+  border-color: #59416780;
+}
+:root[data-theme='signal'] .brand {
+  font-size: clamp(29px, 3.4vw, 48px);
+  font-weight: 750;
+  letter-spacing: -2px;
+  gap: 13px;
+}
+:root[data-theme='signal'] .brand-light {
+  font-weight: inherit;
+  color: inherit;
+}
+:root[data-theme='signal'] .brand-mark {
+  background: var(--orange);
+  color: #1b1b1b;
+  border-radius: 0;
+  transform: none;
+  width: 39px;
+  height: 39px;
+  clip-path: polygon(0 0, 75% 0, 100% 25%, 100% 100%, 0 100%);
+}
+:root[data-theme='signal'] .brand-mark svg {
+  transform: none;
+}
+:root[data-theme='signal'] .brand small {
+  display: none;
+}
+:root[data-theme='signal'] .top-actions {
+  gap: 13px;
+}
+:root[data-theme='signal'] .connection {
+  font-size: 11px;
+}
+:root[data-theme='signal'] #platform {
+  display: none;
+}
+:root[data-theme='signal'] .workspace {
+  max-width: 1644px;
+  padding: 29px 52px 28px;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 20px 24px;
+  align-items: stretch;
+}
+:root[data-theme='signal'] .screen-column,
+:root[data-theme='signal'] .sidebar {
+  display: contents;
+}
+:root[data-theme='signal'] .room-heading {
+  grid-column: 1;
+  grid-row: 1;
+  margin: 0;
+  min-height: 51px;
+  align-items: flex-start;
+}
+:root[data-theme='signal'] .room-heading h1 {
+  font-size: 20px;
+  font-weight: 650;
+}
+:root[data-theme='signal'] .room-heading p {
+  font-size: 10px;
+  margin-top: 7px;
+  color: var(--muted);
+}
+:root[data-theme='signal'] .eyebrow {
+  font:
+    9px Consolas,
+    monospace;
+  letter-spacing: 0.16em;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+:root[data-theme='signal'] .player-shell {
+  grid-column: 1;
+  grid-row: 2;
+  isolation: isolate;
+  min-width: 0;
+  background: #000;
+  border: 1px solid #594167;
+  overflow: clip;
+  border-radius: 0;
+}
+:root[data-theme='signal'] .stage {
+  border: 0;
+  border-radius: 0;
+  aspect-ratio: 16/9;
+  background: #000;
+}
+:root[data-theme='signal'] .stage.lobby-stage {
+  min-height: 310px;
+}
+:root[data-theme='signal'] .transport {
+  border: 0;
+  border-radius: 0;
+  background: #191121;
+  --text: #f3e9ff;
+  --muted: #b9a8c6;
+  --orange: #c9ff4b;
+  --line: #594167;
+}
+:root[data-theme='signal'] :is(.player-settings-panel, .seek-preview) {
+  background: #211729;
+  color: var(--text);
+  border-color: var(--line);
+}
+:root[data-theme='signal'] :is(.chat-panel, .source-card, .members-card, .cache-options) {
+  background: var(--signal-surface);
+  border: 1px solid #594167;
+  border-radius: 0;
+  box-shadow: none;
+}
+:root[data-theme='signal'] .signal-panel {
+  position: relative;
+  isolation: isolate;
+}
+:root[data-theme='signal'] .signal-panel-fragments {
+  position: absolute;
+  inset: 0;
+  overflow: clip;
+  contain: strict;
+  z-index: 5;
+  pointer-events: none;
+  display: block;
+}
+:root[data-theme='signal'] .signal-panel-fragments > span {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  pointer-events: none;
+  background: var(--signal-surface);
+  clip-path: inset(50% 0 50%);
+}
+:root[data-theme='signal'] .signal-panel-inverse {
+  filter: invert(1);
+  border-top: 1px solid var(--text);
+  border-bottom: 1px solid var(--text);
+}
+:root[data-theme='signal'] .signal-panel-counter {
+  background: var(--text);
+}
+:root[data-theme='signal'] .chat-panel:not(.floating) {
+  grid-column: 2;
+  grid-row: 2;
+  height: auto;
+  min-height: 0;
+  flex: none;
+  border-color: #9164ad;
+  overflow: hidden;
+}
+:root[data-theme='signal'] .chat-panel.floating {
+  width: 330px;
+  height: 460px;
+  background: #211729;
+}
+:root[data-theme='signal'] .chat-heading {
+  padding: 21px 21px 18px;
+  border-color: var(--line);
+  gap: 10px;
+}
+:root[data-theme='signal'] .chat-heading > div {
+  font-size: 15px;
+  font-weight: 650;
+}
+:root[data-theme='signal'] .chat-heading > div > svg {
+  display: none;
+}
+:root[data-theme='signal'] .chat-messages {
+  padding: 23px 20px 10px;
+  scrollbar-color: #594167 transparent;
+}
+:root[data-theme='signal'] .message,
+:root[data-theme='signal'] .message.mine {
+  position: relative;
+  display: block;
+  padding-left: 43px;
+  min-height: 36px;
+  margin: 0 0 23px;
+  align-items: flex-start;
+}
+:root[data-theme='signal'] .message::before {
+  content: attr(data-initial);
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 31px;
+  height: 31px;
+  display: grid;
+  place-items: center;
+  background: #c9ff4b;
+  color: #18111f;
+  font-size: 11px;
+  font-weight: 650;
+}
+:root[data-theme='signal'] .message:nth-child(3n + 2)::before {
+  background: #f3e9ff;
+}
+:root[data-theme='signal'] .message:nth-child(3n)::before {
+  background: #ee76f4;
+}
+:root[data-theme='signal'] .message-meta {
+  font-size: 11px;
+  color: var(--muted);
+  margin: 0 0 5px;
+}
+:root[data-theme='signal'] .bubble,
+:root[data-theme='signal'] .mine .bubble {
+  max-width: 100%;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--text);
+  font-size: 12px;
+  line-height: 1.75;
+}
+:root[data-theme='signal'] .chat-compose {
+  padding: 14px 19px 19px;
+  background: transparent;
+  border-top: 1px solid var(--line);
+  position: relative;
+}
+:root[data-theme='signal'] .chat-compose textarea {
+  background: #30203b;
+  border: 1px solid #594167;
+  border-radius: 0;
+  color: var(--text);
+  font-size: 12px;
+}
+:root[data-theme='signal'] .chat-empty {
+  color: var(--muted);
+}
+:root[data-theme='signal'] .chat-empty > span {
+  background: #30203b;
+}
+:root[data-theme='signal'] .sidebar-foot {
+  display: none;
+}
+:root[data-theme='signal'] .source-card {
+  grid-column: 1/-1;
+  grid-row: 3;
+  margin: 0;
+  padding: 20px 25px;
+  display: grid;
+  grid-template-columns: minmax(300px, 0.95fr) minmax(0, 1.6fr);
+  gap: 14px 26px;
+  border-color: #9164ad;
+}
+:root[data-theme='signal'] .source-card > .section-heading {
+  grid-column: 1/-1;
+  font-size: 10px;
+  color: var(--muted);
+}
+:root[data-theme='signal'] .playback-tabs {
+  grid-column: 1;
+  grid-row: 2;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 5px;
+  margin: 0;
+  border: 0;
+}
+:root[data-theme='signal'] .playback-tabs button {
+  padding: 12px 10px;
+  min-height: 44px;
+  gap: 7px;
+  border: 0;
+  border-radius: 0;
+  font-size: 12px;
+  text-align: center;
+  color: var(--muted);
+  background: #211729;
+  justify-content: center;
+}
+:root[data-theme='signal'] .playback-tabs button[aria-selected='true'] {
+  background: #c9ff4b;
+  color: #1b1b1b;
+}
+:root[data-theme='signal'] .playback-tabs button svg {
+  width: 16px;
+  height: 16px;
+}
+:root[data-theme='signal'] .playback-tabs small {
+  display: none;
+}
+:root[data-theme='signal'] .playback-choice {
+  grid-column: 2;
+  grid-row: 2 / span 2;
+  min-width: 0;
+  align-self: center;
+}
+:root[data-theme='signal'] .playback-copy {
+  font-size: 10px;
+  line-height: 1.6;
+  color: var(--muted);
+  margin-top: 0;
+}
+:root[data-theme='signal'] .source-form {
+  gap: 12px;
+}
+:root[data-theme='signal'] .source-form input {
+  height: 48px;
+  background: #30203b;
+  color: var(--text);
+  border: 1px solid #594167;
+  border-radius: 0;
+  font-size: 12px;
+}
+:root[data-theme='signal'] #source-form .button {
+  min-width: 170px;
+  min-height: 48px;
+  font-size: 12px;
+}
+:root[data-theme='signal'] .button {
+  border-radius: 0;
+}
+:root[data-theme='signal'] :is(.accent, .send-button) {
+  background: #c9ff4b;
+  color: #1b1b1b;
+  box-shadow: none;
+}
+:root[data-theme='signal'] .accent:hover {
+  background: #c9ff4b;
+}
+:root[data-theme='signal'] :is(.soft, .room-tabs, .emoji-picker, .player-settings-panel) {
+  background: #30203b;
+  color: var(--text);
+  border-color: #594167;
+}
+:root[data-theme='signal'] .outline {
+  border-color: #9164ad;
+}
+:root[data-theme='signal'] .signal-control {
+  position: relative;
+  isolation: isolate;
+  overflow: clip;
+  contain: paint;
+}
+:root[data-theme='signal']
+  :is(.accent.signal-control, .playback-tabs button[aria-selected='true'], .send-button) {
+  clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px);
+}
+:root[data-theme='signal'] :is(.signal-copy, .signal-counter) {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  gap: inherit;
+  align-items: center;
+  justify-content: center;
+  padding: inherit;
+  font: inherit;
+  color: inherit;
+  background: inherit;
+  border-radius: inherit;
+  opacity: 0;
+  pointer-events: none;
+  z-index: 3;
+  clip-path: inset(50% 0 50%);
+}
+:root[data-theme='signal'] .signal-copy {
+  filter: invert(1);
+}
+:root[data-theme='signal'] .signal-counter {
+  filter: none;
+  text-shadow:
+    -1px 0 #ee76f4,
+    1px 0 #c9ff4b;
+}
+:root[data-theme='signal'] .daylight-voice {
+  grid-column: 1;
+  grid-row: 3;
+  align-self: center;
+  justify-self: start;
+  padding: 0 0 0 12px;
+  border-left: 1px solid var(--line);
+  display: block;
+}
+:root[data-theme='signal'] .daylight-voice > summary {
+  min-height: 36px;
+  color: var(--text);
+  font-size: 11px;
+  font-weight: 500;
+  gap: 10px;
+}
+:root[data-theme='signal'] .daylight-mic {
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: #c9ff4b;
+}
+:root[data-theme='signal'] .daylight-mic svg {
+  width: 20px;
+  height: 20px;
+}
+:root[data-theme='signal'] .daylight-voice .voice-card {
+  position: absolute;
+  top: calc(100% + 12px);
+  left: 0;
+  width: 320px;
+  max-width: calc(100vw - 40px);
+  padding: 20px;
+  z-index: 35;
+  background: #211729;
+  box-shadow: 0 14px 40px #0008;
+}
+:root[data-theme='signal'] .daylight-utilities {
+  grid-column: 1/-1;
+  grid-row: 4;
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  padding: 0;
+}
+:root[data-theme='signal'] .daylight-members {
+  color: var(--text);
+  z-index: 10;
+}
+:root[data-theme='signal'] .daylight-members > summary {
+  background: #211729;
+  border: 1px solid #594167;
+  border-radius: 0;
+  color: var(--text);
+  font-size: 10px;
+}
+:root[data-theme='signal'] .daylight-members > .members-card {
+  background: #211729;
+  border-radius: 0;
+  box-shadow: 0 12px 35px #0007;
+}
+:root[data-theme='signal'] .daylight-utilities .cache-options {
+  margin: 0;
+  min-width: 200px;
+  max-width: 620px;
+}
+:root[data-theme='signal'] .daylight-utilities .screen-foot {
+  margin: 0 0 0 auto;
+  padding: 10px 0;
+  color: var(--muted);
+  font-size: 10px;
+  gap: 20px;
+}
+:root[data-theme='signal']
+  .workspace:has(#choose-link[aria-selected='false'])
+  .daylight-utilities
+  .cache-options {
+  display: none;
+}
+:root[data-theme='signal'] #sidebar-invite {
+  width: auto;
+  margin: 0;
+  padding: 7px 8px;
+  color: #c9ff4b;
+  font-size: 10px;
+  border: 1px solid #594167;
+  flex-shrink: 0;
+}
+:root[data-theme='signal']
+  :is(
+    .member-info small,
+    .voice-status,
+    .voice-volume,
+    .voice-devices label,
+    .voice-device-note,
+    .advanced summary,
+    .cache-field-note,
+    .cache-summary-end,
+    .cache-help,
+    .dialog-note
+  ) {
+  color: var(--muted);
+}
+:root[data-theme='signal'] :is(.avatar, .section-heading b) {
+  background: #30203b;
+  color: #c9ff4b;
+  border-radius: 0;
+}
+:root[data-theme='signal'] .latency {
+  color: #c9ff4b;
+}
+:root[data-theme='signal'] .latency.slow {
+  color: #f1bb74;
+}
+:root[data-theme='signal'] :is(input, textarea)::placeholder {
+  color: #b9a8c6;
+}
+:root[data-theme='signal'] :is(dialog, .toast) {
+  background: #211729;
+  color: var(--text);
+  border-color: #594167;
+  border-radius: 0;
+}
+:root[data-theme='signal'] dialog::backdrop {
+  background: #0e0818b3;
+  backdrop-filter: blur(3px);
+}
+:root[data-theme='signal'] .room-tabs button[aria-pressed='true'] {
+  background: #c9ff4b;
+  color: #1b1b1b;
+}
+:root[data-theme='signal'] :is(dialog input, .voice-devices select, .cache-settings select) {
+  background: #30203b;
+  color: var(--text);
+  border-color: #594167;
+  border-radius: 0;
+}
+:root[data-theme='signal'] .welcome {
+  background: linear-gradient(125deg, #211729 0 72%, #30203b 72%);
+  color: var(--text);
+}
+:root[data-theme='signal'] :is(.scene-orb, .scene-lines) {
+  display: none;
+}
+:root[data-theme='signal'] .welcome .tag {
+  color: #c9ff4b;
+}
+:root[data-theme='signal'] .app-foot {
+  background: transparent;
+  border-color: #59416755;
+  color: var(--muted);
+}
+:root[data-theme='signal']
+  :is(.floating, .daylight-voice[open], .daylight-members[open])
+  :is(.signal-copy, .signal-counter, .signal-panel-fragments),
+:root[data-theme='signal'] .floating > .signal-panel-fragments,
+:root[data-theme='signal']
+  .page-cinema
+  :is(#signal-field, .signal-copy, .signal-counter, .signal-panel-fragments),
+:root[data-theme='signal']
+  body:has(:fullscreen)
+  :is(#signal-field, .signal-copy, .signal-counter, .signal-panel-fragments) {
+  display: none;
+}
+:root[data-theme='signal'] .page-cinema .player-shell,
+:root[data-theme='signal'] .player-shell:fullscreen {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  border: 0;
+  border-radius: 0;
+}
+:root[data-theme='signal'] .page-cinema .stage,
+:root[data-theme='signal'] .player-shell:fullscreen .stage {
+  aspect-ratio: auto;
+  height: auto;
+}
+:root[data-theme='signal'] .page-cinema #sidebar {
+  display: flex;
+}
+:root[data-theme='signal'] .page-cinema .chat-panel:not(.floating) {
+  height: auto;
+  min-height: 300px;
+}
+:root[data-theme='signal'] .workspace:has(#sidebar[hidden]) {
+  grid-template-columns: minmax(0, 1fr);
+}
+@media (max-width: 1160px) {
+  :root[data-theme='signal'] .topbar {
+    padding-inline: 28px;
+    height: 125px;
+  }
+  :root[data-theme='signal'] .workspace {
+    padding-inline: 28px;
+    grid-template-columns: minmax(0, 1fr) 285px;
+    gap: 18px;
+  }
+  :root[data-theme='signal'] .source-card {
+    grid-template-columns: minmax(0, 1fr);
+    padding: 20px;
+  }
+  :root[data-theme='signal'] .source-card > .section-heading {
+    grid-column: 1/-1;
+    grid-row: 1;
+  }
+  :root[data-theme='signal'] .playback-tabs {
+    grid-column: 1;
+    grid-row: 2;
+  }
+  :root[data-theme='signal'] .playback-choice {
+    grid-column: 1;
+    grid-row: 3;
+  }
+  :root[data-theme='signal'] .daylight-voice {
+    grid-column: 1;
+    grid-row: 4;
+  }
+}
+@media (max-width: 850px) {
+  :root[data-theme='signal'] .topbar {
+    height: auto;
+    min-height: 105px;
+    padding: 24px 18px;
+    flex-wrap: wrap;
+    gap: 16px;
+  }
+  :root[data-theme='signal'] .brand {
+    font-size: 32px;
+    letter-spacing: -1.5px;
+  }
+  :root[data-theme='signal'] .brand-mark {
+    width: 30px;
+    height: 30px;
+  }
+  :root[data-theme='signal'] .top-actions {
+    gap: 7px;
+  }
+  :root[data-theme='signal'] .top-actions .connection {
+    display: none;
+  }
+  :root[data-theme='signal'] .workspace {
+    padding: 24px 16px;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 18px;
+  }
+  :root[data-theme='signal'] .room-heading {
+    grid-row: 1;
+    grid-column: 1;
+  }
+  :root[data-theme='signal'] .player-shell {
+    grid-row: 2;
+    grid-column: 1;
+  }
+  :root[data-theme='signal'] .source-card {
+    grid-row: 3;
+    grid-column: 1;
+  }
+  :root[data-theme='signal'] .chat-panel:not(.floating) {
+    grid-row: 4;
+    grid-column: 1;
+    height: 420px;
+  }
+  :root[data-theme='signal'] .daylight-utilities {
+    grid-row: 5;
+    grid-column: 1;
+  }
+  :root[data-theme='signal'] .daylight-voice .voice-card {
+    left: 0;
+    right: auto;
+  }
+  :root[data-theme='signal'] .daylight-utilities .screen-foot {
+    width: 100%;
+    margin: 0;
+    justify-content: space-between;
+  }
+  :root[data-theme='signal'] .source-form {
+    flex-wrap: nowrap;
+  }
+  :root[data-theme='signal'] #source-form .button {
+    min-width: 125px;
+  }
+}
+@media (max-width: 480px) {
+  :root[data-theme='signal'] .topbar {
+    gap: 16px;
+    padding: 22px 16px;
+  }
+  :root[data-theme='signal'] .brand {
+    font-size: 30px;
+  }
+  :root[data-theme='signal'] .brand-mark {
+    width: 29px;
+    height: 29px;
+  }
+  :root[data-theme='signal'] .top-actions {
+    margin-left: auto;
+  }
+  :root[data-theme='signal'] .button.small {
+    padding: 9px 10px;
+    font-size: 11px;
+  }
+  :root[data-theme='signal'] .workspace {
+    padding: 20px 14px;
+  }
+  :root[data-theme='signal'] .room-heading h1 {
+    font-size: 18px;
+  }
+  :root[data-theme='signal'] .source-card {
+    padding: 17px 13px;
+    gap: 14px;
+  }
+  :root[data-theme='signal'] .playback-tabs button {
+    padding: 11px 5px;
+    gap: 5px;
+    font-size: 10px;
+  }
+  :root[data-theme='signal'] .playback-tabs button svg {
+    width: 15px;
+    height: 15px;
+  }
+  :root[data-theme='signal'] #source-form {
+    flex-direction: column;
+    gap: 10px;
+  }
+  :root[data-theme='signal'] #source-form .button {
+    width: 100%;
+    min-height: 44px;
+  }
+  :root[data-theme='signal'] .source-form input {
+    font-size: 11px;
+    height: 45px;
+  }
+  :root[data-theme='signal'] .chat-heading {
+    padding: 17px;
+  }
+  :root[data-theme='signal'] .chat-compose {
+    padding: 13px 15px 15px;
+  }
+  :root[data-theme='signal'] .daylight-voice .voice-card {
+    max-width: calc(100vw - 42px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  :root[data-theme='signal'] *,
+  :root[data-theme='signal'] *::before,
+  :root[data-theme='signal'] *::after {
+    animation: none !important;
+  }
+}
+@media (forced-colors: active) {
+  #signal-field,
+  [data-signal-layer] {
+    display: none !important;
+  }
+  :root[data-theme='signal'] :is(.chat-panel, .source-card, .members-card, .cache-options) {
+    background: Canvas;
+    color: CanvasText;
+    border-color: CanvasText;
+  }
+}

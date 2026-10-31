@@ -4,6 +4,7 @@ import { icon } from './icons';
 export class DaylightLayout {
   private anchors = new Map<HTMLElement, Comment>();
   private active = false;
+  private kind: 'glitch' | 'signal' = 'glitch';
   private utilities = document.createElement('div');
   private members = document.createElement('details');
   private voice = document.createElement('details');
@@ -17,9 +18,17 @@ export class DaylightLayout {
     // PageFullscreen emits this event on the player shell without bubbling.
     document.getElementById('player-shell')?.addEventListener('cinemachange', () => this.arrange());
   }
-  setActive(active: boolean) {
+  setActive(active: boolean, kind: 'glitch' | 'signal' = 'glitch') {
+    if (this.kind !== kind) this.restore();
+    this.kind = kind;
     this.active = active;
     this.arrange();
+  }
+  private restore() {
+    for (const [node, anchor] of this.anchors) anchor.after(node);
+    this.utilities.remove();
+    this.voice.remove();
+    this.voice.open = this.members.open = false;
   }
   private move(node: HTMLElement | null, parent: HTMLElement) {
     if (!node || node.parentElement === parent) return;
@@ -37,10 +46,7 @@ export class DaylightLayout {
       !document.body.classList.contains('page-cinema') &&
       !document.fullscreenElement;
     if (!visible) {
-      for (const [node, anchor] of this.anchors) anchor.after(node);
-      this.utilities.remove();
-      this.voice.remove();
-      this.voice.open = this.members.open = false;
+      this.restore();
       return;
     }
     const topbar = document.querySelector<HTMLElement>('.topbar')!;
@@ -49,7 +55,7 @@ export class DaylightLayout {
     workspace.append(this.utilities);
     picker.append(this.voice);
     this.utilities.append(this.members);
-    this.move(document.querySelector('.room-heading'), topbar);
+    if (this.kind === 'glitch') this.move(document.querySelector('.room-heading'), topbar);
     this.move(document.getElementById('voice-panel'), this.voice);
     this.move(document.querySelector('.sidebar > .members-card:not(.voice-card)'), this.members);
     this.move(document.getElementById('cache-options'), this.utilities);

@@ -20,6 +20,7 @@
     "test": "tsx --test --test-concurrency=1 tests/*.test.ts",
     "test:ui": "tsx scripts/ui-check.ts",
     "test:appearance": "tsx scripts/appearance-check.ts",
+    "test:signal-theme": "tsx scripts/signal-theme-check.ts",
     "test:onboarding": "tsx scripts/onboarding-check.ts",
     "test:bilibili": "tsx scripts/bilibili-check.ts",
     "format": "prettier --write \"**/*.{ts,mjs,cjs,js,json,css,html,yml,yaml,md,java}\"",

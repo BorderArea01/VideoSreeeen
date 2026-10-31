@@ -1,0 +1,234 @@
+@keyframes signal-control-cut {
+  0%,
+  100% {
+    opacity: 0;
+    clip-path: inset(50% 0 50%);
+    transform: translateX(0);
+  }
+  5%,
+  13% {
+    opacity: 1;
+    clip-path: inset(7px 0 calc(100% - 9px));
+    transform: translateX(-18px);
+  }
+  19%,
+  28% {
+    opacity: 1;
+    clip-path: inset(24px 0 calc(100% - 25px));
+    transform: translateX(23px);
+  }
+  34%,
+  45% {
+    opacity: 0;
+  }
+  51%,
+  63% {
+    opacity: 1;
+    clip-path: inset(35px 0 calc(100% - 38px));
+    transform: translateX(-12px);
+  }
+  70%,
+  78% {
+    opacity: 1;
+    clip-path: inset(16px 0 calc(100% - 18px));
+    transform: translateX(9px);
+  }
+  85% {
+    opacity: 0;
+  }
+}
+@keyframes signal-control-counter {
+  0%,
+  100% {
+    opacity: 0;
+    clip-path: inset(50% 0 50%);
+    transform: translateX(0);
+  }
+  5%,
+  13% {
+    opacity: 1;
+    clip-path: inset(11px 0 calc(100% - 12px));
+    transform: translateX(22px);
+  }
+  19%,
+  28% {
+    opacity: 1;
+    clip-path: inset(27px 0 calc(100% - 29px));
+    transform: translateX(-17px);
+  }
+  34%,
+  45% {
+    opacity: 0;
+  }
+  51%,
+  63% {
+    opacity: 1;
+    clip-path: inset(39px 0 calc(100% - 40px));
+    transform: translateX(16px);
+  }
+  70%,
+  78% {
+    opacity: 1;
+    clip-path: inset(20px 0 calc(100% - 21px));
+    transform: translateX(-11px);
+  }
+  85% {
+    opacity: 0;
+  }
+}
+@keyframes signal-panel-cut {
+  0%,
+  100% {
+    opacity: 0;
+    clip-path: inset(50% 0 50%);
+    transform: translateX(0);
+  }
+  5%,
+  13% {
+    opacity: 1;
+    clip-path: inset(4px 0 calc(100% - 6px));
+    transform: translateX(calc(var(--signal-travel) * -1));
+  }
+  19%,
+  28% {
+    opacity: 1;
+    clip-path: inset(calc(100% - 8px) 0 6px);
+    transform: translateX(var(--signal-travel));
+  }
+  34%,
+  45% {
+    opacity: 0;
+  }
+  51%,
+  63% {
+    opacity: 1;
+    clip-path: inset(11px 0 calc(100% - 12px));
+    transform: translateX(-27px);
+  }
+  70%,
+  78% {
+    opacity: 1;
+    clip-path: inset(calc(100% - 4px) 0 1px);
+    transform: translateX(33px);
+  }
+  85% {
+    opacity: 0;
+  }
+}
+@keyframes signal-panel-counter {
+  0%,
+  100% {
+    opacity: 0;
+    clip-path: inset(50% 0 50%);
+    transform: translateX(0);
+  }
+  5%,
+  13% {
+    opacity: 1;
+    clip-path: inset(8px 0 calc(100% - 9px));
+    transform: translateX(36px);
+  }
+  19%,
+  28% {
+    opacity: 1;
+    clip-path: inset(calc(100% - 13px) 0 12px);
+    transform: translateX(-46px);
+  }
+  34%,
+  45% {
+    opacity: 0;
+  }
+  51%,
+  63% {
+    opacity: 1;
+    clip-path: inset(15px 0 calc(100% - 17px));
+    transform: translateX(24px);
+  }
+  70%,
+  78% {
+    opacity: 1;
+    clip-path: inset(calc(100% - 9px) 0 8px);
+    transform: translateX(-31px);
+  }
+  85% {
+    opacity: 0;
+  }
+}
+@keyframes signal-field-cut {
+  0%,
+  100% {
+    opacity: 0;
+    clip-path: inset(50% 0 50%);
+    transform: translateX(0);
+  }
+  5%,
+  13% {
+    opacity: 1;
+    clip-path: inset(104px 0 calc(100% - 106px));
+    transform: translateX(-54px);
+  }
+  19%,
+  28% {
+    opacity: 1;
+    clip-path: inset(204px 0 calc(100% - 205px));
+    transform: translateX(71px);
+  }
+  34%,
+  45% {
+    opacity: 0;
+  }
+  51%,
+  63% {
+    opacity: 1;
+    clip-path: inset(calc(100% - 28px) 0 26px);
+    transform: translateX(-65px);
+  }
+  70%,
+  78% {
+    opacity: 1;
+    clip-path: inset(156px 0 calc(100% - 158px));
+    transform: translateX(42px);
+  }
+  85% {
+    opacity: 0;
+  }
+}
+@keyframes signal-field-counter {
+  0%,
+  100% {
+    opacity: 0;
+    clip-path: inset(50% 0 50%);
+    transform: translateX(0);
+  }
+  5%,
+  13% {
+    opacity: 1;
+    clip-path: inset(110px 0 calc(100% - 111px));
+    transform: translateX(48px);
+  }
+  19%,
+  28% {
+    opacity: 1;
+    clip-path: inset(209px 0 calc(100% - 210px));
+    transform: translateX(-62px);
+  }
+  34%,
+  45% {
+    opacity: 0;
+  }
+  51%,
+  63% {
+    opacity: 1;
+    clip-path: inset(calc(100% - 33px) 0 32px);
+    transform: translateX(55px);
+  }
+  70%,
+  78% {
+    opacity: 1;
+    clip-path: inset(161px 0 calc(100% - 162px));
+    transform: translateX(-39px);
+  }
+  85% {
+    opacity: 0;
+  }
+}

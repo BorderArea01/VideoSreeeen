@@ -1,4 +1,5 @@
 @import './daylight.css';
+@import './signal.css';
 
 /* Appearance controls share the original palette, even when the theme is changed. */
 .appearance-settings {
@@ -23,7 +24,7 @@
 }
 .theme-choices {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   padding: 0;
   margin: 12px 0;
   border: 0;
@@ -77,6 +78,9 @@ dialog .theme-choice input {
 .theme-swatch-glitch {
   background: #438bd0 url('./assets/themes/daylight-sky.png') center / cover;
 }
+.theme-swatch-signal {
+  background: linear-gradient(125deg, #18111f, #30203b);
+}
 .theme-swatch i,
 .theme-swatch b,
 .theme-swatch em {
@@ -112,6 +116,18 @@ dialog .theme-choice input {
     5px -4px 0 -2px #ef78ff,
     -5px 5px 0 -2px #61f1ff;
 }
+.theme-swatch-signal i {
+  background: #211729;
+  border-color: #9164ad;
+}
+.theme-swatch-signal b {
+  background: #c9ff4b;
+  border-radius: 0;
+  box-shadow: 8px -5px 0 -3px #3600b4;
+}
+.theme-swatch-signal em {
+  background: #30203b;
+}
 .theme-choice-name {
   display: flex;
   align-items: center;
@@ -132,4 +148,24 @@ dialog .theme-choice input {
 .appearance-auto .text-button {
   min-height: 32px;
   font-size: 11px;
+}
+@media (max-width: 480px) {
+  .theme-choices {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 9px;
+  }
+  dialog .theme-choice:last-child {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: 82px minmax(0, 1fr);
+    align-items: center;
+    gap: 10px;
+  }
+  .theme-choice:last-child .theme-swatch {
+    height: 64px;
+  }
+  .theme-choice-name {
+    font-size: 11px;
+    padding-inline: 3px;
+  }
 }
