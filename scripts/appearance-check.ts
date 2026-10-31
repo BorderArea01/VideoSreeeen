@@ -90,6 +90,26 @@ async function close(page: Page) {
 }
 const overflow = (page: Page) =>
   page.evaluate(() => document.documentElement.scrollWidth > innerWidth);
+async function edgeTones(page: Page, r: { x: number; y: number; width: number; height: number }) {
+  return page.evaluate((r) => {
+    const canvas = document.querySelector<HTMLCanvasElement>('#theme-fragments')!;
+    const scale = canvas.width / canvas.getBoundingClientRect().width;
+    const x = Math.max(0, Math.ceil((r.x + r.width + 1) * scale));
+    const y = Math.max(0, Math.ceil(r.y * scale));
+    const w = Math.min(canvas.width - x, Math.floor(70 * scale));
+    const h = Math.min(canvas.height - y, Math.floor(r.height * scale));
+    if (w < 1 || h < 1) return { dark: 0, light: 0 };
+    const pixels = canvas.getContext('2d')!.getImageData(x, y, w, h).data;
+    let dark = 0,
+      light = 0;
+    for (let i = 0; i < pixels.length; i += 4) {
+      if (pixels[i + 3]! < 100) continue;
+      if (pixels[i]! < 80 && pixels[i + 1]! < 115 && pixels[i + 2]! < 155) dark++;
+      if (pixels[i]! > 175 && pixels[i + 1]! > 175 && pixels[i + 2]! > 175) light++;
+    }
+    return { dark, light };
+  }, r);
+}
 try {
   await mkdir('.local/screenshots', { recursive: true });
   await mkdir('docs/screenshots', { recursive: true });
@@ -226,16 +246,31 @@ try {
   await viewer.locator('#send-button').click();
   await owner.locator('.bubble').filter({ hasText: '观众端收到消息，视频继续播放。' }).waitFor();
   proof.independentViewerAndChat = true;
+  const edgeHome = await owner.locator('#chat-panel').boundingBox();
+  assert.ok(edgeHome);
+  const homeTones = await edgeTones(owner, edgeHome);
+  assert.ok(homeTones.dark > 30 && homeTones.light > 30, JSON.stringify(homeTones));
   const drag = await owner.locator('#chat-drag').boundingBox();
   assert.ok(drag);
   await owner.mouse.move(drag.x + 40, drag.y + 10);
   await owner.mouse.down();
-  await owner.mouse.move(drag.x - 60, drag.y + 35);
+  await owner.mouse.move(drag.x - 260, drag.y + 35);
   await owner.mouse.up();
   assert.equal(
     await owner.locator('#chat-panel').evaluate((e) => getComputedStyle(e).position),
     'fixed',
   );
+  await owner.waitForTimeout(1400);
+  const edgeMoved = await owner.locator('#chat-panel').boundingBox();
+  assert.ok(edgeMoved);
+  const movedTones = await edgeTones(owner, edgeMoved);
+  const abandonedTones = await edgeTones(owner, edgeHome);
+  assert.ok(movedTones.dark > 30);
+  assert.ok(
+    abandonedTones.dark < homeTones.dark * 0.1,
+    JSON.stringify({ homeTones, movedTones, abandonedTones }),
+  );
+  proof.edgeAttachedToMovingContainer = { homeTones, movedTones, abandonedTones };
   await owner.locator('#chat-dock').click();
   proof.floatingChatPreserved = true;
   await owner.locator('#play-button').click();
@@ -342,16 +377,18 @@ try {
     await owner.waitForTimeout(100);
     const bounds = await owner.locator('#theme-scene').boundingBox();
     assert.ok(bounds && bounds.width >= size.width - 1 && bounds.height >= size.height - 1);
-    assert.equal(
-      await owner.locator('#theme-scene').evaluate((e: HTMLCanvasElement) => {
-        const c = e.getContext('2d')!;
-        return [
-          c.getImageData(0, 0, 1, 1).data[3],
-          c.getImageData(e.width - 1, e.height - 1, 1, 1).data[3],
-        ].every((x) => x === 255);
-      }),
-      true,
-    );
+    const photo = await owner.locator('#theme-photo').evaluate((e: HTMLImageElement) => {
+      const r = e.getBoundingClientRect();
+      return {
+        loaded: e.complete && e.naturalWidth >= 1536,
+        width: r.width,
+        height: r.height,
+        fit: getComputedStyle(e).objectFit,
+      };
+    });
+    assert.equal(photo.loaded, true);
+    assert.equal(photo.fit, 'cover');
+    assert.ok(photo.width >= size.width - 1 && photo.height >= size.height - 1);
   }
   await owner.setViewportSize({ width: 1440, height: 1000 });
   const cdp = await glitchContext.newCDPSession(owner);
@@ -359,6 +396,14 @@ try {
   await owner.screenshot({ path: '.local/screenshots/theme-zoom.png' });
   await cdp.send('Emulation.setPageScaleFactor', { pageScaleFactor: 1 });
   proof.backgroundResizesAndZooms = true;
+  assert.equal(await owner.locator('.daylight-edition').count(), 0);
+  const heading = await owner.locator('.brand').evaluate((e) => ({
+    color: getComputedStyle(e).color,
+    plate: getComputedStyle(e, '::before').backgroundImage,
+  }));
+  assert.equal(heading.color, 'rgb(7, 43, 88)');
+  assert.match(heading.plate, /linear-gradient/);
+  proof.cleanPhotoAndReadableBrand = true;
   await owner.emulateMedia({ reducedMotion: 'reduce' });
   await owner.locator('#source-form .button').hover();
   assert.equal(
@@ -437,6 +482,8 @@ try {
     true,
   );
   await owner.keyboard.press('Escape');
+  await owner.locator('#theme-photo').waitFor({ state: 'visible' });
+  await owner.locator('#theme-scene').waitFor({ state: 'visible' });
   proof.fullscreenPreserved = true;
   await owner.locator('#appearance-button').click();
   await owner.locator('input[name="appearance"][value="glitch"]').focus();

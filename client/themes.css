@@ -75,7 +75,7 @@ dialog .theme-choice input {
   background: linear-gradient(125deg, #16151b, #47343b);
 }
 .theme-swatch-glitch {
-  background: #438bd0 url('./assets/themes/daylight-sky.webp') center / cover;
+  background: #438bd0 url('./assets/themes/daylight-sky.png') center / cover;
 }
 .theme-swatch i,
 .theme-swatch b,

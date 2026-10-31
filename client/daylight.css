@@ -1,6 +1,6 @@
 /* A · Daylight Rupture: proportions and material follow the selected reference. */
 :root[data-theme='glitch'] {
-  color-scheme: light;
+  color-scheme: only light;
   --bg: #1165ba;
   --panel: #f5f8ffed;
   --line: #1d56a529;
@@ -10,8 +10,9 @@
   --accent: #0054e8;
 }
 :root[data-theme='glitch'] body {
-  background: #1165ba url('./assets/themes/daylight-sky.webp') center / cover fixed;
+  background: #1165ba;
 }
+#theme-photo,
 #theme-scene,
 #theme-fragments {
   position: fixed;
@@ -20,6 +21,11 @@
   height: 100%;
   pointer-events: none;
   contain: strict;
+}
+#theme-photo {
+  object-fit: cover;
+  object-position: center;
+  z-index: 0;
 }
 #theme-scene {
   z-index: 0;
@@ -44,13 +50,28 @@
   background: none;
 }
 :root[data-theme='glitch'] .brand {
+  position: relative;
+  isolation: isolate;
+  padding: 9px 16px 11px;
+  margin-left: -16px;
   transform: translateX(14px);
   font-size: clamp(34px, 3.5vw, 57px);
   font-weight: 800;
   letter-spacing: -2.6px;
-  color: #00398f;
+  color: #072b58;
+  text-shadow: 0 1px 0 #ffffff;
   gap: 0;
   line-height: 1;
+}
+:root[data-theme='glitch'] .brand::before {
+  content: '';
+  position: absolute;
+  inset: 0 -12px 0 0;
+  z-index: -1;
+  pointer-events: none;
+  background: linear-gradient(90deg, #f8fbfff5 0%, #f8fbffe8 84%, #f8fbff00 100%);
+  border-left: 3px solid #0c4daf;
+  border-radius: 3px 0 0 3px;
 }
 :root[data-theme='glitch'] .brand-mark {
   display: none;
@@ -63,7 +84,7 @@
   display: none;
 }
 :root[data-theme='glitch'] .room-heading {
-  margin: 0 210px 0 0;
+  margin: 0;
   padding-bottom: 1px;
   min-width: 0;
   max-width: 300px;
@@ -110,37 +131,6 @@
 :root[data-theme='glitch'] .connection {
   font-size: 10px;
   color: #1c4e8a;
-}
-.daylight-edition {
-  margin-left: auto;
-  position: absolute;
-  right: 2.5%;
-  top: 45px;
-  height: 116px;
-  display: flex;
-  align-items: center;
-  color: #f7faff;
-  gap: 17px;
-  pointer-events: none;
-}
-.daylight-edition b {
-  font:
-    126px / 0.9 Georgia,
-    'Times New Roman',
-    serif;
-  letter-spacing: -8px;
-  font-weight: 400;
-}
-.daylight-edition > span {
-  min-width: 175px;
-  font:
-    17px / 1.6 Georgia,
-    'Times New Roman',
-    serif;
-  letter-spacing: 5px;
-  padding-top: 22px;
-  border-bottom: 1px solid #f4f7ffa6;
-  padding-bottom: 7px;
 }
 :root[data-theme='glitch'] .workspace {
   max-width: 1700px;
@@ -231,42 +221,7 @@
   pointer-events: none;
   background: #f5f7fbf5;
   border-radius: inherit;
-  clip-path: polygon(
-    0 0,
-    98% 0,
-    98% 5%,
-    100% 5%,
-    100% 12%,
-    96% 12%,
-    96% 13%,
-    100% 13%,
-    100% 20%,
-    98% 20%,
-    98% 21%,
-    100% 21%,
-    100% 29%,
-    96% 29%,
-    96% 30%,
-    100% 30%,
-    100% 42%,
-    98% 42%,
-    98% 43%,
-    100% 43%,
-    100% 56%,
-    95% 56%,
-    95% 57%,
-    100% 57%,
-    100% 69%,
-    98% 69%,
-    98% 70%,
-    100% 70%,
-    100% 86%,
-    96% 86%,
-    96% 87%,
-    100% 87%,
-    100% 100%,
-    0 100%
-  );
+  clip-path: none;
 }
 :root[data-theme='glitch'] .chat-panel {
   grid-column: 2;
@@ -529,28 +484,7 @@
   pointer-events: none;
   background: linear-gradient(110deg, #0044bd, #0058f5);
   border-radius: 7px;
-  clip-path: polygon(
-    0 0,
-    96% 0,
-    96% 10%,
-    100% 10%,
-    100% 22%,
-    94% 22%,
-    94% 27%,
-    100% 27%,
-    100% 43%,
-    97% 43%,
-    97% 50%,
-    100% 50%,
-    100% 70%,
-    93% 70%,
-    93% 76%,
-    100% 76%,
-    100% 90%,
-    96% 90%,
-    96% 100%,
-    0 100%
-  );
+  clip-path: none;
 }
 :root[data-theme='glitch'] #source-form .button:hover::before {
   background: #0047cc;
@@ -789,7 +723,7 @@
 :root[data-theme='glitch'] .welcome {
   background:
     linear-gradient(105deg, #e9f7fff2, #d7f1ff88),
-    url('./assets/themes/daylight-sky.webp') center / cover;
+    url('./assets/themes/daylight-sky.png') center / cover;
   color: #0f3f83;
 }
 :root[data-theme='glitch'] .welcome h2 {
@@ -843,8 +777,10 @@
 :root[data-theme='glitch'] body.page-cinema {
   background: #000;
 }
-:root[data-theme='glitch'] .page-cinema :is(#theme-scene, #theme-fragments),
-:root[data-theme='glitch'] body:has(.player-shell:fullscreen) :is(#theme-scene, #theme-fragments) {
+:root[data-theme='glitch'] .page-cinema :is(#theme-photo, #theme-scene, #theme-fragments),
+:root[data-theme='glitch']
+  body:has(.player-shell:fullscreen)
+  :is(#theme-photo, #theme-scene, #theme-fragments) {
   display: none;
 }
 :root[data-theme='glitch'] .page-cinema .player-shell,
@@ -895,11 +831,6 @@
     height: 170px;
     padding-bottom: 20px;
     gap: 15px;
-  }
-  .daylight-edition {
-    transform: scale(0.8);
-    transform-origin: right top;
-    top: 45px;
   }
   :root[data-theme='glitch'] .brand {
     transform: none;
@@ -988,10 +919,6 @@
   :root[data-theme='glitch'] .heading-actions {
     display: none;
   }
-  .daylight-edition {
-    top: 50px;
-    transform: scale(0.6);
-  }
   :root[data-theme='glitch'] .workspace {
     padding: 0 22px 25px;
     grid-template-columns: minmax(0, 1fr);
@@ -1072,7 +999,9 @@
   :root[data-theme='glitch'] .brand {
     display: inline-flex;
     position: absolute;
-    top: 71px;
+    top: 66px;
+    padding: 6px 10px;
+    margin-left: 0;
     left: 16px;
     font-size: 34px;
     letter-spacing: -1.9px;
@@ -1101,14 +1030,6 @@
   :root[data-theme='glitch'] .room-heading p {
     display: inline;
     font-size: 9px;
-  }
-  .daylight-edition {
-    top: 58px;
-    right: 14px;
-    transform: scale(0.36);
-  }
-  .daylight-edition > span {
-    display: none;
   }
   :root[data-theme='glitch'] .workspace {
     padding: 0 14px 24px;
@@ -1220,6 +1141,7 @@
   }
 }
 @media (forced-colors: active) {
+  #theme-photo,
   #theme-scene,
   #theme-fragments {
     display: none !important;

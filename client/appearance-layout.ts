@@ -4,14 +4,10 @@ import { icon } from './icons';
 export class DaylightLayout {
   private anchors = new Map<HTMLElement, Comment>();
   private active = false;
-  private edition = document.createElement('div');
   private utilities = document.createElement('div');
   private members = document.createElement('details');
   private voice = document.createElement('details');
   constructor() {
-    this.edition.className = 'daylight-edition';
-    this.edition.setAttribute('aria-hidden', 'true');
-    this.edition.innerHTML = '<b>01</b><span>DAYLIGHT<br>RUPTURE</span>';
     this.utilities.className = 'daylight-utilities';
     this.members.className = 'daylight-members';
     this.members.innerHTML = `<summary>${icon('users', 16)} 成员与连接</summary>`;
@@ -42,7 +38,6 @@ export class DaylightLayout {
       !document.fullscreenElement;
     if (!visible) {
       for (const [node, anchor] of this.anchors) anchor.after(node);
-      this.edition.remove();
       this.utilities.remove();
       this.voice.remove();
       this.voice.open = this.members.open = false;
@@ -51,7 +46,6 @@ export class DaylightLayout {
     const topbar = document.querySelector<HTMLElement>('.topbar')!;
     const workspace = document.querySelector<HTMLElement>('.workspace')!;
     const picker = document.getElementById('playback-picker')!;
-    topbar.append(this.edition);
     workspace.append(this.utilities);
     picker.append(this.voice);
     this.utilities.append(this.members);

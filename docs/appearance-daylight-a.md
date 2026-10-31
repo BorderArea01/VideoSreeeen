@@ -1,6 +1,6 @@
 # A · 天光断层（Daylight Rupture）
 
-2026-10-31，按用户选择，将[四版概念中的 A](design/glitch-concepts/01-daylight-rupture.png)落到真实观影页面。概念图仅作配色、材质和构图参考，未将其中的界面、影片或文字铺成背景。
+2026-10-31，按用户提供的[参考 A 图](design/glitch-concepts/01-daylight-rupture.png)实现真实观影界面，并根据反馈重做边缘材质。保留大片、密集、交错的深蓝 / 白色照片条块，将断层绑定到真实容器和按钮边缘，鼠标扫过时分层伸展、错位、回落。
 
 ## 实际界面
 
@@ -8,50 +8,63 @@
 
 独立预览：<https://daylight-a.videosreeeen.pages.dev/?skin=glitch>。正式入口保持当前版；本次不发布 Windows / Android 安装包，不更新房间 Worker。
 
-在顶部调色盘或「设置与帮助 → 界面皮肤」选择「天光断层 · Glitch Art」。仍保留「暖夜 · 原版」、首次随机分配、同标签页刷新保持和手动选择记忆。`?skin=glitch` 是只影响本机的外观选择链接：记住选择后移除此参数，保留邀请 hash，不写房间状态。
+顶部调色盘或「设置与帮助 → 界面皮肤」可选择「天光断层 · Glitch Art」。保留「暖夜 · 原版」、首次随机分配、同标签页刷新保持、手动选择记忆。`?skin=glitch` 只选择本机外观，记住后移除参数、保留邀请 hash，不写房间状态。
 
-## 设计与边界
+## 本轮调整
 
-- 逐项对照用户再次提供的 A 图：左侧大字品牌、右上「01 / DAYLIGHT RUPTURE」、204px 标题区、影片 / 聊天等高双栏、贯穿底部的播放方式与链接操作带。晴昼云海、下方海岛与右下白色建筑，瓷白面板、钴蓝按钮、深蓝文字均来自同一参考方向。
-- 语音收进底栏的可展开入口，真实成员与 RTT 收进「成员与连接」，共同缓存仍仅在共同播放分支显示。所有入口搬动的都是原有 DOM 控件，换回暖夜和进入全屏时恢复原位置，不创建假控件或新播放器。聊天室保留真实昵称 / 时间，圆形头像使用发送者昵称首字符，不伪造人物照片。
-- 卡片保留完整正文区域，损坏集中于材质外沿：不等距的横向断层、照片条带、白 / 蓝材质碎片和少量色偏像素。按钮文字与实际点击控件保留，不克隆一套假控件，不给边框铺均匀碎点。
-- 鼠标经过产生各自保留起点的短暂余像，随时间向外散开，约 1.1 秒收束。最多 8 组余像，不持续跟随鼠标坐标，不运行闲置动画。触屏和系统「减少动态效果」保留静态材质。
-- 背景与碎片为两张独立、不接收输入的 Canvas；只采样本主题照片，不采样电影、第三方页面或聊天内容。不发送鼠标坐标，不引入动画库。
-- 每帧清除视频、控制栏、输入框与文字操作区的装饰，避免邻接碎片遮挡；系统 / 网页全屏暂停并隐藏画布。真实播放器保持完整，不对片源添加特效，不因为换肤重载、暂停或提交同步操作。参考图的海岸影片不属于主题；实际影片按原始比例居中显示，宽银幕外框在遇到较窄片源时保留黑边。
-- Canvas 上限 240 万像素、DPR 1.5、交互上限 30 fps；没有余像且面板位置未变时不重复绘制。切回原版释放三张画布 backing store。隐藏页面停止帧循环，强制颜色模式隐藏装饰。
-- 聊天仍固定高度、内部滚动、可拖拽停靠；缓存仍为共同播放下默认关闭的手动选项。样式未改变房间、视频解析、缓存和语音协议。
+- 背景重新编辑为没有固定断层的自然天空。原生 1536×1024 PNG 直接作为全窗口 fixed / cover 图片展示，取消此前有损 WebP 转换和背景 Canvas 降采样；它不是 4K 图片，超大屏仍有原始分辨率边界。
+- 删除右上「01 / DAYLIGHT RUPTURE」，品牌使用深蓝文字、浅色渐变衬底，提高天空和云层上的辨识度。
+- 断层使用独立 RGBA 照片材质：真实云层纹理、深蓝厚块、白色横片、蓝色像素排序及少量 RGB 碎片。透明空隙保留，不把整张材质背景贴在页面上。
+- 每个可见卡片 / 按钮读取自己的当前边界，按不同裁切位置取材。卡片破损只进入侧边最多 16% / 64px，按钮最多 16% / 25px，主要横向向外延伸；宽底栏左下缘也有相接断层。条块根部按组错开，避免笔直的贴纸接缝。折叠的缓存摘要不生成宽大断层。
+- 鼠标扫过真实控件，纹理条带以成组切片伸展并回落，根部保持连接；动效约 1.1 秒收束，最多 8 个交互记录，停止后不运行闲置动画。背景响应仍采样本主题照片，余像独立离开鼠标，不持续黏着指针。触屏及系统「减少动态效果」保留静态材质。
+- 装饰每帧避开影片、控制栏、输入框、聊天气泡、消息信息、语音入口和按钮文字。绘制不读取影片或聊天内容的像素，不改变实际命中区域；拖拽聊天室后边缘跟随，旧位置清空。
+- 主背景是图片；背景余像、边缘材质分别使用透明 Canvas，另有仅供采样的离屏天空。每张 Canvas 上限 420 万像素、DPR 2、交互上限约 30 fps。仅在交互或布局变动时绘制。切回原版释放 backing store；隐藏页面、系统 / 网页全屏暂停，退出全屏恢复图片和画布。
+- 保留原有双栏和整条操作带，语音、成员、缓存使用原有 DOM 控件，不创建假播放器。聊天固定高度、内部滚动、可拖拽停靠；换肤不重载视频、不发送播放控制。房间、取源、语音和缓存协议均未修改。
 
-## 素材
+## 素材与生成记录
 
-背景使用内置 `image_gen`，将用户再次提供的 A 图作为编辑目标，移除全部界面、文字、聊天室和独立海岸电影窗口，保留外围云层、下方海岛及白色建筑，并补全中心天空。原始 PNG 保留在 Codex 生成目录，浏览器 Canvas 仅转为 WebP，项目文件 `client/assets/themes/daylight-sky.webp`（318,344 字节）。此前另行生成的泛用天空底图已从运行时资产中替换，没有叠加旧界面截图。
+使用内置 `image_gen` 编辑模式。原始输出保留在 Codex 生成目录，最终运行素材复制到仓库：
 
-生成提示词：
+| 素材         | 项目路径                                     | 原生尺寸  |      字节 |
+| ------------ | -------------------------------------------- | --------- | --------: |
+| 纯净天空照片 | `client/assets/themes/daylight-sky.png`      | 1536×1024 | 2,403,754 |
+| 透明照片断层 | `client/assets/themes/daylight-fracture.png` | 1024×1536 | 2,195,990 |
+
+背景以此前从 A 图去掉全部 UI 的照片为编辑目标；断层以原有照片损坏区为参考，之后单独提取透明背景。未对电影或网页截图进行生成式替换。两张最终 PNG 合计约 4.39 MiB，比旧压缩底图大，换取直接照片展示与独立材质。
+
+纯净天空提示词：
 
 ```text
-Edit target: the attached DAYLIGHT RUPTURE reference screenshot. Create the production BACKGROUND PLATE for implementing this exact website, not another design proposal. Remove EVERY interface element: the VideoSreeeen logo, Chinese text, 01, DAYLIGHT RUPTURE typography, central rectangular movie window and its entirely separate cliff movie picture, the chat card and all avatar/message contents, the bottom toolbar, all buttons and controls. Seamlessly inpaint those removed areas with the surrounding photographic sky landscape. PRESERVE the original background composition as faithfully as possible: brilliant cobalt blue upper-right sky, enormous densely detailed sunlit white clouds along the top-left and framing the left, center lower clouds with a distant blue Mediterranean island horizon ONLY along the bottom fifth, the photorealistic white hillside buildings and rocky sea coast at the very bottom-right. Preserve the natural photographic day lighting and original cloud shapes around the outer edges. Preserve horizontal pixel-sorting tears and data-moshed photographic cloud / blue / white streaks near the upper-middle, left and right peripheral edges and lower edges, with sparse tiny RGB misregistrations. Keep the wide central area reasonably quiet behind future functional panels. The finished plate must be one seamless edge-to-edge photographic background only, with ZERO remaining rectangular UI panel silhouettes, ZERO text, ZERO logos, ZERO buttons, ZERO player/film window, ZERO people. Match the reference's 3:2 landscape framing and high photographic detail. Do not replace it with a generic all-sky cloud photo.
+Edit this existing production photographic background. Preserve its exact photographic composition: sunlit cumulus clouds in the upper-left, rich blue clear upper-right sky, lower framing clouds, blue Mediterranean island and sea along the bottom fifth, white seaside buildings bottom-right. REMOVE ALL of the baked-in digital corruption, rectangular streaks, horizontal pixel sorting, dark horizontal slabs, tiny colored blocks, scanline glitches and RGB offsets from the ENTIRE image, especially the dark strip clusters down the RIGHT EDGE and bottom-left. Reconstruct clean natural cloud detail and blue sky in those places. The finished plate must be a pristine sharp realistic daylight photographic panorama with no glitch marks at all; the application will generate the glitch dynamically from actual panel edges. Improve optical clarity and realistic fine cloud texture: crisp natural cloud edges, well-defined sea coastline and white architecture, no soft wash, no blur, no over-smoothed texture, no painterly appearance. Render at the highest native detail and resolution available, preferably 3072x2048 or larger, landscape 3:2. No text, logo, UI, frame, panel, typography, fake button, or inserted movie scene. Preserve original framing, lighting and natural colors.
+```
+
+边缘材质提示词：
+
+```text
+Edit the reference's existing dense horizontal datamosh cloud corruption into a TRANSPARENT production UI EDGE TEXTURE. Preserve the EXACT reference material and impact, especially the broad dark navy / charcoal slabs mixed with cobalt sky, luminous white photographic cloud texture, cyan and a few tiny red misregistration slivers at the right edge and lower-left. Output a tall portrait texture atlas, transparent background. It is a SINGLE broken vertical material edge: a narrow continuous porcelain-white root down the LEFTMOST 8% of the sheet, then a strongly torn transition that erupts HORIZONTALLY RIGHT into very dense, overlapping, irregular-length large blocks and fine nested stripes. Root all major masses in that left edge. The fracture should occupy a wide deep swath, with varying penetration and huge irregular clusters, NOT three evenly spaced tufts, NOT a comb of isolated thin lines, NOT tiny sparse border confetti. Use the reference's photographic pixel-sorted cloud and blue material, chunky dark underplates, stacked wide offset segments, irregular gaps and a scattering of detached tiny scraps toward the far-right. Leave the rightmost 15% mostly transparent. No scene/background rectangle: transparent gaps throughout the torn zone, preserving original genuine alpha. No lettering, logo, UI mockup, button, complete box, contour outline, grid, glow, smoke, people, or added objects. Keep rich natural photo material in the strips instead of drawing flat geometric blue bars. This asset will be attached to real container borders and animated in layered slices. The desired impact and density must remain as strong as the original reference's dense corrupted edges.
+```
+
+透明提取修订提示词：
+
+```text
+Use case: background-extraction. Edit target: the provided tall broken cloud/blue pixel-sorting material. Remove ONLY the smooth blue/black gradient backdrop behind the horizontal torn slabs. Replace that entire smooth background with genuine transparent alpha, including the large gaps between the stripes and the right edge. Keep the photographic cloud fragments, dense dark navy slabs, white root along left, cobalt horizontal strips and tiny RGB slivers. Preserve their sharp edges and internal textures. This is a cutout production border texture, no rectangular backdrop, no checkerboard drawn into pixels, no glow/fog or new scene. Preserve the irregular dense large overlapping horizontal fragments and left root. Actual RGBA transparency is mandatory.
 ```
 
 ## 验证方法
 
-所有构建与验收串行经过 `scripts/controlled.ps1 -AllowGameThisRun -MinFreeMiB 0`，未触发客户端发布工作流，不接触用户正在观看的房间或真实设备。
+构建、测试、录制和部署串行经过 `scripts/controlled.ps1 -AllowGameThisRun -MinFreeMiB 0`，只使用隔离浏览器与独立房间，不触碰用户正在观看的房间、真实麦克风或设备。
 
-- `npm run build`：类型检查、Vite 前端与现有服务端 / 助手构建。助手内容和 ZIP 校验保持原样，没有发布新版助手。
-- `npm run test:appearance`：独立 Edge、真实双端房间、实际 WebSocket、MDN CC0 MP4；检查皮肤分配与记忆、播放中换肤保持同一 video / 地址 / 进度、不出现 loadstart / 暂停 / 房间控制、另一端独立外观、真实双向文字聊天、拖拽与停靠。
-- 动态检查使用真实装饰画布像素变化与停止，检查按钮和容器的有限余像、视频区域透明、鼠标穿透、减少动态效果、强制颜色、网页全屏。2560×1440、800×1100、1.5 倍 visual viewport、390 / 320px 布局与截图核对；这不是手机真机结论。
-- `npm run test:player-controls`：实际播放、暂停、跳转、进度预览、精细定位、HLS 预览、网页 / 系统全屏与闲置隐藏回归。普通单元测试另行运行。
-- 公网使用独立预览地址和新房间验证，同一个房间 Worker；受控视频 fixture 不等于 B 站 / 稀饭全线路验收，不访问麦克风，不代表语音采集实测。
+- `npm run build`：类型检查、Vite 前端、现有服务端与助手构建。助手 ZIP SHA-256 仍为 `4c94b6e9c51934513326402fd1d34a21d42da72f3a3052349113f85b38a13307`，没有发布客户端或助手。
+- `npm run test:appearance`：真实双端房间、实际 WebSocket、MP4、双向文字聊天、语音收听后换肤、拖拽与停靠、外观记忆、强制颜色、减少动态效果、系统 / 网页全屏。播放器对象、进度和连接保留，换肤没有 loadstart、暂停或房间操作。
+- 新增边缘跟随检查：采样聊天室右侧的深浅实际像素，拖动 300px 后新位置仍有深浅照片条块，旧位置没有残留。另检查鼠标后实际画布连续变化，收束后稳定；视频和输入区域保持透明。
+- 背景图片实际加载且全窗口 cover；检查 2560×1440、800×1100、1.5 倍 visual viewport、390 / 320px 布局。它们是桌面浏览器视口测试，不是手机真机结论。
+- `VS_TEST_SKIN=glitch npm run test:player-controls` 检查实际 MP4 / HLS、暂停、跳转、画面预览、精细定位、网页 / 系统全屏、闲置隐藏与窄屏操作。
+- 公网以独立预览和合成新房间验证，视频使用受控 fixture，不等于对 B 站 / 稀饭全部线路或用户环境做了实测。
 
-本机证据 `.local/appearance-evidence.json`、`.local/appearance-public-evidence.json`、`.local/screenshots/theme-*.png`；部署与最终检查结果见下方回执。
+本机回执与实录：`.local/appearance-evidence.json`、`.local/appearance-public-evidence.json`、`.local/daylight-motion.webm`、`.local/daylight-scroll-evidence.json`、`.local/daylight-public-assets.json`。最终部署信息见下方回执。
 
-参考：[Canvas 绘制与状态](https://html.spec.whatwg.org/dev/canvas.html)、[ResizeObserver](https://developer.mozilla.org/en-US/docs/Web/API/Resize_Observer_API)、[减少动态效果](https://developer.mozilla.org/en-US/docs/Web/CSS/@media/prefers-reduced-motion)。
+参考：[Canvas 绘制与状态](https://html.spec.whatwg.org/dev/canvas.html)、[ResizeObserver](https://developer.mozilla.org/en-US/docs/Web/API/Resize_Observer_API)、[减少动态效果](https://developer.mozilla.org/en-US/docs/Web/CSS/@media/prefers-reduced-motion)、[color-scheme](https://developer.mozilla.org/en-US/docs/Web/CSS/Reference/Properties/color-scheme)。
 
-## 验收回执
+## 部署回执
 
-- 源码提交 `8c4f8c0`；2026-10-31 已部署到独立 Pages 预览 `ab7dacdf`，固定地址 <https://ab7dacdf.videosreeeen.pages.dev/?skin=glitch>，别名 <https://daylight-a.videosreeeen.pages.dev/?skin=glitch>。仅此预览更新，正式入口未切换。
-- 最终构建通过，116 项单元测试通过；本地与公网 `test:appearance` 均通过。真实两端 MP4 播放、双向文字聊天、拖拽 / 停靠、外观选择与记忆正常；换肤保持同一 video、0 次 loadstart、无暂停和房间控制。语音已加入收听后跨皮肤切换保持同一面板与连接，未开启物理麦克风。
-- 1536×1024 的实际布局：播放器 `(79.86, 204)`，`968.77×503.75`；聊天室 `(1068.63, 204)`，`387.52×503.75`；底栏 `(79.86, 727.75)`，`1376.28×96`。截图为真实房间与示例视频，不将概念稿充作运行画面。
-- A 皮肤下 `VS_TEST_SKIN=glitch npm run test:player-controls` 通过：实际 MP4 / HLS 预览、暂停、跳转、精细定位、网页 / 系统全屏、约 1 秒闲置隐藏、窄屏与触摸仿真。错误列表为空；不代表手机真机验收。
-- 动效实录 `.local/daylight-motion.webm`，5.45 秒、1152×768、458,111 字节：从独立浏览器的真实页面捕获，不是概念图动画或电影录屏。仅含本机合成房间、CC0 示例视频和鼠标引发的材质动效，没有用户房间或账号；实录关闭本机聊天弹幕以保持影片区干净。
-- 补验 390×844 窗口滚到底部：滚动 325px 后背景仍固定覆盖整个可视区域，采样得到 341 种照片色值，未退化成纯色。证据 `.local/daylight-scroll-evidence.json` 与 `.local/daylight-scrolled.png`；fullPage 截图只在第一屏捕获 fixed 背景，不能用其下方的截图空白代替真实滚动结论。
-- 核对预览 HTML、6 个 JS / CSS / WebP 资源和预览别名，均与本地成品逐字节一致。入口 `index-CKShY03F.js` SHA-256 `8614eaef15847dae4dd295304b09bfe4566ea97bfa3fdcfaffe9f106c5fa18c4`；CSS `index-89MxgkNv.css` SHA-256 `e6083501d7b3313738980a0529db364cbc47774c409ea09096ac3cad48b69775`；背景 SHA-256 `c074b0268270f486e5e6215a4721e242e62b79f98a5c2673c5fe2a1f9acde887`。本机回执 `.local/daylight-public-assets.json`。
-- 正式入口仍加载 `assets/index-ByAASs3a.js`，核对未改变；房间 Worker、Durable Objects、原站取源和已发布客户端未更新。没有创建新付费资源，没有启用 TURN，没有新增安装包、Release、标签或回退版本。当前 dist 约 1.18 MiB，Pages 上传目录约 1.19 MiB，仍沿用 `.local/rollback/manifest.json` 定位的唯一回退。
+前一预览 `ab7dacdf`（源码 `8c4f8c0`）是本次用户反馈的基线；本轮完成后以下记录以实际新部署为准。
