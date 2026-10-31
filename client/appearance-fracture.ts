@@ -169,6 +169,9 @@ export function fractureEdge(
         );
       }
     }
+    // Transparent controls borrow their panel's light packet, without turning
+    // the control's own glyph plate into an opaque rectangular sticker.
+    const packetSurface = surface === 'rgba(0, 0, 0, 0)' ? '#f5f7fb' : surface;
     // Dark decode-loss plates, original surface packets and live sorted photo rows
     // interleave densely; nested slices give broad slabs an irregular torn contour.
     const kind = j % 7;
@@ -176,7 +179,7 @@ export function fractureEdge(
       ctx.fillStyle = kind === 0 ? '#07264c' : blue ? '#0053e6' : '#0750aa';
       ctx.fillRect(x, y, width * (0.6 + glitch * 0.25), h);
     } else if (kind === 1 || kind === 5) {
-      ctx.fillStyle = surface;
+      ctx.fillStyle = packetSurface;
       ctx.fillRect(x, y, width, h);
     } else {
       const sampleX = Math.floor(hash(n + step * 7) * 65);
@@ -345,6 +348,22 @@ function controlPlate(button: HTMLElement, burst: GlitchBurst, surface: string) 
   // The sync link glyph is our CSS mask rather than a DOM svg. Reuse its own
   // inline paths so it travels in the same surface/text packet.
   const pseudo = getComputedStyle(button, '::after');
+  const pseudoLabel = /^['"]([^'"]{1,40})['"]$/.exec(pseudo.content);
+  if (!firstLabel && pseudoLabel) {
+    p.save();
+    p.font = `${pseudo.fontStyle} ${pseudo.fontWeight} ${pseudo.fontSize} ${pseudo.fontFamily}`;
+    p.textAlign = 'center';
+    p.textBaseline = 'middle';
+    for (const [color, x, y] of [
+      ['#43deef', 2, 1],
+      ['#ed7097', -2, -1],
+      [pseudo.color, 0, 0],
+    ] as const) {
+      p.fillStyle = color;
+      p.fillText(pseudoLabel[1]!, box.width / 2 + x, box.height / 2 + y);
+    }
+    p.restore();
+  }
   const mask = /^url\("(data:image\/svg\+xml,[\s\S]+)"\)$/.exec(pseudo.maskImage);
   if (firstLabel && button.matches('#source-form .button') && mask) {
     const vector = new DOMParser().parseFromString(

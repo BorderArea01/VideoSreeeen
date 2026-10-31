@@ -531,6 +531,72 @@ try {
   await owner.waitForTimeout(250);
   assert.equal(await signature('#theme-fragments'), settledButton);
   proof.buttonMaterialAfterimage = true;
+  const unifiedControls: Record<string, unknown> = {};
+  for (const selector of [
+    '#sidebar-invite',
+    '#choose-link',
+    '.daylight-voice > summary',
+    '#settings-button',
+    '#send-button',
+    '#chat-collapse',
+  ]) {
+    await owner.mouse.move(4, 100);
+    await owner.waitForTimeout(1000);
+    const before = await owner.locator(selector).boundingBox();
+    assert.ok(before, 'Control should be visible: ' + selector);
+    await owner.locator(selector).hover();
+    await owner.waitForTimeout(155);
+    const pixels = await owner.locator(selector).evaluate((control) => {
+      const r = control.getBoundingClientRect();
+      const canvas = document.querySelector<HTMLCanvasElement>('#theme-fragments')!;
+      const scale = canvas.width / canvas.getBoundingClientRect().width;
+      const data = canvas
+        .getContext('2d')!
+        .getImageData(
+          Math.max(0, Math.floor(r.left * scale)),
+          Math.max(0, Math.floor(r.top * scale)),
+          Math.max(1, Math.floor(r.width * scale)),
+          Math.max(1, Math.floor(r.height * scale)),
+        ).data;
+      let opaque = 0;
+      for (let i = 3; i < data.length; i += 4) if (data[i]! > 80) opaque++;
+      return opaque;
+    });
+    assert.ok(pixels > 10, 'Missing live data slices on ' + selector);
+    const after = await owner.locator(selector).boundingBox();
+    assert.deepEqual(after, before, 'Decoration must not move the real control');
+    unifiedControls[selector] = { pixels, stableBounds: true };
+    await owner.screenshot({
+      path: '.local/screenshots/daylight-control-' + selector.replace(/[^a-z0-9-]/gi, '') + '.png',
+    });
+  }
+  proof.unifiedControls = unifiedControls;
+  // Sweep the upper-right chat edge beside the invitation action. The old header
+  // rectangle erased this whole band, causing the user's clean corner cutout.
+  await owner.mouse.move(4, 100);
+  await owner.waitForTimeout(1100);
+  const chatCorner = await owner.locator('#chat-panel').boundingBox();
+  assert.ok(chatCorner);
+  await owner.mouse.move(chatCorner.x + chatCorner.width - 3, chatCorner.y + 12);
+  await owner.waitForTimeout(100);
+  const cornerInk = await owner
+    .locator('#theme-fragments')
+    .evaluate((canvas: HTMLCanvasElement) => {
+      const r = document.getElementById('chat-panel')!.getBoundingClientRect();
+      const header = document.getElementById('chat-heading')!.getBoundingClientRect();
+      const scale = canvas.width / canvas.getBoundingClientRect().width;
+      const x = Math.floor((r.right - 12) * scale),
+        y = Math.floor((r.top + 2) * scale);
+      const data = canvas
+        .getContext('2d')!
+        .getImageData(x, y, Math.ceil(12 * scale), Math.ceil((header.height - 4) * scale)).data;
+      let count = 0;
+      for (let i = 3; i < data.length; i += 4) if (data[i]! > 80) count++;
+      return count;
+    });
+  assert.ok(cornerInk > 10, 'Chat header must not rectangularly erase the corner fracture');
+  proof.chatCornerFracturePixels = cornerInk;
+  await owner.screenshot({ path: '.local/screenshots/daylight-chat-corner.png' });
   const originalPhoto = await owner.locator('#theme-photo').getAttribute('src');
   assert.ok(originalPhoto);
   await owner.evaluate(async () => {

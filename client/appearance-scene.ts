@@ -11,8 +11,39 @@ type Wake = {
   impact: number;
   samples: Map<string, HTMLCanvasElement>;
 };
+const controlSelector = 'button, summary, a.button, [role="button"]';
 const materialSelector =
-  '.source-card, .members-card, .chat-panel, .cache-options[open], .top-actions .button, .source-card .button, .welcome .button, .send-button';
+  '.source-card, .members-card, .chat-panel, .cache-options[open], ' + controlSelector;
+const excluded = '.player-shell, dialog, .chat-messages, .emoji-picker, .members, .voice-members';
+function materials() {
+  return Array.from(document.querySelectorAll<HTMLElement>(materialSelector))
+    .filter((node) => !node.closest(excluded))
+    .slice(0, 120);
+}
+
+/** Protect visible glyphs, not the rectangular header or summary around them. */
+function readableContent(node: HTMLElement) {
+  const rects: DOMRect[] = [];
+  const walker = document.createTreeWalker(node, NodeFilter.SHOW_TEXT);
+  let text: Node | null;
+  while ((text = walker.nextNode())) {
+    const value = text.textContent?.trim();
+    if (
+      !value ||
+      !text.parentElement?.checkVisibility() ||
+      text.parentElement.closest('svg,[aria-hidden="true"],input,textarea')
+    )
+      continue;
+    const start = text.textContent!.indexOf(value),
+      range = document.createRange();
+    range.setStart(text, start);
+    range.setEnd(text, start + value.length);
+    rects.push(...range.getClientRects());
+  }
+  for (const glyph of node.querySelectorAll('svg,.tiny-dot'))
+    if (glyph.checkVisibility()) rects.push(glyph.getBoundingClientRect());
+  return rects;
+}
 
 /** Decorative photo/material only. Never reads video pixels, captures input, or sends coordinates. */
 export class GlitchScene {
@@ -62,10 +93,7 @@ export class GlitchScene {
       });
       if (!layout.length) return;
       if (layout.some((r) => r.type === 'childList' || r.attributeName === 'open'))
-        this.nodes = Array.from(document.querySelectorAll<HTMLElement>(materialSelector)).slice(
-          0,
-          80,
-        );
+        this.nodes = materials();
       this.invalidate();
     }).observe(document.body, {
       childList: true,
@@ -99,10 +127,7 @@ export class GlitchScene {
     this.wakes = [];
     this.stop();
     if (active) {
-      this.nodes = Array.from(document.querySelectorAll<HTMLElement>(materialSelector)).slice(
-        0,
-        80,
-      );
+      this.nodes = materials();
       this.resize();
     } else {
       this.image.hidden = this.canvas.hidden = this.fragments.hidden = true;
@@ -181,6 +206,7 @@ export class GlitchScene {
         );
       });
     const box = node?.getBoundingClientRect();
+    if (node?.matches(':disabled,[aria-disabled="true"]')) return;
     if (now - this.lastPointer.at < 75 && node === this.lastPointer.target) return;
     this.wakes.push({
       x: event.clientX,
@@ -226,11 +252,19 @@ export class GlitchScene {
     });
     const protectedRects = Array.from(
       document.querySelectorAll<HTMLElement>(
-        '.player-shell, dialog[open], .daylight-voice > summary, input:not([type="range"]), textarea, .bubble, .message-meta, .chat-heading > div',
+        '.player-shell, dialog[open], .daylight-voice[open] > .voice-card, .daylight-members[open] > .members-card, input:not([type="range"]), textarea, select, .bubble, .message-meta',
       ),
     )
       .filter((e) => e.checkVisibility())
       .map((e) => e.getBoundingClientRect());
+    const content = visible
+      .filter(({ node }) => node.matches(controlSelector))
+      .map(({ node }) => ({ node, rects: readableContent(node) }));
+    const headerRects = Array.from(
+      document.querySelectorAll<HTMLElement>('.chat-heading > div:first-child'),
+    )
+      .filter((node) => node.checkVisibility())
+      .flatMap(readableContent);
     const layout = JSON.stringify([
       visible.map(({ node, i, r }) => [
         i,
@@ -256,7 +290,7 @@ export class GlitchScene {
     ink.setTransform(this.scale, 0, 0, this.scale, 0, 0);
     ink.clearRect(0, 0, this.fragments.width / this.scale, this.fragments.height / this.scale);
     for (const { node, r } of visible) {
-      const compact = node.matches('button');
+      const compact = node.matches(controlSelector);
       const candidates = this.motion.matches
         ? []
         : [...this.wakes].reverse().filter((w) => w.target && node.contains(w.target));
@@ -279,8 +313,8 @@ export class GlitchScene {
           ? pseudoSurface
           : cssSurface !== 'rgba(0, 0, 0, 0)'
             ? cssSurface
-            : blue
-              ? '#0053e6'
+            : compact
+              ? 'rgba(0, 0, 0, 0)'
               : '#f5f7fb';
       if (compact && !this.motion.matches) labels.push({ node, wake: candidates[0]!, surface });
       for (const wake of packets) {
@@ -311,25 +345,25 @@ export class GlitchScene {
         );
       }
     ctx.globalAlpha = 1;
-    // Clip every frame away from the real movie and controls, including floating panels.
+    // Media, input and open popovers keep their complete safety windows.
     for (const r of protectedRects) {
       ink.clearRect(r.left - 10, r.top - 10, r.width + 20, r.height + 20);
       ctx.clearRect(r.left - 10, r.top - 10, r.width + 20, r.height + 20);
     }
-    // Adjacent labels are readable even when a fractured edge stretches toward them.
-    for (const button of document.querySelectorAll<HTMLElement>('button')) {
-      if (!button.checkVisibility()) continue;
-      const r = button.getBoundingClientRect();
-      const edge = r.width >= 60 ? Math.min(18, r.width * 0.085) : 0;
-      ink.clearRect(
-        r.left + edge,
-        r.top + 3,
-        Math.max(0, r.width - edge * 2),
-        Math.max(0, r.height - 6),
-      );
-    }
+    const eraseGlyphs = (rects: DOMRect[]) => {
+      for (const r of rects) {
+        ink.clearRect(r.left - 1, r.top - 1, r.width + 2, r.height + 2);
+        ctx.clearRect(r.left - 1, r.top - 1, r.width + 2, r.height + 2);
+      }
+    };
+    // Keep a readable core without punching a whole rectangular hole through the edge.
+    for (const { rects } of content) eraseGlyphs(rects);
+    eraseGlyphs(headerRects);
     for (const { node, wake, surface } of labels)
       fractureControl(ink, node, { ...wake, elapsed: now - wake.at }, surface);
+    const animated = new Set(labels.map(({ node }) => node));
+    for (const { node, rects } of content) if (!animated.has(node)) eraseGlyphs(rects);
+    eraseGlyphs(headerRects);
     // Label slices are strictly decorative and obey the same protected areas.
     for (const r of protectedRects)
       ink.clearRect(r.left - 10, r.top - 10, r.width + 20, r.height + 20);

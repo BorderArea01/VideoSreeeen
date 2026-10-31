@@ -1,5 +1,7 @@
 # A · 天光断层（Daylight Rupture）
 
+最新正式站修订：邀请与语音入口不再整块擦除断层，按文字 / 图标实际范围保护；其他操作按钮接入一致的数据切片，聊天室收起图标恢复可见。详见 [边缘与按钮验收](verification-daylight-edges.md)。下文独立预览与早期实现为历史记录。
+
 按用户提供的[参考 A 图](design/glitch-concepts/01-daylight-rupture.png)实现真实观影界面。2026-10-31 根据「条块像软糖、云朵不应写死、数据故障应由鼠标掠过产生」的反馈，重写动态绘制，移除固定断层 PNG 与平滑弹性拉伸。
 
 旧 `daylight-a` 独立预览已于 2026-10-31 按用户要求删除，包含该分支的全部 5 次部署；删除后地址返回 404。本文以下保留当时设计及验证的历史记录。当前请使用[正式入口的天光主题](https://videosreeeen.pages.dev/?skin=glitch)，删除回执见 [daylight-preview-removal.json](daylight-preview-removal.json)。

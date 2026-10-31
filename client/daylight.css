@@ -243,7 +243,7 @@
   font-size: 18px;
   font-weight: 700;
 }
-:root[data-theme='glitch'] .chat-heading > div :is(svg, .tiny-dot) {
+:root[data-theme='glitch'] .chat-heading > div:first-child :is(svg, .tiny-dot) {
   display: none;
 }
 :root[data-theme='glitch'] #sidebar-invite {
