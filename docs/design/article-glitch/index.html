@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="zh-CN" data-scheme="a">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="dark light" />
+    <title>VideoSreeeen · 四版故障艺术交互方案</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="sky" aria-hidden="true">
+      <div class="sky-base"></div>
+      <div class="sky-copy copy-one"></div>
+      <div class="sky-copy copy-two"></div>
+      <div class="sky-copy copy-three"></div>
+    </div>
+    <svg class="symbols" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <defs>
+        <symbol id="play" viewBox="0 0 24 24"><path d="m8 4 13 8-13 8Z" /></symbol>
+        <symbol id="screen" viewBox="0 0 24 24">
+          <rect x="2" y="3" width="20" height="14" rx="1" />
+          <path d="M8 21h8M12 17v4" />
+        </symbol>
+        <symbol id="file" viewBox="0 0 24 24"><path d="M2 6h8l2 3h10v12H2Z" /></symbol>
+        <symbol id="link" viewBox="0 0 24 24">
+          <path d="m10 7 3-3a5 5 0 0 1 7 7l-3 3M14 17l-3 3a5 5 0 0 1-7-7l3-3M8 16l8-8" />
+        </symbol>
+        <symbol id="mic" viewBox="0 0 24 24">
+          <rect x="9" y="2" width="6" height="13" rx="3" />
+          <path d="M5 10v2a7 7 0 0 0 14 0v-2M12 19v3M8 22h8" />
+        </symbol>
+        <symbol id="chat" viewBox="0 0 24 24">
+          <path d="M21 15a4 4 0 0 1-4 4H9l-7 4V7a4 4 0 0 1 4-4h11a4 4 0 0 1 4 4Z" />
+          <path d="M7 8h10M7 12h7" />
+        </symbol>
+        <symbol id="arrow" viewBox="0 0 24 24"><path d="M4 12h15m-6-6 6 6-6 6" /></symbol>
+        <symbol id="close" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18" /></symbol>
+      </defs>
+    </svg>
+    <div class="showroom">
+      <nav class="chooser" aria-label="切换设计方案">
+        <a class="chooser-label" href="./board.html">四版对比 <span>↗</span></a>
+        <div class="scheme-tabs">
+          <a href="?scheme=a" data-choice="a"><b>A</b><span>硫黄脉冲</span><i></i></a>
+          <a href="?scheme=b" data-choice="b"><b>B</b><span>薄荷断讯</span><i></i></a>
+          <a href="?scheme=c" data-choice="c"><b>C</b><span>紫电残像</span><i></i></a>
+          <a href="?scheme=d" data-choice="d"><b>D</b><span>锈红银幕</span><i></i></a>
+        </div>
+        <button class="motion-toggle" aria-pressed="true" title="开启或关闭全部故障动效">
+          动效 开
+        </button>
+      </nav>
+      <header class="masthead">
+        <div class="brand-block">
+          <p class="eyebrow">WATCH TOGETHER / GLITCH STUDIES</p>
+          <h1>VideoSreeeen<span class="brand-slice" aria-hidden="true">VideoSreeeen</span></h1>
+        </div>
+        <div class="edition">
+          <span class="edition-number">A</span>
+          <div>
+            <strong id="scheme-name">硫黄脉冲</strong
+            ><span id="scheme-subtitle">SULFUR / SIGNAL</span>
+          </div>
+        </div>
+      </header>
+      <main class="watchroom">
+        <section class="film-column">
+          <div class="film-heading">
+            <div>
+              <span class="section-index">01 /</span><strong>放映厅</strong
+              ><span class="demo-tag">视觉交互样片</span>
+            </div>
+            <button
+              class="chat-toggle icon-button"
+              title="隐藏聊天室"
+              aria-label="隐藏聊天室"
+              aria-expanded="true"
+            >
+              <svg><use href="#chat" /></svg>
+            </button>
+          </div>
+          <div class="frame film-frame" data-fracture>
+            <div class="frame-body video-surface">
+              <video
+                playsinline
+                controls
+                preload="none"
+                poster="./poster.jpg"
+                aria-label="本机样片播放器"
+              ></video>
+              <button class="load-film" data-glitch data-label="播放样片">
+                <svg><use href="#play" /></svg><span>播放样片</span>
+              </button>
+              <span class="film-caption">MDN / CC0 · 本机播放</span>
+            </div>
+            <div class="edge-copy edge-one" aria-hidden="true"></div>
+            <div class="edge-copy edge-two" aria-hidden="true"></div>
+          </div>
+          <div class="film-meta">
+            <div><strong>微观花园</strong><span>画面、声音与进度仅在本页演示</span></div>
+            <span class="film-format">FILM STUDY <b>01</b></span>
+          </div>
+        </section>
+        <aside class="frame conversation" data-fracture aria-label="聊天室样式预览">
+          <div class="frame-body chat-body">
+            <header class="chat-heading">
+              <div>
+                <span class="section-index">02 /</span>
+                <h2>聊天室</h2>
+              </div>
+              <span class="sample-label">样例消息</span>
+            </header>
+            <div class="messages" role="log" aria-label="本机样例聊天">
+              <div class="message">
+                <span class="avatar avatar-one">L</span>
+                <div>
+                  <header>Lin <time>14:20</time></header>
+                  <p>这段光线很漂亮。</p>
+                </div>
+              </div>
+              <div class="message">
+                <span class="avatar avatar-two">M</span>
+                <div>
+                  <header>Momo <time>14:21</time></header>
+                  <p>边缘像信号被切开了一样。</p>
+                </div>
+              </div>
+              <div class="message">
+                <span class="avatar avatar-three">K</span>
+                <div>
+                  <header>Kai <time>14:22</time></header>
+                  <p>中间画面还是完整的 👌</p>
+                </div>
+              </div>
+              <div class="message">
+                <span class="avatar avatar-four">雪</span>
+                <div>
+                  <header>雪川 <time>14:22</time></header>
+                  <p>这版的颜色，我可以。</p>
+                </div>
+              </div>
+              <div class="message">
+                <span class="avatar avatar-one">L</span>
+                <div>
+                  <header>Lin <time>14:23</time></header>
+                  <p>试试把鼠标划过边框和按钮。</p>
+                </div>
+              </div>
+            </div>
+            <form class="message-form">
+              <input
+                aria-label="本机预览消息"
+                placeholder="发一条预览消息…"
+                maxlength="200"
+              /><button data-glitch data-label="发送" type="submit">发送</button>
+            </form>
+          </div>
+          <div class="edge-copy edge-one" aria-hidden="true"></div>
+          <div class="edge-copy edge-two" aria-hidden="true"></div>
+        </aside>
+        <section class="frame source-panel" data-fracture aria-label="播放方式样式预览">
+          <div class="frame-body source-body">
+            <div class="source-top">
+              <div class="mode-tabs" role="tablist" aria-label="播放方式预览">
+                <button
+                  role="tab"
+                  aria-selected="true"
+                  data-mode="together"
+                  data-glitch
+                  data-label="共同播放"
+                >
+                  <svg><use href="#play" /></svg><span>共同播放</span>
+                </button>
+                <button
+                  role="tab"
+                  aria-selected="false"
+                  data-mode="screen"
+                  data-glitch
+                  data-label="共享画面"
+                >
+                  <svg><use href="#screen" /></svg><span>共享画面</span>
+                </button>
+                <button
+                  role="tab"
+                  aria-selected="false"
+                  data-mode="file"
+                  data-glitch
+                  data-label="本地视频"
+                >
+                  <svg><use href="#file" /></svg><span>本地视频</span>
+                </button>
+              </div>
+              <button
+                class="voice-preview"
+                data-glitch
+                data-label="语音预览"
+                title="只预览面板，不申请麦克风权限"
+              >
+                <svg><use href="#mic" /></svg><span>语音预览</span>
+              </button>
+            </div>
+            <form class="source-form">
+              <label class="source-input"
+                ><svg><use href="#link" /></svg
+                ><input type="text" aria-label="链接样式预览" placeholder="粘贴视频链接…" /></label
+              ><button type="submit" class="primary" data-glitch data-label="同步此链接">
+                <span>同步此链接</span><svg><use href="#arrow" /></svg>
+              </button>
+            </form>
+            <div class="mode-description" aria-live="polite">各自加载，同步进度。</div>
+            <div class="voice-panel" hidden>
+              语音面板样式预览 · 此页面不连接房间，也不访问麦克风。
+            </div>
+          </div>
+          <div class="edge-copy edge-one" aria-hidden="true"></div>
+          <div class="edge-copy edge-two" aria-hidden="true"></div>
+        </section>
+      </main>
+      <footer class="notes">
+        <p>
+          <span class="note-marker"></span
+          ><span id="scheme-note">黄黑大色块 · 品红 / 冰青切片 · 高对比硬切</span>
+        </p>
+        <div>
+          <span>鼠标掠过触发 · 视频区域保持完整</span
+          ><a
+            href="https://www.cnblogs.com/dragonir/p/14878001.html"
+            target="_blank"
+            rel="noreferrer"
+            >参考 Dragonir 原文 ↗</a
+          >
+        </div>
+      </footer>
+    </div>
+    <div class="toast" role="status" hidden></div>
+    <script type="module" src="./preview.js"></script>
+  </body>
+</html>

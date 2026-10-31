@@ -1,0 +1,19 @@
+{
+  "at": "2026-10-31T05:04:18.147Z",
+  "preview": "https://article-four.videosreeeen.pages.dev",
+  "immutable": "https://c48295d5.videosreeeen.pages.dev",
+  "productionEntry": "./assets/index-ByAASs3a.js",
+  "hashes": {
+    "a.jpg": "2c90a63399589508c832c892d661af34c059cd39e21c424ade6475fac97cbdd3",
+    "b.jpg": "d7b7e18d39472a73de43291193f56cccc436b67f68723cc7a5e529753a86108d",
+    "board.css": "9a8dda9c8d80b8c524597f963a888947e2734de386f77cbab739eb16f7b536b1",
+    "board.html": "c45fe69402b3618a8ae4d91971275151f9e4d81939baa252cce21c1b23907ca8",
+    "c.jpg": "21a053e0623d85615df6b65b2bb3090b4434e0eeae01d6b385902c325733f66a",
+    "d.jpg": "12c534b46d02bc8557a06539476b5f5aab727a85498fe5fe64a1169353d7591f",
+    "index.html": "4f43747d9f18c1713faddab04e27abe395f436c6d6d513e707e0f7a9b379cae2",
+    "poster.jpg": "a6e3fc63f383653f24d60840f57b8504556629ea5b87a7f975283642e0e5ea11",
+    "preview.js": "051a13974abb794990056801fd82e48b90173d2277e21e98e323eddb7e0cda66",
+    "sky.png": "48e5b26cbf31428e23df58d83d4770edb5fdf4655f2dea3298e25e9f935cba69",
+    "styles.css": "0b4879836e9ab3bbb7f3e28e98624b66de5e1c8b2af0678b277d2629dd595dfd"
+  }
+}

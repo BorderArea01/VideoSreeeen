@@ -20,5 +20,8 @@
 - https://webtorrent.io/faq
 - https://github.com/Novage/p2p-media-loader
 - https://developers.cloudflare.com/durable-objects/best-practices/websockets/
+- Dragonir《仅用 CSS 几步实现赛博朋克 2077 风格视觉效果》：https://www.cnblogs.com/dragonir/p/14878001.html 。四版独立视觉方案参考其分层裁切与阶跃动画思路；页面、配色、切片坐标和时序独立实现，未复制文章图片或完整示例。
+
+`docs/design/article-glitch/poster.jpg` 是 MDN CC0 `flower.mp4` 的本地提取缩略图；视频不提交和打包，设计预览仅在用户点击播放时直接访问 MDN 样片地址。
 
 项目代码为独立实现，未整体导入这两个参考项目。测试真实视频使用 MDN 提供的 CC0 flower.mp4，只在验收时获取，不提交仓库或分发到安装包。

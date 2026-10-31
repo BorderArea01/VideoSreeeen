@@ -1,8 +1,10 @@
 # 0.4.0 验证记录
 
+2026-10-31 按 CSS 故障艺术文章推翻旧外观、重写四套色调与交互的独立方案，见 [四版方案验收](verification-article-glitch.md)。尚待用户选择，不代表已更新正式播放器或客户端。
+
 可选外观、随机分配、播放中切换和故障艺术素材见 [2026-10-31 界面皮肤](appearance.md)。
 
-用户已从[四张概念稿](design/glitch-concepts/README.md)中选择 A，真实界面、边缘照片条块动效、隔离验证与独立部署见 [A「天光断层」](appearance-daylight-a.md)。[图稿与方案页交付检查](design/glitch-concepts-verification.md) 与此前 [B 系列预览验证](design/skin-directions-verification.md) 保留为历史记录。
+此前从[四张概念稿](design/glitch-concepts/README.md)中选择的 A，真实界面、隔离验证与独立部署见 [A「天光断层」](appearance-daylight-a.md)。用户现已要求推翻旧外观，以上 A 与[图稿交付检查](design/glitch-concepts-verification.md)、[B 系列预览验证](design/skin-directions-verification.md)均保留为历史记录；当前四版待选方案见上方新记录。
 
 共同缓存面板布局整理、目录选择与桌面 / 窄屏截图见 [2026-10-31 缓存设置界面](verification-cache-ui.md)。
 
