@@ -60,4 +60,13 @@ Edit this existing production photographic background. Preserve its exact photog
 
 ## 部署回执
 
-前一预览 `fa95d7c0`、源码 `26e5391` 使用固定照片条块，是这轮用户反馈的基线。以下将记录本轮实际部署和验证结果。
+前一预览 `fa95d7c0`、源码 `26e5391` 使用固定照片条块，是这轮用户反馈的基线。
+
+- 本轮源码 `7a1fbdd`；2026-10-31 部署到独立 Pages 预览 `0253c709`，固定地址 <https://0253c709.videosreeeen.pages.dev/?skin=glitch>，别名 <https://daylight-a.videosreeeen.pages.dev/?skin=glitch>。
+- 最终构建、本地和公网 `test:appearance`、A 皮肤 `test:player-controls` 通过。真实双端 MP4、文字聊天、语音收听后换肤、拖拽 / 停靠、皮肤记忆与全屏恢复正常；保持同一播放器，0 次 loadstart，换肤没有房间控制。MP4 / HLS 预览、精细定位、暂停 / 跳转与约 1 秒闲置隐藏回归通过。没有访问物理麦克风，不是手机真机结论。
+- 公网活动边缘采样：移动前深色 1,541 / 浅色 12,513 像素，移动后新边缘深色 3,189 / 浅色 12,837，旧位置均为 0。静止后恢复透明。数值只验证输出位置与清理，不代替主观风格评价。
+- 实时取样检查：本地纯金色底图产生 1,481 个同色实际碎片像素，公网产生 4,353 个；两端均无旧断层 PNG 资源请求。测试后恢复正常天空，影片未被用作素材。
+- 实录 `.local/daylight-motion.webm`：5.45 秒、1152×768、576,408 字节。已检查连续截帧中条带的保持 / 跳变、独立丢弃及恢复，未制作概念图动画。390×844 窗口滚动 325px 后照片仍完整 cover，缩略采样 982 种照片色值。
+- 公网 HTML、6 个资源及预览别名与本地构建逐字节一致。入口 `index-eqo0Z8D4.js` SHA-256 `7ad76bc3baaf3a8b00cdcfcb194c609886729a2f2fb37cfcdb86cf80fc48c089`；CSS `index-Ba_wyFUD.css` SHA-256 `36964723dad06c659c2a257154da243899f4a25a8962111a3382bcd74338b35d`；天空 SHA-256 `48e5b26cbf31428e23df58d83d4770edb5fdf4655f2dea3298e25e9f935cba69`。
+- 正式入口仍为 `assets/index-ByAASs3a.js`，未改房间 Worker / Durable Objects、用户房间状态、已发布客户端或助手，没有创建付费资源、TURN、标签或 Release。代码只推送现有开发分支，不触发手动客户端发布工作流。
+- dist 与 Pages 上传目录各约 3.18 MiB，比上一预览各减少约 2.09 MiB；服务端输出约 0.28 MiB。当前输出原位覆盖，继续使用 `.local/rollback/manifest.json` 中的唯一回退，没有新增候选安装包或备份目录。D 盘可用约 45.71 GiB。
