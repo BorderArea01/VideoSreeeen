@@ -20,4 +20,14 @@
 
 本地两套检查均通过。1440 像素宽屏下，C 视频宽度 992 → 1336 → 992 像素；A 为 907.31 → 1290.25 → 907.31；原版为 954.41 → 1310.41 → 954.41。实际播放中收起仍保持播放，语音收听状态不变，无新增媒体加载和房间控制消息，麦克风申请为 0。C 的 31 帧装饰 / 视频隔离比对最大通道差异为 0。已目视检查桌面与 320 像素语音面板截图。
 
-本地证据 `.local/signal-theme-evidence.json`、`.local/appearance-evidence.json`。正式部署结果另行补充。
+本地证据 `.local/signal-theme-evidence.json`、`.local/appearance-evidence.json`。
+
+## 正式部署
+
+源码 `471b4fd` 对应构建已集中更新正式 Pages 一次，部署 `45c1ad16`。入口仍为 [videosreeeen.pages.dev](https://videosreeeen.pages.dev/)，没有新增独立预览地址，没有部署房间 Worker 或触发客户端 Release。
+
+正式入口又在全新隔离双端房间运行 `test:signal-theme`，三主题收起 / 展开、语音收听保持、弹层命中、聊天、全屏恢复、320 / 390 窄屏与 31 帧视频保护检查均通过。`.local/signal-theme-public-evidence.json` 记录零换片 / 控制消息、零麦克风申请、检查通过与浏览器清理完成。未刷新或控制用户正在观看的房间。
+
+正式 HTML 与全部 11 项静态资源逐一下载核对 SHA-256，`/healthz` 健康，回执见 [sidebar-layout-deployment.json](sidebar-layout-deployment.json)。入口 `assets/index-CmabPGbA.js`，样式 `assets/index-CWzO1mK8.css`。助手仍为 0.1.1，ZIP 未改变。
+
+当前网页构建约 3.20 MiB，未新增安装包或历史构建副本；唯一既有回退仍由 `.local/rollback/manifest.json` 定位，未另建回退。D 盘检查剩余约 49.86 GiB。

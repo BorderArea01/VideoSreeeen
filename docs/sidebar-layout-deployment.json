@@ -1,0 +1,66 @@
+{
+  "at": "2026-10-31T10:25:27.982Z",
+  "url": "https://videosreeeen.pages.dev",
+  "entry": "./assets/index-CmabPGbA.js",
+  "healthOK": true,
+  "bytes": 3360478,
+  "assets": [
+    {
+      "asset": "assets/daylight-sky-CuDSnB5C.png",
+      "bytes": 2403754,
+      "sha256": "48e5b26cbf31428e23df58d83d4770edb5fdf4655f2dea3298e25e9f935cba69"
+    },
+    {
+      "asset": "assets/disk-cache-worker-tARWS97h.js",
+      "bytes": 9062,
+      "sha256": "3df281cea431ab46b525e51292d665c6f3a825ee4b0e6cdfd1d9373562b0d597"
+    },
+    {
+      "asset": "assets/hls-fKiPGt_L.js",
+      "bytes": 592559,
+      "sha256": "6b4baffabedbc882577d7f69ecc7241c9f44c65ee9275c5d211bcdde90a2e0da"
+    },
+    {
+      "asset": "assets/index-CmabPGbA.js",
+      "bytes": 246122,
+      "sha256": "fcef3a341f5ea6c8d96308cac5544565cbe98a2c053eec9671033ad7dea45e93"
+    },
+    {
+      "asset": "assets/index-CWzO1mK8.css",
+      "bytes": 78954,
+      "sha256": "31153d3c47fbfa7b6dbdda2ef7256a892c2f9f90858c128f6783991a7d1f386a"
+    },
+    {
+      "asset": "assets/voice-worklet-CXYuCvEA.js",
+      "bytes": 4333,
+      "sha256": "bc3bb1f45329f025ba9ee6078125df5f37e52df201df618642455b9b52691401"
+    },
+    {
+      "asset": "downloads/VideoSreeeen-SourceHelper.zip",
+      "bytes": 18483,
+      "sha256": "4c94b6e9c51934513326402fd1d34a21d42da72f3a3052349113f85b38a13307"
+    },
+    {
+      "asset": "icon.svg",
+      "bytes": 387,
+      "sha256": "49ca5d04cc87f5431a96efc6f87beba6a6b5d8ce7e81c8c38e6868f4e6859f28"
+    },
+    {
+      "asset": "index.html",
+      "bytes": 542,
+      "sha256": "87ba7929793a59abf72eae071ab894dab145070d2d02f8ec339668450737f217"
+    },
+    {
+      "asset": "licenses/noble-hashes.txt",
+      "bytes": 1109,
+      "sha256": "4f221aee6e072336700c408c68ab3b96a3fc09f6aebe6f48f1bd99e5ef13faec"
+    },
+    {
+      "asset": "public-video-sw.js",
+      "bytes": 5173,
+      "sha256": "9dd4de83289652bbbe58ff7a987699ad7c0bdfb2c3a8b76cc885e450cd8639a1"
+    }
+  ],
+  "deployment": "45c1ad16",
+  "sourceCommit": "471b4fd"
+}
