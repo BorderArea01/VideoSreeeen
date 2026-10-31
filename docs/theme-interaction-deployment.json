@@ -1,0 +1,184 @@
+{
+  "at": "2026-10-31T11:30:46.504Z",
+  "url": "https://videosreeeen.pages.dev",
+  "deployment": "418855be",
+  "sourceCommit": "3aa18ec",
+  "healthOK": true,
+  "bytes": 3750390,
+  "assets": [
+    {
+      "asset": "assets/chakra-petch-latin-600-normal-DVQm9bgb.woff2",
+      "bytes": 9968,
+      "sha256": "a5888696e9eb1b4bbbecc8eb3922b8369f49d4bddb72263e033cbd17f399be76"
+    },
+    {
+      "asset": "assets/daylight-sky-CuDSnB5C.png",
+      "bytes": 2403754,
+      "sha256": "48e5b26cbf31428e23df58d83d4770edb5fdf4655f2dea3298e25e9f935cba69"
+    },
+    {
+      "asset": "assets/disk-cache-worker-tARWS97h.js",
+      "bytes": 9062,
+      "sha256": "3df281cea431ab46b525e51292d665c6f3a825ee4b0e6cdfd1d9373562b0d597"
+    },
+    {
+      "asset": "assets/hls-fKiPGt_L.js",
+      "bytes": 592559,
+      "sha256": "6b4baffabedbc882577d7f69ecc7241c9f44c65ee9275c5d211bcdde90a2e0da"
+    },
+    {
+      "asset": "assets/index-CRWp1pPP.css",
+      "bytes": 83020,
+      "sha256": "12aa8fc6f02698e7fcc0a7ad664f38c2e18e8e43c15869784e9dc66c49f249ed"
+    },
+    {
+      "asset": "assets/index-Dn7heQsQ.js",
+      "bytes": 250638,
+      "sha256": "63b9d82698d1cafc2919695e724619ca224f85a807422e9bda8a235c4fc0b92b"
+    },
+    {
+      "asset": "assets/voice-worklet-CXYuCvEA.js",
+      "bytes": 4333,
+      "sha256": "bc3bb1f45329f025ba9ee6078125df5f37e52df201df618642455b9b52691401"
+    },
+    {
+      "asset": "assets/zcool-qingke-huangyou-105-400-normal-C2PWaBhy.woff2",
+      "bytes": 58900,
+      "sha256": "84219e245fdd6d8fcf667c33529703932fddc8ae2b138ff00f4e7a3b5e95b5ce"
+    },
+    {
+      "asset": "assets/zcool-qingke-huangyou-111-400-normal-Cf25zVik.woff2",
+      "bytes": 60660,
+      "sha256": "db0924c0159b58de219bf0c9fb98b3cd8017215b3c1e8f158eb3d3e88ca1d3ca"
+    },
+    {
+      "asset": "assets/zcool-qingke-huangyou-112-400-normal-CTfiTfOy.woff2",
+      "bytes": 54844,
+      "sha256": "2c068c40672a659268e0a183c45c50df23320e3744f60d89ad3b68e8d382fb66"
+    },
+    {
+      "asset": "assets/zcool-qingke-huangyou-115-400-normal-Pu4XsB99.woff2",
+      "bytes": 51392,
+      "sha256": "dd994d4092069a0d34915196712c2e88133fd6d1d88ed8b9d4b3baf1430a54c2"
+    },
+    {
+      "asset": "assets/zcool-qingke-huangyou-116-400-normal-BZhzVL1t.woff2",
+      "bytes": 47160,
+      "sha256": "a9488d9cf64f3f59c89434519d6a572adbbf20174701d131610f14a42936a342"
+    },
+    {
+      "asset": "assets/zcool-qingke-huangyou-117-400-normal-Bo1FTfyX.woff2",
+      "bytes": 47080,
+      "sha256": "5ef1387f70328f660b12ca2ee99a09673a690d1901a3f4885ba97974cc411ad3"
+    },
+    {
+      "asset": "assets/zcool-qingke-huangyou-118-400-normal-bwFTX4f3.woff2",
+      "bytes": 41436,
+      "sha256": "16a3a95ae3a8d860f0c40d85ca8c3f92ffed3e60f9ab898c927932f96fa6277e"
+    },
+    {
+      "asset": "downloads/VideoSreeeen-SourceHelper.zip",
+      "bytes": 18483,
+      "sha256": "4c94b6e9c51934513326402fd1d34a21d42da72f3a3052349113f85b38a13307"
+    },
+    {
+      "asset": "icon.svg",
+      "bytes": 387,
+      "sha256": "49ca5d04cc87f5431a96efc6f87beba6a6b5d8ce7e81c8c38e6868f4e6859f28"
+    },
+    {
+      "asset": "index.html",
+      "bytes": 542,
+      "sha256": "56043d7464abaf422457ceab23bbb9f01950a1158a8925457dc7843bcb3c94ff"
+    },
+    {
+      "asset": "licenses/fonts/chakra-petch-OFL.txt",
+      "bytes": 5472,
+      "sha256": "8f32c96ea465c5916489845361238b31b365414228bc2e4e45e3ae98ba1d311a"
+    },
+    {
+      "asset": "licenses/fonts/zcool-qingke-huangyou-OFL.txt",
+      "bytes": 4418,
+      "sha256": "50b72b139fd95a876853c42bbb22c24e0690d88fb50cb992c06b166f8ba7304a"
+    },
+    {
+      "asset": "licenses/noble-hashes.txt",
+      "bytes": 1109,
+      "sha256": "4f221aee6e072336700c408c68ab3b96a3fc09f6aebe6f48f1bd99e5ef13faec"
+    },
+    {
+      "asset": "public-video-sw.js",
+      "bytes": 5173,
+      "sha256": "9dd4de83289652bbbe58ff7a987699ad7c0bdfb2c3a8b76cc885e450cd8639a1"
+    }
+  ],
+  "verification": {
+    "appearance": {
+      "checkedAt": "2026-10-31T11:29:22.917Z",
+      "passed": true,
+      "hoverChance": {
+        "rejectedAtHalf": true,
+        "noRerollWithinControl": true,
+        "reentryCanTrigger": true
+      },
+      "fileButtonFragmentTails": {
+        "pixels": 244,
+        "differentEnds": 9,
+        "inputPixels": 0
+      },
+      "protectedVideoAndInputs": true
+    },
+    "signal": {
+      "checkedAt": "2026-10-31T11:28:24.966Z",
+      "passed": true,
+      "typography": {
+        "techLoaded": true,
+        "tubeLoaded": true,
+        "brand": {
+          "font": "\"Signal Tech\", Bahnschrift, \"Segoe UI\", \"Microsoft YaHei UI\", \"PingFang SC\", sans-serif",
+          "glow": "rgb(255, 255, 255) 0px 0px 2px, rgba(239, 138, 255, 0.61) 0px 0px 8px, rgba(168, 73, 216, 0.42) 0px 0px 22px"
+        },
+        "chatTitle": {
+          "font": "\"Signal Tube\", Bahnschrift, \"Segoe UI\", \"Microsoft YaHei UI\", \"PingFang SC\", sans-serif",
+          "glow": "rgb(255, 255, 255) 0px 0px 1px, rgba(231, 140, 255, 0.7) 0px 0px 5px, rgba(168, 73, 216, 0.4) 0px 0px 13px"
+        },
+        "bubble": {
+          "font": "\"Segoe UI\", \"Microsoft YaHei UI\", \"PingFang SC\", sans-serif",
+          "glow": "none"
+        },
+        "transport": {
+          "font": "Bahnschrift, \"Segoe UI\", \"Microsoft YaHei UI\", \"PingFang SC\", sans-serif",
+          "glow": "none"
+        },
+        "sources": [
+          "https://videosreeeen.pages.dev",
+          "https://videosreeeen.pages.dev",
+          "https://videosreeeen.pages.dev",
+          "https://videosreeeen.pages.dev",
+          "https://videosreeeen.pages.dev",
+          "https://videosreeeen.pages.dev"
+        ]
+      },
+      "hoverChance": {
+        "rejectedAtHalf": true,
+        "noRerollWithinControl": true,
+        "variation": {
+          "active": true,
+          "travel": 0.76,
+          "size": 0.8400000000000001
+        },
+        "changedVariation": {
+          "travel": 0.97,
+          "size": 0.9800000000000001
+        }
+      },
+      "videoGuard": {
+        "samples": 31,
+        "maxChannelDifference": 0,
+        "tolerance": 1
+      },
+      "microphoneRequests": 0
+    },
+    "realPhone": false
+  }
+}
