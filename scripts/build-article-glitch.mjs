@@ -22,7 +22,6 @@ for (const name of [
 ]) {
   await cp(path.join(source, name), path.join(target, name));
 }
-await cp(path.join(root, 'client/assets/themes/daylight-sky.png'), path.join(target, 'sky.png'));
 const bytes = (
   await Promise.all(
     (await readdir(target)).map(async (name) => (await stat(path.join(target, name))).size),

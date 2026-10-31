@@ -4,8 +4,14 @@ import { createServer } from 'node:http';
 import { readFile, writeFile, stat, mkdir } from 'node:fs/promises';
 import { resolve, extname, sep } from 'node:path';
 import { chromium } from 'playwright';
+import { createRequire } from 'node:module';
+
+const { PNG } = createRequire(import.meta.url)(
+  resolve('node_modules/playwright-core/lib/utilsBundle.js'),
+);
 
 const source = resolve('docs/design/article-glitch');
+const captureOnly = process.argv.includes('--capture-only');
 const mime = {
   '.html': 'text/html; charset=utf-8',
   '.js': 'text/javascript',
@@ -22,7 +28,6 @@ const server = createServer(async (req, res) => {
       res.writeHead(403).end();
       return;
     }
-    if (pathname === '/sky.png') file = resolve('client/assets/themes/daylight-sky.png');
     if ((await stat(file)).isDirectory()) file = resolve(file, 'index.html');
     const data = await readFile(file);
     res.writeHead(200, { 'Content-Type': mime[extname(file)] || 'application/octet-stream' });
@@ -87,6 +92,20 @@ try {
         fullPage: true,
       });
     }
+    assert.equal(
+      await page
+        .locator('[data-glitch]')
+        .evaluateAll((buttons) =>
+          buttons.every(
+            (el) =>
+              getComputedStyle(el).color ===
+              getComputedStyle(el.querySelector('.control-counter')).color,
+          ),
+        ),
+      true,
+      'Original-colour copy inherits the actual text colour',
+    );
+    if (captureOnly) continue;
     const button = page.locator('.primary');
     await button.hover();
     await page.waitForTimeout(100);
@@ -96,6 +115,7 @@ try {
       return {
         name: s.animationName,
         easing: s.animationTimingFunction,
+        inversion: s.filter,
         duration: s.animationDuration,
         text: copy?.textContent ?? s.content,
         clip: s.clipPath,
@@ -104,7 +124,8 @@ try {
       };
     });
     assert.equal(active.name, 'control-cut');
-    assert.equal(active.easing, 'steps(2)');
+    assert.match(active.easing, /^(steps\(1\)|step-end)$/);
+    assert.equal(active.inversion, 'invert(1)');
     assert.equal(active.pointerEvents, 'none');
     assert.ok(active.text.includes('同步此链接'));
     await page.screenshot({ path: resolve(`.local/screenshots/article-${scheme}-active.png`) });
@@ -116,22 +137,17 @@ try {
       0,
       'Finite motion must stop while hovered',
     );
-    const frame = await page.locator('.conversation').boundingBox();
-    await page.mouse.move(frame.x + frame.width - 4, frame.y + frame.height / 3);
+    const frame = await page.locator('.room-chat').boundingBox();
+    await page.mouse.move(frame.x + frame.width / 2, frame.y + 5);
     await page.waitForTimeout(100);
     assert.equal(
-      await page.locator('.conversation').evaluate((el) => el.classList.contains('is-glitching')),
+      await page.locator('.room-chat').evaluate((el) => el.classList.contains('is-glitching')),
       true,
     );
-    const filmZ = await page.evaluate(() => ({
-      surface: +getComputedStyle(document.querySelector('.video-surface')).zIndex,
-      effect: +getComputedStyle(document.querySelector('.film-frame .edge-copy')).zIndex,
-    }));
-    assert.ok(filmZ.surface > filmZ.effect, 'All video pixels above decorative fragments');
     await page.mouse.move(9, 270);
     await page.waitForTimeout(80);
     assert.equal(
-      await page.locator('.sky').evaluate((el) => el.classList.contains('is-glitching')),
+      await page.locator('.ambient-field').evaluate((el) => el.classList.contains('is-glitching')),
       true,
     );
     await page.waitForTimeout(1150);
@@ -141,6 +157,30 @@ try {
       ),
       0,
     );
+    assert.equal(await page.locator('.sky, .sky-copy, .edge-copy').count(), 0);
+    assert.equal(
+      await page.evaluate(
+        () =>
+          [...document.querySelectorAll('*')].filter((el) =>
+            getComputedStyle(el).backgroundImage.includes('url('),
+          ).length,
+      ),
+      0,
+      'No photo backgrounds',
+    );
+    assert.equal(
+      await page.locator('.stage-shell [data-glitch], .stage-shell [data-fracture]').count(),
+      0,
+    );
+    assert.equal(
+      await page.evaluate(() =>
+        [...document.querySelectorAll('.panel,.glitch-control')].every((el) =>
+          getComputedStyle(el).contain.includes('paint'),
+        ),
+      ),
+      true,
+    );
+    const protectedFrames = await checkVideoPixels(page);
     await page.getByRole('tab', { name: '共享画面' }).click();
     await page.getByRole('tab', { name: '共享画面' }).press('ArrowRight');
     assert.equal(await page.locator('[data-mode=file]').getAttribute('aria-selected'), 'true');
@@ -148,7 +188,7 @@ try {
     await page.locator('.message-form button').click();
     assert.equal(await page.locator('.messages img').count(), 0);
     assert.ok((await page.locator('.messages').innerText()).includes('<img src=x> 本机 👋'));
-    const initialChatHeight = await page.locator('.conversation').evaluate((el) => el.clientHeight);
+    const initialChatHeight = await page.locator('.room-chat').evaluate((el) => el.clientHeight);
     await page.locator('.messages').evaluate((el) => {
       for (let i = 0; i < 25; i++) el.append(el.firstElementChild.cloneNode(true));
     });
@@ -157,12 +197,12 @@ try {
       .evaluate((el) => ({ height: el.clientHeight, total: el.scrollHeight }));
     assert.ok(log.total > log.height);
     assert.equal(
-      await page.locator('.conversation').evaluate((el) => el.clientHeight),
+      await page.locator('.room-chat').evaluate((el) => el.clientHeight),
       initialChatHeight,
       'Chat history cannot grow the panel',
     );
     await page.locator('.chat-toggle').click();
-    assert.equal(await page.locator('.conversation').isVisible(), false);
+    assert.equal(await page.locator('.room-chat').isVisible(), false);
     await page.locator('.chat-toggle').click();
     await page.locator('.voice-preview').click();
     assert.equal(await page.locator('.voice-panel').isVisible(), true);
@@ -174,13 +214,14 @@ try {
       return v.readyState >= 2 && v.videoWidth > 0 && !v.paused;
     });
     evidence.variants[scheme] = {
+      videoPixelGuard: protectedFrames,
       button: active,
       video: await page
         .locator('video')
         .evaluate((v) => ({ width: v.videoWidth, height: v.videoHeight, paused: v.paused })),
       palettes: await page.evaluate(() => ({
         accent: getComputedStyle(document.documentElement).getPropertyValue('--accent'),
-        panel: getComputedStyle(document.documentElement).getPropertyValue('--panel'),
+        panel: getComputedStyle(document.documentElement).getPropertyValue('--paper'),
       })),
     };
     await page.locator('.motion-toggle').click();
@@ -206,7 +247,12 @@ try {
     assert.equal(await page.evaluate(() => document.getAnimations().length), 0);
     await page.emulateMedia({ reducedMotion: 'no-preference' });
   }
-  assert.equal(new Set(Object.values(evidence.variants).map((v) => v.palettes.accent)).size, 4);
+  if (!captureOnly)
+    assert.equal(new Set(Object.values(evidence.variants).map((v) => v.palettes.accent)).size, 4);
+  assert.equal(
+    requests.some((url) => /\bsky\.(png|webp)|daylight-sky/.test(url)),
+    false,
+  );
   assert.equal(
     requests.some((url) => /^(wss?|https?):.*\/(ws|voice|broadcast-relay)(\?|$)/.test(url)),
     false,
@@ -230,10 +276,94 @@ try {
     fullPage: true,
   });
   await context.close();
-  await writeFile('.local/article-glitch-verification.json', JSON.stringify(evidence, null, 2));
-  console.log(JSON.stringify(evidence, null, 2));
+  if (!captureOnly)
+    await writeFile('.local/article-glitch-verification.json', JSON.stringify(evidence, null, 2));
+  console.log(
+    captureOnly
+      ? 'Only refreshed current design screenshots; no functional checks claimed.'
+      : JSON.stringify(evidence, null, 2),
+  );
 } finally {
   await browser.close();
   server.close();
   await once(server, 'close');
+}
+
+// Pixel proof catches neighbouring stacking contexts, not just the player's own z-index.
+async function checkVideoPixels(page) {
+  await page.mouse.move(0, 0);
+  await page.evaluate(() => {
+    document.querySelector('video').controls = false;
+  });
+  await page.waitForTimeout(500);
+  const rect = await page.locator('.video-surface').boundingBox();
+  const clip = {
+    x: Math.ceil(rect.x) + 1,
+    y: Math.ceil(rect.y) + 1,
+    width: Math.floor(rect.width) - 2,
+    height: Math.floor(rect.height) - 2,
+  };
+  const baseline = await page.screenshot({ clip });
+  const baselinePixels = PNG.sync.read(baseline);
+  let maxChannelDifference = 0;
+  await page.evaluate(() => {
+    for (const el of document.querySelectorAll('.panel,[data-glitch],.ambient-field'))
+      el.classList.add('is-glitching');
+    window.__glitchAnimations = document.getAnimations();
+    for (const animation of window.__glitchAnimations) animation.pause();
+  });
+  for (let ms = 0; ms <= 900; ms += 30) {
+    await page.evaluate((ms) => {
+      for (const animation of window.__glitchAnimations) animation.currentTime = ms;
+    }, ms);
+    const frame = await page.screenshot({ clip });
+    if (!frame.equals(baseline)) {
+      const pixels = PNG.sync.read(frame);
+      assert.equal(pixels.width, baselinePixels.width);
+      assert.equal(pixels.height, baselinePixels.height);
+      let delta = 0;
+      for (let i = 0; i < pixels.data.length; i++)
+        delta = Math.max(delta, Math.abs(pixels.data[i] - baselinePixels.data[i]));
+      maxChannelDifference = Math.max(maxChannelDifference, delta);
+      if (delta > 1) {
+        await writeFile('.local/screenshots/article-video-before.png', baseline);
+        await writeFile('.local/screenshots/article-video-after.png', frame);
+      }
+      // A new compositing layer can round one RGB channel by one unit. Nothing larger is allowed.
+      assert.ok(
+        delta <= 1,
+        'Glitch overlapped video at ' + ms + ' ms; maximum channel difference ' + delta,
+      );
+    }
+    if (ms === 90) {
+      const pair = await page.locator('.primary').evaluate((el) => {
+        const a = getComputedStyle(el.querySelector('.control-copy')),
+          b = getComputedStyle(el.querySelector('.control-counter'));
+        return {
+          inverse: a.filter,
+          positive: b.filter,
+          x1: new DOMMatrix(a.transform).m41,
+          x2: new DOMMatrix(b.transform).m41,
+        };
+      });
+      assert.equal(pair.inverse, 'invert(1)');
+      assert.equal(pair.positive, 'none');
+      assert.ok(pair.x1 * pair.x2 < 0, 'Opposite strip movement');
+      await page.screenshot({
+        path: resolve(
+          '.local/screenshots/article-' +
+            (await page.locator('html').getAttribute('data-scheme')) +
+            '-active.png',
+        ),
+        fullPage: true,
+      });
+    }
+  }
+  await page.evaluate(() => {
+    for (const el of document.querySelectorAll('.is-glitching'))
+      el.classList.remove('is-glitching');
+    document.querySelector('video').controls = true;
+    delete window.__glitchAnimations;
+  });
+  return { samples: 31, maxChannelDifference, channelTolerance: 1 };
 }

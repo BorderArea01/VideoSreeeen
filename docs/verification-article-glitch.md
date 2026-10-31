@@ -1,44 +1,38 @@
-# 2026-10-31 四版 CSS 故障艺术方案
+# 2026-10-31 四版故障艺术 · 无照片重写
 
-用户要求推翻旧实现，以 Dragonir 的 [CSS 故障艺术文章](https://www.cnblogs.com/dragonir/p/14878001.html)为第一参考，更换色调，完成四版后选择。本轮只做独立方案，未选择或接入其中一版到正式观影页面。
+本轮按用户指出的三个问题重新制作方案：删除沿用的天空背景；排除旁边容器特效越界；纠正反相机制和粗短切片比例。源目录 docs/design/article-glitch 的 HTML、CSS 和动效触发已重写，旧照片图层及左右窄边碎块均移除。
 
-## 实现
+## 实现与范围
 
-源目录为 `docs/design/article-glitch`：独立 HTML / CSS、少量只负责触发有限动画和本机交互的 JavaScript。没有导入现有 A 版的 Canvas、纹理条块和指针跟随实现。背景分层、按钮整体副本切片、`clip-path` 与阶跃位移均为真实网页效果；四套变量、标题、面板形状、排版和动效节奏分别定义。
+四版为 A 明黄断电、B 赤白偏移、C 紫电噪讯、D 钴蓝反相，使用纯色和几何布局。表面副本使用真实 invert(1)，保留原色的按钮副本向反方向移动；横带为 1–3 CSS 像素高。按钮、面板均设置独立 paint containment 和 overflow clip，裁切不能逸出宿主。视频区域没有任何故障副本或滤镜，画面上的样例播放按钮也不参与故障动画。
 
-四版与实际截图、参考落实和复现入口见 [方案说明](design/article-glitch/README.md)。
+本轮仍为独立视觉方案，不连接房间或语音，不访问麦克风、共享和文件，不替换正式放映厅。参考落实、具体 RGB 反相对和四版截图见 [方案说明](design/article-glitch/README.md)。
 
-## 自动与目视验收
+## 实际验收
 
-通过受控入口串行运行 `scripts/article-glitch-check.mjs`，每次只启动一个隔离 Edge 上下文，结束关闭所属浏览器与本机服务器。
+通过 scripts/controlled.ps1 串行执行 scripts/article-glitch-check.mjs，每次只启动一个隔离 Edge 上下文，结束释放所属浏览器与临时 HTTP 服务。
 
-- 四个 URL 正确选择 A / B / C / D，配色分别不同；截图来自实际 HTML 页面。
-- 鼠标悬停使按钮副本实际出现 `control-cut` 动画，使用 `steps(2)`；包含原文字，带图标按钮包含同一 SVG。装饰副本不能截获点击。
-- 实际移动鼠标到容器边缘、空白背景会触发相应层；结束后，即使指针仍停留也没有运行中的动画。
-- 视频表面位于全部边缘碎片之上，不会因边缘动画遮住影片。
-- 系统“减少动态效果”和本页动效开关均能关闭全部动画。
-- 聊天加长后内部滚动，面板高度不变；输入 `<img src=x>` 作为文字显示，不生成图片节点。
-- 播放方式按钮、键盘方向切换、聊天收起 / 展开、语音样式面板和预览提交提示可操作。
-- 四版实际解码本机 CC0 视频为 960 × 540，能开始播放；该样片分辨率仅属于设计页示例，与产品 B 站取流无关。
-- 桌面 1440 像素、窄屏 390 / 320 像素没有横向溢出；这属于桌面浏览器视口检查，未宣称手机真机验证。
-- 没有页面脚本异常，没有 WebSocket / 房间 / 语音请求，不申请麦克风或屏幕权限。
+- 四版实际 URL、配色、图标文字副本、按钮点击和键盘切换通过。
+- CSS 实际读取到 invert(1)、steps(1)、原色层 filter:none；同一时点原色层和反相层的横向位移符号相反。
+- 页面没有 CSS 图片背景，没有天空图片请求，没有旧天空节点、边缘块节点或 Canvas。
+- 视频内没有 data-glitch / data-fracture；面板和按钮具有 paint containment，所有装饰节点禁止截获点击。
+- 同时激活所有背景、面板和按钮特效；每版按 0–900 ms 的 30 ms 间隔采样 31 帧，共 124 帧，比对完整视频矩形。
+- 本地与公网两轮均通过。视频最大通道差异为 1/255；此一级容差用于合成与光栅舍入的不确定性。任何更大差异均失败，不屏蔽边缘或忽略局部像素。
+- 第一轮也因此发现原生视频控件隐藏尚未结束时基准图不稳定；基准在控件隐藏 500 ms 后采集。没有用不稳定的图冒充遮挡结果。
+- 动效有限结束，无悬停常驻循环；关闭动效与系统减少动态效果时均无动画。
+- 聊天加长后内部滚动，面板高度不变；消息按文字创建，不能注入图片节点。
+- 聊天收起 / 展开、语音样式面板、预览提交提示和样例播放通过，实际解码本机 CC0 文件为 960 × 540。
+- 390 / 320 像素窄屏检查无横向溢出；这是桌面视口检查，不代表手机真机验证。逐帧遮挡比对为桌面 1440 像素布局。
+- 无脚本错误，无 WebSocket / 房间 / 语音请求。视频请求在验收中替换为本地同一 CC0 文件，不代表所有地区到 MDN 的网络都正常。
 
-本机完整结果覆盖写入 `.local/article-glitch-verification.json`，当前动态帧与窄屏截图覆盖写入 `.local/screenshots/article-*`，不累计历史构建。
+公开完整结果覆盖为 .local/article-glitch-verification.json；截图覆盖为当前四张 JPG、overview.jpg 和本机当前动态帧，不累计候选版本。最后修正两处配色描述与副本文字颜色继承；未改变隔离边界、切片几何或时间线。--capture-only 用于更新截图和检查四版副本颜色继承，明确不宣称运行完整功能验收。
 
 ## 构建与部署
 
-静态构建为 `.local/article-glitch-dist`，11 个文件、3.15 MiB，无 Worker、Service Binding、Functions 或房间服务。使用同一已授权免费 Pages 项目，仅更新 `article-four` 预览分支。
+静态构建仅 10 个文件、约 0.74 MiB，已删除天空图分发。没有 Worker、Service Binding 或房间服务。沿用同一授权免费 Pages 项目的 article-four 独立预览分支。
 
-- 固定部署：[c48295d5.videosreeeen.pages.dev](https://c48295d5.videosreeeen.pages.dev/board.html)。
-- 四版入口：[article-four.videosreeeen.pages.dev/board.html](https://article-four.videosreeeen.pages.dev/board.html)。
-- 公开四版浏览器交互复验通过。样片请求在浏览器检查中替换为同一份本地 CC0 文件；该检查证明已部署播放器能够解码与播放，不代表各地到 MDN 的网络均畅通。
-- 全部 11 个公开文件逐一 SHA-256 对上构建产物，包括 HTML、CSS、JS、原照片和四张截图。Pages 会把 `.html` 地址重定向为无后缀地址，核对使用跳转后的完整响应；未忽略或篡改响应差异。
-- 正式页面入口仍为 `assets/index-ByAASs3a.js`，没有部署正式分支或房间 Worker，没有发布客户端或触发 Release 工作流。
+最终固定部署为 [be73be7e](https://be73be7e.videosreeeen.pages.dev/board.html)，全部资源 SHA-256 见 [当前回执](design/article-glitch/deployment.json)。入口为 [四版对比](https://article-four.videosreeeen.pages.dev/board.html)。最终公开 10 个文件逐一与本地产物核对一致；正式入口仍为 assets/index-ByAASs3a.js。未部署正式分支、房间 Worker、客户端、Release 或 Actions。
 
-精确哈希、部署 URL 与检查时间见 [当前部署回执](design/article-glitch/deployment.json)。
+本轮只覆盖一份当前设计构建与四张明确要求的方案截图，没有增加项目回退版本。唯一回退仍由 .local/rollback/manifest.json 定位，未触碰原素材、账号数据或安装包。原始 SVG 图标与 CC0 样片缩略图继续用于功能示意，所有背景绘制均由新 CSS 完成。
 
-产物检查：本轮仅保留一份当前方案构建，源码中的四版截图是用户要求的对比交付物，不是四份回退包。项目唯一回退仍由 `.local/rollback/manifest.json` 定位，本轮未增加回退版本或安装包。结束时 D 盘剩余约 45.49 GiB，无新增大型编译中间目录。
-
-## 边界
-
-这是可以体验的四版视觉方案，不是真实多人观影验收。样例聊天不代表用户，样片是本机播放。用户尚未选择最终方案；本轮不发布客户端、Git 标签或 Release，也不触发客户端 Actions。
+临时对照截图的清理被自动审批以 blocked by policy 拒绝，工具未返回更具体原因；未重试或绕过，保留本轮两张临时 PNG 对照图。
