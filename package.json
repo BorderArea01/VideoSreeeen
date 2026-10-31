@@ -52,6 +52,7 @@
     "release:publish": "node scripts/publish-release.mjs",
     "test:site-broadcast": "tsx scripts/site-broadcast-check.ts",
     "test:playback-modes": "tsx scripts/playback-modes-check.ts",
+    "test:playback-tabs": "tsx scripts/playback-tabs-layout-check.ts",
     "test:chat-overlay": "tsx scripts/chat-overlay-check.ts",
     "test:native-origin": "tsx scripts/native-origin-check.ts",
     "test:native-sync": "tsx scripts/native-sync-check.ts",

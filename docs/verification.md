@@ -1,5 +1,7 @@
 # 0.4.0 验证记录
 
+2026-11-01 播放方式按钮随错误提示被拉高的修正，以及三主题 / 响应式布局检查，见[播放方式按钮布局](verification-playback-tabs-layout.md)。
+
 2026-11-01 B 站大合集视频响应超过 512 KiB 限制的调查、助手 0.1.2 修复及验证，见[大合集响应大小验收](verification-bilibili-metadata-size.md)。
 
 2026-10-31 缓存中途被要求重来、removeEntry 文件占用异常的调查与隔离修复，见[缓存恢复验收](verification-cache-recovery.md)。之后经用户同意只发布网页，房间 Worker 未更新，正式入口独立双端回归已通过。
