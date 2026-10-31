@@ -14,6 +14,20 @@ const files = new Map<
 const hex = (bytes: Uint8Array) => [...bytes].map((b) => b.toString(16).padStart(2, '0')).join('');
 let chain = Promise.resolve();
 let external: FileSystemDirectoryHandle | undefined;
+const deferred = new Map<string, number>();
+async function drainDrops() {
+  let bytes = 0;
+  for (const [name, size] of [...deferred].slice(0, 256)) {
+    try {
+      await external!.removeEntry(name);
+    } catch (cause) {
+      if (!(cause instanceof DOMException && cause.name === 'NotFoundError')) continue;
+    }
+    deferred.delete(name);
+    bytes += size;
+  }
+  return { bytes, pending: deferred.size };
+}
 async function externalBlock(name: string, offset: number, length: number) {
   const data = await (
     await (await external!.getFileHandle(name + '.' + offset + '.part')).getFile()
@@ -26,7 +40,22 @@ globalThis.onmessage = (event: MessageEvent) => {
   chain = chain.then(async () => {
     try {
       let value: unknown;
-      if (action === 'init') {
+      if (action === 'close') {
+        for (const f of files.values()) {
+          try {
+            f.access?.close();
+          } catch {
+            /* Termination still releases a failed handle. */
+          } finally {
+            f.access = undefined;
+          }
+        }
+        files.clear();
+        external = undefined;
+        deferred.clear();
+      } else if (action === 'retry-drops') {
+        value = await drainDrops();
+      } else if (action === 'init') {
         if (files.size || !/^\d+-[a-zA-Z0-9-]{1,80}$/.test(p.directory))
           throw new Error('磁盘缓存目录无效');
         if (
@@ -85,14 +114,14 @@ globalThis.onmessage = (event: MessageEvent) => {
           )
         )
           throw new Error('缓存清理范围无效');
-        let bytes = 0;
         for (const offset of new Set<number>(p.offsets))
           if (f.blocks.has(offset)) {
-            await external.removeEntry(p.name + '.' + offset + '.part');
+            // Withdraw availability first. A locked watched file may remain on
+            // disk, but can never be served or advertised as retained again.
+            deferred.set(p.name + '.' + offset + '.part', Math.min(BLOCK_SIZE, f.size - offset));
             f.blocks.delete(offset);
-            bytes += Math.min(BLOCK_SIZE, f.size - offset);
           }
-        value = bytes;
+        value = await drainDrops();
       } else if (action === 'finish') {
         const hashes: string[] = [];
         const buffer = new Uint8Array(BLOCK_SIZE);
@@ -177,6 +206,7 @@ globalThis.onmessage = (event: MessageEvent) => {
     } catch (cause) {
       globalThis.postMessage({
         id,
+        errorName: cause instanceof DOMException ? cause.name : undefined,
         error:
           cause instanceof DOMException && cause.name === 'QuotaExceededError'
             ? '浏览器磁盘空间不足，缓存未完成。'

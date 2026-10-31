@@ -1,5 +1,7 @@
 # 0.4.0 验证记录
 
+2026-10-31 缓存中途被要求重来、removeEntry 文件占用异常的调查与隔离修复，见[缓存恢复验收](verification-cache-recovery.md)。当前为待上线源码，按用户正在观影的要求，本轮不更新或重启线上。
+
 2026-10-31 紫电全界面主题字体、更多霓虹文字、聊天输入留白及链接图标对齐，见[字体与输入框验收](verification-signal-typography.md)。
 
 2026-10-31 紫电主题字体、霓虹标题、约 50% 随机悬停与天光按钮断层收尾，见[交互与字体验收](verification-theme-interaction.md)。

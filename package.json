@@ -33,6 +33,7 @@
     "test:cache-download": "tsx scripts/cache-download-check.ts",
     "test:cache-parts": "tsx scripts/cache-parts-check.ts",
     "test:cache-window": "node scripts/cache-window-fixture.mjs && tsx scripts/cache-parts-check.ts --eviction",
+    "test:disk-lifecycle": "tsx scripts/disk-lifecycle-check.ts",
     "test:cache-location": "node scripts/cache-window-fixture.mjs && tsx scripts/cache-location-check.ts",
     "verify": "npm run format:check && npm test && npm run build && npm run check:worker && npm run worker:check",
     "test:worker": "tsx scripts/worker-check.ts",

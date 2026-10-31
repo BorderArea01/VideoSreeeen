@@ -390,7 +390,16 @@ let relayPlaybackUrl = '';
 let clearing: Promise<void> = Promise.resolve();
 let clearingBusy = false,
   clearingTicket = 0;
-let cacheContext: { jobId: string; mediaId: string; epoch: number } | null = null;
+let cacheContext: {
+  jobId: string;
+  mediaId: string;
+  epoch: number;
+  code: string;
+  server: string;
+} | null = null;
+let lastCacheProgress: NativeCache | null = null;
+let cachePlaybackFailed = false;
+let cacheStartTicket = 0;
 let hls: Hls | null = null,
   loadedMedia = '',
   loadedKind = '',
@@ -497,8 +506,13 @@ function send(message: ClientMessage) {
     toast('连接尚未恢复，请稍后操作');
     return false;
   }
-  ws.send(JSON.stringify(message));
-  return true;
+  try {
+    ws.send(JSON.stringify(message));
+    return true;
+  } catch {
+    // A transport race must not turn a progress notification into a disk failure.
+    return false;
+  }
 }
 function operation(message: Record<string, unknown>) {
   if (!room || !connected) {
@@ -707,6 +721,8 @@ async function connect(kind: 'create' | 'join', reconnect = false) {
             resume,
           });
           adopt(message.room);
+          if (message.room.finished && cacheContext) queueCacheCleanup(true);
+          else if (lastCacheProgress) cacheProgress(lastCacheProgress, true);
           closeDialog();
           connectionView('同步连接正常', true);
           resolve();
@@ -823,7 +839,8 @@ async function connect(kind: 'create' | 'join', reconnect = false) {
         releasePublisher();
         provideError = '房间连接中断，尚未完成共享，请重新操作';
       }
-      peers.close();
+      if (desiredSession && room?.mode === 'cache') peers.suspend();
+      else peers.close();
       broadcast.close();
       broadcastFallback.close();
       publisher?.pause();
@@ -834,14 +851,13 @@ async function connect(kind: 'create' | 'join', reconnect = false) {
       render();
       if (!welcomed) reject(new Error('服务器连接已关闭'));
       if (desiredSession && (room || restoring)) {
-        if (room?.mode === 'cache') void stopCachedPlayback().catch(error);
         const delay = Math.min(15000, 1000 * 2 ** Math.min(retries++, 4));
         reconnectTimer = setTimeout(() => {
           void connect('join', true).catch((e) => {
             if (!restoring && desiredSession) error(e);
           });
         }, delay);
-      }
+      } else if (room?.mode === 'cache') queueCacheCleanup();
     };
   });
 }
@@ -868,6 +884,8 @@ function adopt(snapshot: Snapshot) {
       snapshot.media?.provider !== 'direct';
     sourceFailed = false;
     cacheContext = null;
+    lastCacheProgress = null;
+    cachePlaybackFailed = false;
     cleanupState = 'idle';
     clearingBusy = true;
     const ticket = ++clearingTicket;
@@ -1442,7 +1460,11 @@ function render() {
         : mine?.state === 'downloading'
           ? `正在完整缓存 · ${Math.floor(mine.progress * 100)}%`
           : mine?.state === 'error'
-            ? '本机缓存未完成'
+            ? cachePlaybackFailed
+              ? '播放暂时中断 · 缓存已保留'
+              : cache.retryPending
+                ? '下载已暂停 · 缓存已保留'
+                : '本机缓存未完成'
             : '等待完整缓存';
   $('cache-stream').hidden = mine?.state !== 'error' || !!room?.finished;
   $('cache-description').textContent =
@@ -1454,24 +1476,32 @@ function render() {
   if (mine?.peerBytes !== undefined)
     $('cache-description').textContent +=
       ` 已从成员接收 ${(mine.peerBytes / 1024 ** 2).toFixed(1)} MiB，源站 ${((mine.sourceBytes ?? 0) / 1024 ** 2).toFixed(1)} MiB。`;
-  if (cacheNote && mine?.state === 'downloading')
-    $('cache-description').textContent += ' ' + cacheNote;
+  if (cacheNote && mine?.state !== 'error') $('cache-description').textContent += ' ' + cacheNote;
   if (room?.cacheSliding && mine?.retainedBytes !== undefined)
     $('cache-description').textContent +=
       ` 本机保留 ${(mine.retainedBytes / 1024 ** 2).toFixed(1)} MiB${mine.released ? `，已清理 ${mine.released} 批` : ''}。灰色进度不可跳转。`;
+  const continuing = cache.retryPending && !!cacheContext;
   $<HTMLButtonElement>('cache-button').disabled =
-    clearingBusy || cacheStartBusy || mine?.state === 'downloading' || mine?.state === 'ready';
+    !connected ||
+    clearingBusy ||
+    (!continuing &&
+      !cachePlaybackFailed &&
+      (cacheStartBusy || mine?.state === 'downloading' || mine?.state === 'ready'));
   $('cache-button').textContent = room?.finished
     ? '重新准备这一部'
-    : mine?.state === 'ready'
-      ? '等待全员就绪'
-      : clearingBusy
-        ? '正在准备缓存…'
-        : mine?.state === 'downloading'
-          ? '正在下载…'
-          : mine?.state === 'error'
-            ? '重试本机缓存'
-            : '开始本机缓存';
+    : continuing
+      ? '继续本机缓存'
+      : cachePlaybackFailed
+        ? '重试本机播放'
+        : mine?.state === 'ready'
+          ? '等待全员就绪'
+          : clearingBusy
+            ? '正在准备缓存…'
+            : mine?.state === 'downloading'
+              ? '正在下载…'
+              : mine?.state === 'error'
+                ? '重试本机缓存'
+                : '开始本机缓存';
   $('extract-button').hidden =
     !isNative ||
     !room?.media ||
@@ -1591,6 +1621,9 @@ function renderChat() {
   messages.scrollTop = nearBottom ? messages.scrollHeight : previousTop;
 }
 async function clearPlayback(keepSite = false, keepPreview = false) {
+  cacheContext = null;
+  lastCacheProgress = null;
+  cachePlaybackFailed = false;
   playerStartup?.abort();
   playerStartup = null;
   playerFirstFrameReady = false;
@@ -1634,6 +1667,8 @@ async function clearPlayback(keepSite = false, keepPreview = false) {
 }
 async function stopCachedPlayback() {
   cacheContext = null;
+  lastCacheProgress = null;
+  cachePlaybackFailed = false;
   if (loadedKind === 'cache') {
     playerStartup?.abort();
     playerStartup = null;
@@ -1653,6 +1688,28 @@ async function stopCachedPlayback() {
     loadedMedia = '';
   }
   await cache.clear();
+}
+function queueCacheCleanup(finished = false) {
+  clearingBusy = true;
+  const ticket = ++clearingTicket;
+  if (finished) cleanupState = 'running';
+  clearing = stopCachedPlayback()
+    .then(
+      () => {
+        if (finished && clearingTicket === ticket) cleanupState = 'done';
+      },
+      (cause) => {
+        if (finished && clearingTicket === ticket) cleanupState = 'error';
+        throw cause;
+      },
+    )
+    .finally(() => {
+      if (clearingTicket === ticket) {
+        clearingBusy = false;
+        render();
+      }
+    });
+  void clearing.catch(error);
 }
 function mediaPath(slot: string) {
   if ((!mediaRelay || room?.media?.source?.bilibiliDirect) && room?.media?.source)
@@ -2358,17 +2415,25 @@ setInterval(configureBroadcast, 3000);
 let lastProgressSend = 0;
 let lastCacheSignature = '';
 let cacheNote = '';
-function cacheProgress(event: NativeCache) {
+function cacheProgress(event: NativeCache, force = false) {
   if (
     event.jobId !== cache.jobId ||
     !room?.media ||
     room.mode !== 'cache' ||
     cacheContext?.jobId !== event.jobId ||
+    cacheContext.code !== room.code ||
+    cacheContext.server !== activeServer ||
     cacheContext.mediaId !== room.media.id ||
     cacheContext.epoch !== room.epoch
   )
     return;
-  if (event.state === 'downloading' && event.error) cacheNote = event.error;
+  lastCacheProgress = {
+    ...event,
+    entry: event.entry ?? lastCacheProgress?.entry,
+    audio: event.audio ?? lastCacheProgress?.audio,
+  };
+  if (!connected) return; // Keep downloading locally; authentication must precede publishing.
+  if (event.state !== 'error') cacheNote = event.error ?? '';
   const now = performance.now();
   const signature = [
     event.jobId,
@@ -2379,6 +2444,7 @@ function cacheProgress(event: NativeCache) {
     event.window?.end ?? '',
   ].join(':');
   if (
+    force ||
     event.state !== 'downloading' ||
     event.entry ||
     signature !== lastCacheSignature ||
@@ -2403,12 +2469,19 @@ function cacheProgress(event: NativeCache) {
       ...(event.error ? { error: event.error } : {}),
     });
   }
-  if (event.entry && (event.state === 'ready' || event.parts?.length)) {
+  const entry = lastCacheProgress.entry;
+  if (
+    entry &&
+    event.state !== 'error' &&
+    (event.state === 'ready' || event.parts?.length) &&
+    (video.getAttribute('src') !== entry || !!video.error || cachePlaybackFailed)
+  ) {
+    cachePlaybackFailed = false;
     loadedKind = 'cache';
     loadedMedia = room.media.id;
     siteOpen = false;
     void nativeCall('closeSite').catch(() => {});
-    void setPlayer(event.entry, event.audio, event.entry.includes('.m3u8')).then(() =>
+    void setPlayer(entry, lastCacheProgress.audio, entry.includes('.m3u8')).then(() =>
       applyPlayback(true),
     );
   }
@@ -2936,6 +3009,26 @@ $('mode-toggle').onclick = () =>
   });
 $('cache-stream').onclick = () => operation({ type: 'mode', mode: 'stream' });
 $('cache-button').onclick = () => {
+  if (
+    cacheContext &&
+    room?.media?.id === cacheContext.mediaId &&
+    room.epoch === cacheContext.epoch
+  ) {
+    if (cache.retryPending) {
+      void (async () => {
+        if (!isNative) await authorizeCacheDirectory();
+        cacheNote = '';
+        cache.resume();
+        render();
+      })().catch(error);
+      return;
+    }
+    if (cachePlaybackFailed && lastCacheProgress?.entry && cache.jobId === cacheContext.jobId) {
+      cacheProgress(lastCacheProgress, true);
+      render();
+      return;
+    }
+  }
   if (room?.finished) {
     operation({
       type: 'mode',
@@ -2950,6 +3043,7 @@ $('cache-button').onclick = () => {
     const mediaId = room.media.id,
       epoch = room.epoch;
     const jobId = crypto.randomUUID();
+    const ticket = ++cacheStartTicket;
     cacheStartBusy = true;
     cacheNote = '';
     send({ type: 'cache', mediaId, epoch, state: 'downloading', progress: 0, bytes: 0 });
@@ -2964,7 +3058,9 @@ $('cache-button').onclick = () => {
       if (loadedKind === 'cache') await stopCachedPlayback();
       if (room?.media?.id !== mediaId || room.epoch !== epoch || !room.media.source) return;
       peers.configure(room, memberId);
-      cacheContext = { jobId, mediaId, epoch };
+      cacheContext = { jobId, mediaId, epoch, code: room.code, server: activeServer };
+      lastCacheProgress = null;
+      cachePlaybackFailed = false;
       await cache.start(
         jobId,
         activeServer,
@@ -2975,6 +3071,10 @@ $('cache-button').onclick = () => {
       );
     } catch (e) {
       if (room?.media?.id === mediaId && room.epoch === epoch) {
+        if (cache.jobId !== jobId) {
+          lastCacheProgress = null;
+          cachePlaybackFailed = false;
+        }
         const reported = send({
           type: 'cache',
           mediaId,
@@ -2987,7 +3087,7 @@ $('cache-button').onclick = () => {
         if (!reported) error(e);
       }
     } finally {
-      cacheStartBusy = false;
+      if (ticket === cacheStartTicket) cacheStartBusy = false;
       render();
     }
   })();
@@ -3055,17 +3155,31 @@ function playbackError(event: Event) {
     audio.pause();
     video.hidden = true;
     render();
-  } else if (loadedKind === 'cache' && room?.media && !clearingBusy && !cacheStartBusy) {
-    send({
-      type: 'cache',
-      mediaId: room.media.id,
-      epoch: room.epoch,
-      state: 'error',
-      progress: 0,
-      bytes: 0,
-      error: '本机缓存无法读取或解码，请重新缓存或返回边播边看。',
-    });
-    void stopCachedPlayback().catch(error);
+  } else if (
+    loadedKind === 'cache' &&
+    room?.media &&
+    !clearingBusy &&
+    !!cache.jobId &&
+    cacheContext?.jobId === cache.jobId
+  ) {
+    cachePlaybackFailed = true;
+    video.pause();
+    audio.pause();
+    if (connected && !cache.retryPending)
+      send({
+        type: 'cache',
+        mediaId: room.media.id,
+        epoch: room.epoch,
+        state: 'error',
+        progress: lastCacheProgress?.progress ?? 0,
+        bytes: lastCacheProgress?.bytes ?? 0,
+        parts: lastCacheProgress?.parts,
+        window: lastCacheProgress?.window,
+        released: lastCacheProgress?.released,
+        retainedBytes: lastCacheProgress?.retainedBytes,
+        error: '本机缓存播放中断，已保留下载内容；可先重试本机播放。',
+      });
+    render();
   } else toast('本地视频无法播放，请检查格式或换用客户端。');
 }
 video.addEventListener('error', playbackError);

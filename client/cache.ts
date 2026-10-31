@@ -22,6 +22,7 @@ import { cacheStream } from './cache-stream';
 import { mp4Bootstrap, partOffsets, type CacheParts } from '../shared/cache-parts';
 import { cacheTimeline, type CacheTimeline } from '../shared/cache-timeline';
 import { sha256 } from '@noble/hashes/sha2.js';
+import { CacheRecovery } from './cache-recovery';
 
 const PREFIX = 'videosreeeen-';
 export class DeviceCache {
@@ -35,11 +36,53 @@ export class DeviceCache {
   private parts: CacheParts = 1;
   private sliding = false;
   private release?: (position: number, ended: boolean) => Promise<void>;
+  private recovery = new CacheRecovery();
+  private latest?: NativeCache;
   jobId = '';
   constructor(
-    private progress: (event: NativeCache) => void,
+    private onProgress: (event: NativeCache) => void,
     private peers: RoomPeers,
   ) {}
+  private progress(event: NativeCache) {
+    this.latest = event;
+    this.onProgress(event);
+  }
+  get retryPending() {
+    return this.recovery.waiting;
+  }
+  resume() {
+    return this.recovery.resume();
+  }
+  private recover<T>(signal: AbortSignal, task: () => Promise<T>) {
+    const report = (error?: string) => {
+      if (signal.aborted || this.controller?.signal !== signal) return;
+      const {
+        entry: _entry,
+        audio: _audio,
+        ...previous
+      } = this.latest ?? {
+        jobId: this.jobId,
+        bytes: 0,
+        progress: 0,
+        state: 'downloading' as const,
+      };
+      this.progress({ ...previous, state: error ? 'error' : 'downloading', error });
+    };
+    return this.recovery.run(
+      task,
+      signal,
+      (note) => report(note),
+      () => report(),
+    );
+  }
+  private whole(
+    url: string,
+    size: number,
+    signal: AbortSignal,
+    store: (offset: number, data: Uint8Array) => Promise<void>,
+  ) {
+    return this.recover(signal, () => downloadWholeTrack(url, size, signal, store));
+  }
   private async network(
     action: 'probe' | 'fetch' | 'text',
     jobId: string,
@@ -47,7 +90,10 @@ export class DeviceCache {
     referer?: string,
     offset = 0,
     length = 1,
+    recover = true,
   ): Promise<any> {
+    if (this.jobId !== jobId || !this.controller)
+      throw new DOMException('缓存已取消', 'AbortError');
     const signal = this.controller!.signal;
     signal.throwIfAborted();
     if (isNative)
@@ -59,7 +105,9 @@ export class DeviceCache {
         offset,
         length,
       });
-    const result = await browserCacheNetwork(action, url, signal, offset, length);
+    // Try an available alternate before entering a suspended transfer state.
+    const request = () => browserCacheNetwork(action, url, signal, offset, length);
+    const result = await (recover ? this.recover(signal, request) : request());
     if (typeof result === 'object' && 'sequential' in result && result.sequential)
       this.sequential.add(url);
     return result instanceof Uint8Array ? encode(result) : result;
@@ -74,6 +122,7 @@ export class DeviceCache {
   ) {
     await this.clear();
     this.jobId = jobId;
+    this.latest = undefined;
     this.parts = parts;
     this.sliding = parts > 1 && sliding;
     this.controller = new AbortController();
@@ -85,7 +134,7 @@ export class DeviceCache {
     } catch (cause) {
       // Failure during planning/probing must clean up too, without clearing a
       // later job that replaced this one while a response was in flight.
-      if (this.controller?.signal === signal) await this.clear();
+      if (this.controller?.signal === signal) await this.clear().catch(() => {});
       throw cause;
     }
   }
@@ -140,7 +189,15 @@ export class DeviceCache {
           let info: FileInfo | undefined;
           for (const url of urls[i]!)
             try {
-              const result = await this.network('probe', jobId, url, plan.referer);
+              const result = await this.network(
+                'probe',
+                jobId,
+                url,
+                plan.referer,
+                0,
+                1,
+                url === urls[i]!.at(-1),
+              );
               if (!Number.isSafeInteger(result.size) || result.size < 1 || result.size > MAX_CACHE)
                 throw new Error('视频大小无效');
               info = { name: plan.files[i]!.name, size: result.size };
@@ -187,7 +244,7 @@ export class DeviceCache {
             await nativeCall('cacheIO', { action: 'get', jobId, name: files![file]!.name, offset }),
           )
         : disk
-          ? disk.get(files![file]!.name, offset)
+          ? this.recover(signal, () => disk.get(files![file]!.name, offset))
           : new Uint8Array(await (await browser!.match(cacheKey(file, offset)))!.arrayBuffer());
     await this.peers.start(files, read);
     if (this.parts > 1) {
@@ -198,11 +255,16 @@ export class DeviceCache {
       ordinal = 0;
     for (let file = 0; file < files.length; file++) {
       const f = files[file]!;
-      const complete = new Set<number>();
+      const complete = new Map<number, string>();
       const store = async (offset: number, data: Uint8Array) => {
         signal.throwIfAborted();
         if (data.length !== Math.min(BLOCK_SIZE, f.size - offset)) throw new Error('分块长度不符');
         const hash = await hexDigest(data);
+        if (complete.has(offset)) {
+          if (complete.get(offset) !== hash)
+            throw new Error('视频源内容已变化，请重新识别后缓存。');
+          return;
+        }
         signal.throwIfAborted();
         if (isNative)
           await nativeCall('cacheIO', {
@@ -212,14 +274,16 @@ export class DeviceCache {
             offset,
             data: encode(data),
           });
-        else if (disk) await disk.put(f.name, offset, data);
+        else if (disk) await this.recover(signal, () => disk.put(f.name, offset, data));
         else
-          await browser!.put(cacheKey(file, offset), new Response(data as Uint8Array<ArrayBuffer>));
+          await this.recover(signal, () =>
+            browser!.put(cacheKey(file, offset), new Response(data as Uint8Array<ArrayBuffer>)),
+          );
         signal.throwIfAborted();
         this.peers.announce(file, offset, hash);
         if (!complete.has(offset)) {
           bytes += data.length;
-          complete.add(offset);
+          complete.set(offset, hash);
         }
         this.progress({
           state: 'downloading',
@@ -258,14 +322,22 @@ export class DeviceCache {
             try {
               if (!isNative && this.sequential.has(url)) throw new RangeMetadataUnavailable();
               data = decode(
-                await this.network('fetch', jobId, url, plan.referer, block.offset, length),
+                await this.network(
+                  'fetch',
+                  jobId,
+                  url,
+                  plan.referer,
+                  block.offset,
+                  length,
+                  url === urls[file]!.at(-1),
+                ),
               );
               break;
             } catch (e) {
               signal.throwIfAborted();
               if (e instanceof RangeMetadataUnavailable) {
                 try {
-                  await downloadWholeTrack(url, f.size, signal, async (offset, part) => {
+                  await this.whole(url, f.size, signal, async (offset, part) => {
                     this.sourceBytes += part.length;
                     await store(offset, part);
                   });
@@ -295,7 +367,7 @@ export class DeviceCache {
     if (isNative) ready = await nativeCall('cacheIO', { action: 'finish', jobId });
     else if (disk) {
       const external = !!cacheDirectory();
-      const fingerprint = await disk.finish(!external);
+      const fingerprint = await this.recover(signal, () => disk.finish(!external));
       signal.throwIfAborted();
       const local = external
         ? await cacheStream(
@@ -379,8 +451,7 @@ export class DeviceCache {
     let released = 0,
       freedBytes = 0,
       attached = false,
-      finalFingerprint = '',
-      cleanupError = false;
+      finalFingerprint = '';
     let localUrl = (_name: string) => '';
     const available = () => {
       if (layouts.length !== files.length || !fingerprints.length || released >= this.parts)
@@ -400,8 +471,10 @@ export class DeviceCache {
         audio = plan.audio ? localUrl(plan.audio) : undefined;
       }
       this.progress({
-        state: cleanupError ? 'error' : finalFingerprint ? 'ready' : 'downloading',
-        ...(cleanupError ? { error: '缓存片段清理失败，请关闭缓存后重试' } : {}),
+        state: finalFingerprint ? 'ready' : 'downloading',
+        ...(disk?.hasDeferredDrops
+          ? { error: '部分已看片段暂被占用，将稍后清理；无需重新缓存。' }
+          : {}),
         jobId,
         progress: bytes / total,
         bytes,
@@ -419,8 +492,12 @@ export class DeviceCache {
       if (data.length !== Math.min(BLOCK_SIZE, file.size - offset))
         throw new Error('缓存分块长度不符');
       signal.throwIfAborted();
-      if (complete[index]!.has(offset)) return;
       const hash = await hexDigest(data);
+      if (complete[index]!.has(offset)) {
+        if (complete[index]!.get(offset) !== hash)
+          throw new Error('视频源内容已变化，请重新识别后缓存。');
+        return;
+      }
       if (isNative)
         await nativeCall('cacheIO', {
           action: 'put',
@@ -429,7 +506,7 @@ export class DeviceCache {
           offset,
           data: encode(data),
         });
-      else await disk!.put(file.name, offset, data);
+      else await this.recover(signal, () => disk!.put(file.name, offset, data));
       signal.throwIfAborted();
       complete[index]!.set(offset, hash);
       bytes += data.length;
@@ -462,7 +539,17 @@ export class DeviceCache {
           for (const url of urls[index]!) {
             try {
               if (this.sequential.has(url)) throw new RangeMetadataUnavailable();
-              data = decode(await this.network('fetch', jobId, url, plan.referer, offset, length));
+              data = decode(
+                await this.network(
+                  'fetch',
+                  jobId,
+                  url,
+                  plan.referer,
+                  offset,
+                  length,
+                  url === urls[index]!.at(-1),
+                ),
+              );
               break;
             } catch (cause) {
               signal.throwIfAborted();
@@ -470,7 +557,7 @@ export class DeviceCache {
               if (!isNative && cause instanceof RangeMetadataUnavailable) {
                 if (!whole.has(index)) {
                   const task = { done: Promise.resolve(), failed: undefined as unknown };
-                  task.done = downloadWholeTrack(url, file.size, signal, async (p, chunk) => {
+                  task.done = this.whole(url, file.size, signal, async (p, chunk) => {
                     this.sourceBytes += chunk.length;
                     await store(index, p, chunk);
                   }).catch((error) => {
@@ -480,10 +567,11 @@ export class DeviceCache {
                   void task.done.catch(() => {});
                   whole.set(index, task);
                 }
-                const deadline = Date.now() + 30000;
+                let deadline = Date.now() + 30000;
                 while (!complete[index]!.has(offset)) {
                   signal.throwIfAborted();
                   if (whole.get(index)!.failed) throw whole.get(index)!.failed;
+                  if (this.retryPending) deadline = Date.now() + 30000;
                   if (Date.now() > deadline) throw new Error('等待顺序下载超时，请选择完整缓存');
                   await new Promise((resolve) => setTimeout(resolve, 50));
                 }
@@ -537,9 +625,14 @@ export class DeviceCache {
     if (this.sliding) {
       let busy = false;
       this.release = async (position, ended) => {
-        if (busy || cleanupError || signal.aborted || !Number.isFinite(position)) return;
+        if (busy || signal.aborted || !Number.isFinite(position)) return;
         busy = true;
         try {
+          if (disk?.hasDeferredDrops) {
+            const freed = await disk.retryDrops();
+            freedBytes += freed;
+            if (freed) report();
+          }
           while (released < this.parts) {
             const next = released + 1;
             if (fingerprints.length < Math.min(this.parts, next + 1)) break;
@@ -574,8 +667,10 @@ export class DeviceCache {
           }
         } catch (cause) {
           if (!signal.aborted) {
-            cleanupError = true;
-            report();
+            this.progress({
+              ...this.latest!,
+              error: '已看片段清理暂未完成，已保留后续缓存；稍后重试清理。',
+            });
           }
         } finally {
           busy = false;
@@ -622,7 +717,7 @@ export class DeviceCache {
     const ready = isNative
       ? await nativeCall('cacheIO', { action: 'finish', jobId })
       : {
-          fingerprint: await disk!.finish(false),
+          fingerprint: await this.recover(signal, () => disk!.finish(false)),
         };
     signal.throwIfAborted();
     this.progress({
@@ -686,6 +781,7 @@ export class DeviceCache {
     const previous = this.jobId,
       name = this.browserName;
     this.jobId = '';
+    this.latest = undefined;
     this.browserName = '';
     const disk = this.disk;
     this.disk = null;

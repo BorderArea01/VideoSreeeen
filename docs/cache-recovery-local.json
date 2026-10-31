@@ -1,0 +1,330 @@
+{
+  "at": "2026-10-31T13:10:32.388Z",
+  "sourceBase": "b700155",
+  "deployment": false,
+  "onlineRestart": false,
+  "roomWorkerChanged": false,
+  "realPhone": false,
+  "unitChecks": {
+    "total": 20,
+    "passed": 20
+  },
+  "sources": [
+    {
+      "file": "client/cache-recovery.ts",
+      "bytes": 2959,
+      "sha256": "2a8df249d6d156b3435f43eb1a7a612c9c626c9dd151d24a97dbf14603950f53"
+    },
+    {
+      "file": "client/cache-network.ts",
+      "bytes": 8383,
+      "sha256": "4e20acdc081bd4b5e62878a86cfdec206232d9beb98263e017304adc6ec3609f"
+    },
+    {
+      "file": "client/cache.ts",
+      "bytes": 29512,
+      "sha256": "0ff014766c4befb7df0a5fa577bda5459d92a5d8eb745ff8a6fedff87f9dd589"
+    },
+    {
+      "file": "client/disk-cache.ts",
+      "bytes": 7703,
+      "sha256": "965d52e3bb5806f76a898a25d0ed5868baba4187da4458ec39c548742ee01b7d"
+    },
+    {
+      "file": "client/disk-cache-worker.ts",
+      "bytes": 8535,
+      "sha256": "f0b8cd0aa9599c7284dbaa49f71eebec8fb9653801304e80f78eef6190d66724"
+    },
+    {
+      "file": "client/main.ts",
+      "bytes": 139600,
+      "sha256": "7091c97ab429156dc0b50f1d212053f9c5aaa56026d49e841801eb12c061386a"
+    },
+    {
+      "file": "client/peers.ts",
+      "bytes": 16105,
+      "sha256": "cf11e9a37211220389cd6df75fc92f153118e81f8ea28b8d923a0e9708ccec48"
+    }
+  ],
+  "assets": [
+    {
+      "file": "assets/disk-cache-worker-CqIMXsxN.js",
+      "bytes": 9493,
+      "sha256": "a5ced8805f8d64515ed795aa9b9c5685bbad643eae144116ea7449a375f5f8a1"
+    },
+    {
+      "file": "assets/index-WEIHZEBp.css",
+      "bytes": 193427,
+      "sha256": "93e19128eba9732e235b329273300d091ff4c64a89678ee1534efa10cdf2c9b3"
+    },
+    {
+      "file": "assets/index-YKNwr3IR.js",
+      "bytes": 255721,
+      "sha256": "2c00e0ca6a21d795c1cfe92012a1c51fee9fac8ab98de8e7671a0328591e60ed"
+    }
+  ],
+  "checks": {
+    "disk-lifecycle": {
+      "at": "2026-10-31T12:54:14.099Z",
+      "production": false,
+      "realPhone": false,
+      "checks": {
+        "locked": {
+          "name": "NoModificationAllowedError",
+          "message": "Failed to execute 'removeEntry' on 'FileSystemDirectoryHandle': An attempt was made to modify an object where modifications are not allowed."
+        },
+        "concurrentClear": true,
+        "otherJobByte": 7,
+        "remaining": [],
+        "heldCacheLocks": 0
+      },
+      "checksPassed": true,
+      "cleanup": true,
+      "passed": true
+    },
+    "cache-window": {
+      "at": "2026-10-31T13:00:54.595Z",
+      "production": false,
+      "mediaFixture": true,
+      "realPhone": false,
+      "parts": 3,
+      "sequential": false,
+      "eviction": true,
+      "earlyReady": [
+        {
+          "progress": 0.3848660021971873,
+          "bytes": 1835008
+        },
+        {
+          "progress": 0.3848660021971873,
+          "bytes": 1835008
+        }
+      ],
+      "earlyDecode": [
+        {
+          "width": 640,
+          "height": 360,
+          "position": 0.265252,
+          "frames": 11,
+          "localDisk": true
+        },
+        {
+          "width": 640,
+          "height": 360,
+          "position": 0.28548,
+          "frames": 11,
+          "localDisk": true
+        }
+      ],
+      "partialReconnectKeepsDiskAndHashes": true,
+      "realFileLock": {
+        "name": "NoModificationAllowedError",
+        "message": "Failed to execute 'removeEntry' on 'FileSystemDirectoryHandle': An attempt was made to modify an object where modifications are not allowed."
+      },
+      "evictedBeforeFinalDownload": [
+        {
+          "bytes": 3407872,
+          "retainedBytes": 2097152,
+          "window": {
+            "start": 5,
+            "end": 8.416666666666666
+          },
+          "released": 1
+        },
+        {
+          "bytes": 3407872,
+          "retainedBytes": 1835008,
+          "window": {
+            "start": 5,
+            "end": 8.416666666666666
+          },
+          "released": 1
+        }
+      ],
+      "lockedDeletionDidNotInvalidateCache": true,
+      "physicalDisk": {
+        "bytes": 1835103,
+        "files": 9
+      },
+      "unavailableSeekBlocked": true,
+      "retainedSeekAccepted": true,
+      "fullDownload": true,
+      "wholeFingerprintAfterEviction": true,
+      "endCleanup": true,
+      "chosenDirectoryCleanup": true,
+      "fullModeRegression": true,
+      "fullModeContinuation": {
+        "retained": 262144,
+        "prefixDownloads": 1,
+        "readyReconnectKeepsDisk": true
+      },
+      "playbackRetryKeepsDownloadedData": true,
+      "directoryRemembered": true,
+      "checksPassed": true,
+      "cleanup": true,
+      "passed": true
+    },
+    "cache-parts-2": {
+      "at": "2026-10-31T13:07:59.954Z",
+      "production": false,
+      "mediaFixture": true,
+      "realPhone": false,
+      "parts": 2,
+      "sequential": false,
+      "eviction": false,
+      "earlyReady": [
+        {
+          "progress": 0.6969597873047524,
+          "bytes": 786432
+        },
+        {
+          "progress": 0.6969597873047524,
+          "bytes": 786432
+        }
+      ],
+      "earlyDecode": [
+        {
+          "width": 960,
+          "height": 540,
+          "position": 0.268229,
+          "frames": 13,
+          "localDisk": true
+        },
+        {
+          "width": 960,
+          "height": 540,
+          "position": 0.278755,
+          "frames": 13,
+          "localDisk": true
+        }
+      ],
+      "partialReconnectKeepsDiskAndHashes": true,
+      "fullDownload": true,
+      "chosenDirectoryCleanup": true,
+      "fullModeRegression": true,
+      "fullModeContinuation": {
+        "retained": 262144,
+        "prefixDownloads": 1,
+        "readyReconnectKeepsDisk": true
+      },
+      "playbackRetryKeepsDownloadedData": true,
+      "directoryRemembered": true,
+      "checksPassed": true,
+      "cleanup": true,
+      "passed": true
+    },
+    "cache-parts-3": {
+      "at": "2026-10-31T12:58:12.656Z",
+      "production": false,
+      "mediaFixture": true,
+      "realPhone": false,
+      "parts": 3,
+      "sequential": false,
+      "eviction": false,
+      "earlyReady": [
+        {
+          "progress": 0.4646398582031683,
+          "bytes": 524288
+        },
+        {
+          "progress": 0.4646398582031683,
+          "bytes": 524288
+        }
+      ],
+      "earlyDecode": [
+        {
+          "width": 960,
+          "height": 540,
+          "position": 0.267109,
+          "frames": 12,
+          "localDisk": true
+        },
+        {
+          "width": 960,
+          "height": 540,
+          "position": 0.267379,
+          "frames": 13,
+          "localDisk": true
+        }
+      ],
+      "partialReconnectKeepsDiskAndHashes": true,
+      "fullDownload": true,
+      "chosenDirectoryCleanup": true,
+      "fullModeRegression": true,
+      "fullModeContinuation": {
+        "retained": 262144,
+        "prefixDownloads": 1,
+        "readyReconnectKeepsDisk": true
+      },
+      "playbackRetryKeepsDownloadedData": true,
+      "directoryRemembered": true,
+      "checksPassed": true,
+      "cleanup": true,
+      "passed": true
+    },
+    "cache-parts-3-sequential": {
+      "at": "2026-10-31T13:02:43.432Z",
+      "production": false,
+      "mediaFixture": true,
+      "realPhone": false,
+      "parts": 3,
+      "sequential": true,
+      "eviction": false,
+      "earlyReady": [
+        {
+          "progress": 0.4646398582031683,
+          "bytes": 524288
+        },
+        {
+          "progress": 0.4646398582031683,
+          "bytes": 524288
+        }
+      ],
+      "earlyDecode": [
+        {
+          "width": 960,
+          "height": 540,
+          "position": 0.268662,
+          "frames": 13,
+          "localDisk": true
+        },
+        {
+          "width": 960,
+          "height": 540,
+          "position": 0.328968,
+          "frames": 15,
+          "localDisk": true
+        }
+      ],
+      "partialReconnectKeepsDiskAndHashes": true,
+      "fullDownload": true,
+      "chosenDirectoryCleanup": true,
+      "fullModeRegression": true,
+      "fullModeContinuation": {
+        "retained": 262144,
+        "prefixDownloads": 0,
+        "readyReconnectKeepsDisk": true
+      },
+      "playbackRetryKeepsDownloadedData": true,
+      "directoryRemembered": true,
+      "checksPassed": true,
+      "cleanup": true,
+      "passed": true
+    },
+    "sessionRefresh": {
+      "syntheticOnly": true,
+      "recovery": {
+        "hostReloads": 3,
+        "guestReload": true,
+        "identityPreserved": true,
+        "duplicateSeats": false,
+        "freshTabSeparateIdentity": true,
+        "explicitLeaveClears": true,
+        "expiredRoomDoesNotCreate": true,
+        "transientRestoreRetry": true,
+        "activeServerPreserved": true
+      },
+      "errors": []
+    }
+  }
+}

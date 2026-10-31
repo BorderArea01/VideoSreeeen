@@ -1,3 +1,4 @@
+import { CacheTransferError } from './cache-recovery';
 const MiB = 1024 ** 2;
 export class RangeMetadataUnavailable extends Error {}
 
@@ -26,13 +27,13 @@ export async function cacheRequest(
     });
   } catch (cause) {
     if (signal.aborted && signal.reason?.name === 'TimeoutError')
-      throw new Error(
+      throw new CacheTransferError(
         stage === 'plan' ? '读取房间缓存计划超时，请重试。' : '视频缓存下载超时，请重试。',
       );
     signal.throwIfAborted();
     // Fetch intentionally conceals the difference between CORS and network
     // failures. Never publish a raw exception containing a signed source URL.
-    throw new Error(
+    throw new CacheTransferError(
       stage === 'plan'
         ? '无法读取房间缓存计划，请检查房间连接后重试。'
         : '无法下载视频：可能是网络中断或源站未允许网页跨域下载。可以重试，或返回边播边看。',
@@ -62,9 +63,11 @@ export async function browserCacheNetwork(
     const match = /^bytes (\d+)-(\d+)\/(\d+)$/.exec(rawRange ?? '');
     try {
       if (!response.ok)
-        throw new Error(
-          `视频源拒绝缓存下载（HTTP ${response.status}），请重新识别视频或返回边播边看。`,
-        );
+        throw new (
+          response.status === 408 || response.status === 429 || response.status >= 500
+            ? CacheTransferError
+            : Error
+        )(`视频源拒绝缓存下载（HTTP ${response.status}），请重新识别视频或返回边播边看。`);
       if (action !== 'text') {
         if (response.status !== 206)
           throw new Error('源站不支持分块下载，请返回边播边看或使用客户端。');
@@ -126,8 +129,9 @@ export async function browserCacheNetwork(
     }
   } catch (cause) {
     parent.throwIfAborted();
-    if (signal.aborted) throw new Error('视频缓存下载超时，请检查网络后重试。');
-    if (cause instanceof TypeError) throw new Error('视频缓存下载中断，请重试，或返回边播边看。');
+    if (signal.aborted) throw new CacheTransferError('视频缓存下载超时，请检查网络后重试。');
+    if (cause instanceof TypeError)
+      throw new CacheTransferError('视频缓存下载中断，请重试，或返回边播边看。');
     throw cause;
   }
 }
@@ -152,6 +156,8 @@ export async function downloadWholeTrack(
   let response: Response | undefined;
   try {
     response = await cacheRequest(url, signal, {}, 'source', fetcher);
+    if (response.status === 408 || response.status === 429 || response.status >= 500)
+      throw new CacheTransferError('视频源暂时无法提供下载，请稍后继续。');
     if (
       response.status !== 200 ||
       Number(response.headers.get('content-length')) !== size ||
@@ -187,15 +193,15 @@ export async function downloadWholeTrack(
           }
         }
       }
-      if (offset !== size || used) throw new Error('视频未完整下载，请重试缓存。');
+      if (offset !== size || used) throw new CacheTransferError('视频未完整下载，请重试缓存。');
     } finally {
       await reader.cancel().catch(() => {});
       reader.releaseLock();
     }
   } catch (cause) {
     parent.throwIfAborted();
-    if (controller.signal.aborted) throw new Error('视频缓存下载超时，请重试。');
-    if (cause instanceof TypeError) throw new Error('视频完整下载中断，请重试缓存。');
+    if (controller.signal.aborted) throw new CacheTransferError('视频缓存下载超时，请重试。');
+    if (cause instanceof TypeError) throw new CacheTransferError('视频完整下载中断，请重试缓存。');
     throw cause;
   } finally {
     clearTimeout(timer!);

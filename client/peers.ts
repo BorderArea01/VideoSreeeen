@@ -69,11 +69,11 @@ export class RoomPeers {
       room?.mode === 'cache' && !room.finished && room.media
         ? `${room.media.id}:${room.epoch}`
         : '';
-    if (scope !== this.scope || me !== this.me) {
+    if (scope !== this.scope) {
       this.close();
       this.scope = scope;
-      this.me = me;
-    }
+    } else if (me !== this.me) this.suspend();
+    this.me = me;
     this.room = room;
     if (!scope || !this.enabled || typeof RTCPeerConnection === 'undefined') return;
     const online = room!.members.filter((m) => m.online && m.id !== me).map((m) => m.id);
@@ -451,11 +451,15 @@ export class RoomPeers {
     p.pc.close();
   }
   close() {
+    this.suspend();
+    this.resetCache();
+    this.scope = '';
+  }
+  /** Transport loss invalidates peers, not this job's verified local inventory. */
+  suspend() {
     for (const p of this.peers.values()) this.dispose(p);
     this.peers.clear();
-    this.resetCache();
     this.manifests.clear();
-    this.scope = '';
     this.room = null;
   }
 }

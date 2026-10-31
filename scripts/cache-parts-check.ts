@@ -6,7 +6,7 @@ import { chromium } from 'playwright';
 import { createApp } from '../server/index';
 import { closeInvitation, selectSource } from './room-ui';
 import { BLOCK_SIZE } from '../shared/cache-plan';
-import { partEnd, mp4Bootstrap } from '../shared/cache-parts';
+import { partEnd, mp4Bootstrap, partOffsets } from '../shared/cache-parts';
 import { createHash } from 'node:crypto';
 
 const eviction = process.argv.includes('--eviction');
@@ -36,6 +36,7 @@ const bootstrap = await mp4Bootstrap(data.length, async (offset) =>
 let hold = true,
   waiting = 0;
 let holdTail = eviction;
+let interruptWhole = false;
 const releaseTail: (() => void)[] = [];
 const release: (() => void)[] = [];
 const source = createServer((request, response) => {
@@ -51,6 +52,11 @@ const source = createServer((request, response) => {
     response.setHeader('Content-Range', `bytes ${start}-${end}/${data.length}`);
   }
   response.setHeader('Content-Length', end - start + 1);
+  if (interruptWhole && request.headers.origin && !range && request.method === 'GET') {
+    response.write(data.subarray(0, BLOCK_SIZE));
+    setTimeout(() => response.destroy(), 150);
+    return;
+  }
   const send = () =>
     response.end(request.method === 'HEAD' ? undefined : data.subarray(start, end + 1));
   if (hold && sequential && request.headers.origin && !range && request.method !== 'HEAD') {
@@ -116,6 +122,20 @@ try {
     Object.defineProperty(window, 'showDirectoryPicker', { value: undefined });
   });
   for (const context of [ownerContext, viewerContext]) {
+    await context.addInitScript(String.raw`
+      try { localStorage.setItem('videosreeeen.appearance', 'classic'); } catch {}
+      window.__welcomes = 0;
+      window.WebSocket = new Proxy(WebSocket, {construct(target, args) {
+        const socket = Reflect.construct(target, args);
+        if (new URL(args[0], location.href).pathname === '/ws') {
+          window.__roomSocket = socket;
+          socket.addEventListener('message', event => {
+            try { if (JSON.parse(event.data).type === 'welcome') window.__welcomes++; } catch {}
+          });
+        }
+        return socket;
+      }});
+    `);
     if (process.env.VS_PUBLIC_URL)
       await context.route(url, async (route) => {
         const range = /^bytes=(\d+)-(\d*)$/.exec(route.request().headers().range ?? '');
@@ -177,6 +197,23 @@ try {
   }
   const owner = await ownerContext.newPage(),
     viewer = await viewerContext.newPage();
+  const reconnect = async (page: typeof owner) => {
+    const count = await page.evaluate(() => {
+      const previous = (window as any).__welcomes;
+      (window as any).__roomSocket.close();
+      return previous;
+    });
+    await page.waitForFunction((n) => (window as any).__welcomes > n, count);
+  };
+  const diskJobs = () =>
+    owner.evaluate(async () => {
+      const root = await (
+        await (await navigator.storage.getDirectory()).getDirectoryHandle('chosen-drive-fixture')
+      ).getDirectoryHandle('videosreeeen-disk');
+      const names = [];
+      for await (const name of (root as any).keys()) names.push(name);
+      return names.sort();
+    });
   const failures: string[] = [];
   for (const page of [owner, viewer]) page.on('pageerror', (e) => failures.push(e.message));
   let latest: any;
@@ -263,6 +300,68 @@ try {
       })),
     ),
   );
+  const jobsBeforeReconnect = await diskJobs();
+  const memberIds = latest.members.map((m: any) => m.id).sort();
+  await reconnect(owner);
+  await owner.waitForFunction(() =>
+    /首批已就绪/.test(document.querySelector('#cache-title')!.textContent!),
+  );
+  await reconnect(viewer);
+  await owner.waitForFunction(() =>
+    document.querySelector('#mode-description')!.textContent!.includes('大家都已准备好'),
+  );
+  assert.deepEqual(await diskJobs(), jobsBeforeReconnect);
+  assert.deepEqual(latest.members.map((m: any) => m.id).sort(), memberIds);
+  assert.ok(latest.members.every((m: any) => m.cache.parts.length === 1 && m.cache.bytes > 0));
+  proof.partialReconnectKeepsDiskAndHashes = true;
+  if (await owner.locator('#video').evaluate((v: HTMLVideoElement) => v.paused))
+    await owner.locator('#play-button').click();
+  if (eviction) {
+    const lockedOffset = partOffsets(data.length, 1, parts).find(
+      (offset) => !bootstrap.includes(offset),
+    );
+    assert.notEqual(lockedOffset, undefined);
+    proof.realFileLock = await owner.evaluate(async (offset) => {
+      const selected = await (
+        await navigator.storage.getDirectory()
+      ).getDirectoryHandle('chosen-drive-fixture');
+      const root = await selected.getDirectoryHandle('videosreeeen-disk');
+      let directory!: FileSystemDirectoryHandle;
+      for await (const d of (root as any).values())
+        if (d.kind === 'directory') {
+          directory = d;
+          break;
+        }
+      const name = 'video.mp4.' + offset + '.part';
+      const script = `let access; self.onmessage = async ({data}) => {
+        if(data.release){access.close();self.postMessage('released');return;}
+        let root=await navigator.storage.getDirectory();
+        for(const part of data.path) root=await root.getDirectoryHandle(part);
+        access=await (await root.getFileHandle(data.name)).createSyncAccessHandle();
+        self.postMessage('locked');
+      };`;
+      const url = URL.createObjectURL(new Blob([script], { type: 'text/javascript' }));
+      const worker = new Worker(url);
+      (window as any).__cacheLock = worker;
+      (window as any).__cacheLockURL = url;
+      await new Promise<void>((resolve, reject) => {
+        worker.onmessage = () => resolve();
+        worker.onerror = reject;
+        worker.postMessage({
+          path: ['chosen-drive-fixture', 'videosreeeen-disk', directory.name],
+          name,
+        });
+      });
+      try {
+        await directory.removeEntry(name);
+        throw new Error('Lock did not block deletion');
+      } catch (error) {
+        if (error instanceof DOMException) return { name: error.name, message: error.message };
+        throw error;
+      }
+    }, lockedOffset!);
+    assert.equal(proof.realFileLock.name, 'NoModificationAllowedError');
+  }
   hold = false;
   for (const done of release.splice(0)) done();
   if (eviction) {
@@ -289,6 +388,19 @@ try {
       window: m.cache.window,
       released: m.cache.released,
     }));
+    assert.ok(latest.members.every((m: any) => m.cache.state !== 'error'));
+    await owner.evaluate(async () => {
+      const worker = (window as any).__cacheLock as Worker;
+      await new Promise<void>((resolve) => {
+        worker.onmessage = () => resolve();
+        worker.postMessage({ release: true });
+      });
+      worker.terminate();
+      URL.revokeObjectURL((window as any).__cacheLockURL);
+      delete (window as any).__cacheLock;
+    });
+    await owner.waitForTimeout(2000);
+    proof.lockedDeletionDidNotInvalidateCache = true;
     const disk = await owner.evaluate(async () => {
       const root = await (
         await (await navigator.storage.getDirectory()).getDirectoryHandle('chosen-drive-fixture')
@@ -369,7 +481,37 @@ try {
   assert.deepEqual(entries, []);
   proof.chosenDirectoryCleanup = true;
   await owner.locator('#cache-parts').selectOption('1');
+  let failRange = true,
+    prefixDownloads = 0;
+  interruptWhole = sequential;
+  await ownerContext.route(url, async (route) => {
+    const range = route.request().headers().range;
+    if (range === 'bytes=0-262143') prefixDownloads++;
+    if (failRange && range === 'bytes=262144-524287')
+      await route.fulfill({
+        status: 503,
+        headers: { 'Access-Control-Allow-Origin': '*' },
+        body: '',
+      });
+    else await route.fallback();
+  });
   await owner.locator('#mode-toggle').click();
+  await owner.locator('#cache-button').click();
+  await owner
+    .locator('#cache-button')
+    .filter({ hasText: '继续本机缓存' })
+    .waitFor({ timeout: 20000 });
+  const pausedJobs = await diskJobs();
+  const retained = latest.members.find((m: any) => m.name === '分段房主').cache.bytes;
+  assert.ok(retained > 0);
+  await reconnect(owner);
+  await owner.locator('#cache-button').filter({ hasText: '继续本机缓存' }).waitFor();
+  assert.deepEqual(await diskJobs(), pausedJobs);
+  await owner
+    .locator('#cache-overlay')
+    .screenshot({ path: '.local/screenshots/cache-continue.png' });
+  failRange = false;
+  interruptWhole = false;
   await owner.locator('#cache-button').click();
   await viewer.locator('#cache-button').click();
   await owner.locator('#mode-description').filter({ hasText: '大家都已准备好' }).waitFor();
@@ -381,6 +523,28 @@ try {
     latest.members.every((m: any) => m.cache.fingerprint === latest.members[0].cache.fingerprint),
   );
   proof.fullModeRegression = true;
+  if (!sequential)
+    assert.equal(prefixDownloads, 1, 'Continue must not redownload an already committed prefix');
+  assert.deepEqual(await diskJobs(), pausedJobs);
+  await reconnect(owner);
+  await reconnect(viewer);
+  await owner.locator('#mode-description').filter({ hasText: '大家都已准备好' }).waitFor();
+  assert.deepEqual(await diskJobs(), pausedJobs);
+  proof.fullModeContinuation = { retained, prefixDownloads, readyReconnectKeepsDisk: true };
+  await owner.locator('#video').evaluate((video: HTMLVideoElement) => {
+    const missing = new URL(video.currentSrc);
+    missing.pathname = missing.pathname.replace(/[^/]+$/, 'missing.mp4');
+    video.src = missing.href;
+  });
+  await owner.locator('#cache-button').filter({ hasText: '重试本机播放' }).waitFor();
+  assert.deepEqual(await diskJobs(), pausedJobs);
+  await owner.locator('#cache-button').click();
+  await owner.waitForFunction(
+    () => document.querySelector<HTMLVideoElement>('#video')!.readyState >= 2,
+  );
+  assert.deepEqual(await diskJobs(), pausedJobs);
+  if (!sequential) assert.equal(prefixDownloads, 1);
+  proof.playbackRetryKeepsDownloadedData = true;
   await owner.locator('#mode-toggle').click();
   await owner.reload();
   await owner
@@ -391,7 +555,7 @@ try {
   proof.directoryRemembered = true;
   assert.deepEqual(failures, []);
   await owner.screenshot({ path: '.local/screenshots/cache-parts.png', fullPage: true });
-  proof.passed = true;
+  proof.checksPassed = true;
 } catch (cause) {
   proof.diagnostic = await diagnostic();
   console.log(JSON.stringify(proof.diagnostic));
@@ -405,14 +569,17 @@ try {
   for (const done of releaseTail.splice(0)) done();
   for (const context of browser.contexts()) await context.unrouteAll({ behavior: 'ignoreErrors' });
   await mkdir('.local/screenshots', { recursive: true });
+  await browser.close();
+  source.closeAllConnections();
+  source.close();
+  app.close();
+  proof.cleanup = true;
+  proof.passed = proof.checksPassed === true;
   await writeFile(
     eviction
       ? `.local/cache-window${process.env.VS_PUBLIC_URL ? '-public' : ''}-evidence.json`
       : `.local/cache-parts-${parts}${sequential ? '-sequential' : ''}${process.env.VS_PUBLIC_URL ? '-public' : ''}-evidence.json`,
     JSON.stringify(proof, null, 2),
   );
-  await browser.close();
-  source.closeAllConnections();
-  source.close();
-  app.close();
 }
+console.log(JSON.stringify(proof, null, 2));

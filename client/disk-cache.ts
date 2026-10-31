@@ -6,6 +6,10 @@ export class BrowserDiskCache {
   private worker: Worker;
   private sequence = 0;
   private closed = false;
+  private failed = false;
+  private clearing?: Promise<void>;
+  private deferredDrops = 0;
+  private lastDropRetry = 0;
   private pending = new Map<
     number,
     { resolve: (value: any) => void; reject: (error: Error) => void }
@@ -20,11 +24,15 @@ export class BrowserDiskCache {
       const p = this.pending.get(data.id);
       if (!p) return;
       this.pending.delete(data.id);
-      if (data.error) p.reject(new Error(data.error));
+      if (data.error)
+        p.reject(
+          data.errorName ? new DOMException(data.error, data.errorName) : new Error(data.error),
+        );
       else p.resolve(data.value);
     };
     this.worker.onerror = () => {
       this.closed = true;
+      this.failed = true;
       this.worker.terminate();
       this.rejectAll(new Error('浏览器磁盘缓存进程失败，请重试。'));
     };
@@ -44,7 +52,8 @@ export class BrowserDiskCache {
       signal.throwIfAborted();
       await new Promise<void>((resolve, reject) => {
         void navigator.locks
-          .request(ROOT + ':' + store.directory, async () => {
+          .request(ROOT + ':' + store.directory, { signal }, async () => {
+            signal.throwIfAborted();
             await new Promise<void>((release) => {
               store.release = release;
               resolve();
@@ -57,7 +66,7 @@ export class BrowserDiskCache {
       signal.throwIfAborted();
       return store;
     } catch (cause) {
-      await store.clear();
+      await store.clear().catch(() => {});
       throw cause;
     } finally {
       signal.removeEventListener('abort', stop);
@@ -72,7 +81,8 @@ export class BrowserDiskCache {
     payload: Record<string, unknown> = {},
     transfer: Transferable[] = [],
   ): Promise<any> {
-    if (this.closed) return Promise.reject(new DOMException('缓存已取消', 'AbortError'));
+    if (this.closed && action !== 'close')
+      return Promise.reject(new DOMException('缓存已取消', 'AbortError'));
     const id = ++this.sequence;
     return new Promise((resolve, reject) => {
       this.pending.set(id, { resolve, reject });
@@ -90,7 +100,19 @@ export class BrowserDiskCache {
     return this.call('finish', { assemble });
   }
   async drop(name: string, offsets: number[]): Promise<number> {
-    return this.call('drop', { name, offsets });
+    const result = await this.call('drop', { name, offsets });
+    this.deferredDrops = result.pending;
+    return result.bytes;
+  }
+  get hasDeferredDrops() {
+    return this.deferredDrops > 0;
+  }
+  async retryDrops(): Promise<number> {
+    if (!this.deferredDrops || performance.now() - this.lastDropRetry < 1500) return 0;
+    this.lastDropRetry = performance.now();
+    const result = await this.call('retry-drops');
+    this.deferredDrops = result.pending;
+    return result.bytes;
   }
   async file(name: string) {
     if (this.closed) throw new DOMException('缓存已取消', 'AbortError');
@@ -99,17 +121,48 @@ export class BrowserDiskCache {
     );
     return (await (await root.getDirectoryHandle(this.directory)).getFileHandle(name)).getFile();
   }
-  async clear() {
+  clear() {
+    return (this.clearing ??= this.closeAndRemove());
+  }
+  private async closeAndRemove() {
     this.closed = true;
-    this.worker.terminate();
     this.rejectAll(new DOMException('缓存已取消', 'AbortError'));
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      if (!this.failed)
+        await Promise.race([
+          this.call('close'),
+          new Promise<void>((resolve) => {
+            timer = setTimeout(resolve, 3000);
+          }),
+        ]);
+    } catch {
+      /* Termination is the bounded fallback for a failed worker. */
+    } finally {
+      clearTimeout(timer);
+      this.worker.terminate();
+      this.rejectAll(new DOMException('缓存已取消', 'AbortError'));
+    }
     try {
       const root = await (
         this.parent ?? (await navigator.storage.getDirectory())
       ).getDirectoryHandle(ROOT);
-      await root.removeEntry(this.directory, { recursive: true });
+      for (let attempt = 0; ; attempt++) {
+        try {
+          await root.removeEntry(this.directory, { recursive: true });
+          break;
+        } catch (cause) {
+          if (
+            !(cause instanceof DOMException && cause.name === 'NoModificationAllowedError') ||
+            attempt >= 3
+          )
+            throw cause;
+          await new Promise((resolve) => setTimeout(resolve, 100 * 2 ** attempt));
+        }
+      }
     } catch (cause) {
-      if (!(cause instanceof DOMException && cause.name === 'NotFoundError')) throw cause;
+      if (!(cause instanceof DOMException && cause.name === 'NotFoundError'))
+        throw new Error('部分应用缓存暂无法删除，可能仍被占用或目录权限已失效；请稍后重试清理。');
     } finally {
       this.release();
     }
