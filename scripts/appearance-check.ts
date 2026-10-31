@@ -1,3 +1,4 @@
+import { checkChatCollapse, checkRoomPopovers } from './sidebar-checks';
 import assert from 'node:assert/strict';
 import { once } from 'node:events';
 import { createServer } from 'node:http';
@@ -255,33 +256,12 @@ try {
   await owner.waitForTimeout(110);
   const homeTones = await edgeTones(owner, edgeHome);
   assert.ok(homeTones.dark > 30 && homeTones.light > 30, JSON.stringify(homeTones));
-  const drag = await owner.locator('#chat-drag').boundingBox();
-  assert.ok(drag);
-  await owner.mouse.move(drag.x + 40, drag.y + 10);
-  await owner.mouse.down();
-  await owner.mouse.move(drag.x - 260, drag.y + 35);
-  await owner.mouse.up();
-  assert.equal(
-    await owner.locator('#chat-panel').evaluate((e) => getComputedStyle(e).position),
-    'fixed',
-  );
-  const edgeMoved = await owner.locator('#chat-panel').boundingBox();
-  assert.ok(edgeMoved);
-  await owner.mouse.move(edgeMoved.x + edgeMoved.width - 7, edgeMoved.y + edgeMoved.height * 0.5);
-  await owner.waitForTimeout(110);
-  const movedTones = await edgeTones(owner, edgeMoved);
-  const abandonedTones = await edgeTones(owner, edgeHome);
-  assert.ok(movedTones.dark > 30);
-  assert.ok(
-    abandonedTones.dark < homeTones.dark * 0.1,
-    JSON.stringify({ homeTones, movedTones, abandonedTones }),
-  );
-  proof.edgeAttachedToMovingContainer = { homeTones, movedTones, abandonedTones };
-  await owner.waitForTimeout(1000);
-  assert.deepEqual(await edgeTones(owner, edgeMoved), { dark: 0, light: 0 });
+  proof.chatCollapse = await checkChatCollapse(owner);
+  await checkRoomPopovers(owner);
+  await owner.mouse.move(4, 100);
+  await owner.waitForTimeout(1100);
+  assert.deepEqual(await edgeTones(owner, edgeHome), { dark: 0, light: 0 });
   proof.idleHasNoFrozenGlitch = true;
-  await owner.locator('#chat-dock').click();
-  proof.floatingChatPreserved = true;
   await owner.locator('#play-button').click();
   await owner.locator('#cache-options > summary').click();
   await owner.screenshot({ path: '.local/screenshots/theme-glitch-room.png', fullPage: true });

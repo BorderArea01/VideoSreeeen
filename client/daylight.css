@@ -233,11 +233,6 @@
   overflow: visible;
   padding: 0 4px 0 0;
 }
-:root[data-theme='glitch'] .chat-panel.floating {
-  position: fixed;
-  width: 350px;
-  height: 470px;
-}
 :root[data-theme='glitch'] .chat-heading {
   padding: 16px 18px 12px 24px;
   border-bottom: 1px solid #bccbe24d;
@@ -248,12 +243,8 @@
   font-size: 18px;
   font-weight: 700;
 }
-:root[data-theme='glitch'] .chat-heading > div :is(svg, .tiny-dot, .drag-hint) {
+:root[data-theme='glitch'] .chat-heading > div :is(svg, .tiny-dot) {
   display: none;
-}
-:root[data-theme='glitch'] #chat-dock {
-  margin-left: auto;
-  width: 20px;
 }
 :root[data-theme='glitch'] #sidebar-invite {
   flex: 0 0 auto;
@@ -800,7 +791,7 @@
 :root[data-theme='glitch'] .page-cinema #sidebar {
   display: flex;
 }
-:root[data-theme='glitch'] .page-cinema .chat-panel:not(.floating) {
+:root[data-theme='glitch'] .page-cinema .chat-panel {
   height: auto;
   min-height: 300px;
 }
@@ -946,7 +937,7 @@
     grid-column: 2;
     grid-row: 2;
   }
-  :root[data-theme='glitch'] .chat-panel:not(.floating) {
+  :root[data-theme='glitch'] .chat-panel {
     grid-row: 3;
     grid-column: 1;
     height: 430px;
@@ -1124,7 +1115,7 @@
   .daylight-members > .members-card {
     width: min(310px, calc(100vw - 36px));
   }
-  :root[data-theme='glitch'] .chat-panel:not(.floating) {
+  :root[data-theme='glitch'] .chat-panel {
     height: 420px;
   }
   :root[data-theme='glitch'] .chat-heading {

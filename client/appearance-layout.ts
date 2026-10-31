@@ -14,9 +14,39 @@ export class DaylightLayout {
     this.members.innerHTML = `<summary>${icon('users', 16)} 成员与连接</summary>`;
     this.voice.className = 'daylight-voice';
     this.voice.innerHTML = `<summary><span class="daylight-mic">${icon('mic', 26)}</span><span>语音</span>${icon('chevron', 15)}</summary>`;
+    for (const panel of [this.voice, this.members]) {
+      panel.addEventListener('toggle', () => {
+        if (!panel.open) return;
+        (panel === this.voice ? this.members : this.voice).open = false;
+        this.fitPanel(panel);
+      });
+    }
+    document.addEventListener('pointerdown', (event) => {
+      for (const panel of [this.voice, this.members])
+        if (!panel.contains(event.target as Node)) panel.open = false;
+    });
+    document.addEventListener('keydown', (event) => {
+      if (event.key !== 'Escape') return;
+      for (const panel of [this.voice, this.members]) {
+        if (!panel.open) continue;
+        panel.open = false;
+        panel.querySelector('summary')?.focus({ preventScroll: true });
+      }
+    });
+    window.addEventListener('resize', () => {
+      for (const panel of [this.voice, this.members]) if (panel.open) this.fitPanel(panel);
+    });
     document.addEventListener('fullscreenchange', () => this.arrange());
     // PageFullscreen emits this event on the player shell without bubbling.
     document.getElementById('player-shell')?.addEventListener('cinemachange', () => this.arrange());
+  }
+  private fitPanel(panel: HTMLDetailsElement) {
+    const card = panel.querySelector<HTMLElement>('.members-card');
+    if (!card) return;
+    card.style.translate = '';
+    const rect = card.getBoundingClientRect();
+    const offset = Math.max(12 - rect.left, Math.min(0, innerWidth - 12 - rect.right));
+    if (offset) card.style.translate = offset + 'px 0';
   }
   setActive(active: boolean, kind: 'glitch' | 'signal' = 'glitch') {
     if (this.kind !== kind) this.restore();
@@ -25,7 +55,10 @@ export class DaylightLayout {
     this.arrange();
   }
   private restore() {
-    for (const [node, anchor] of this.anchors) anchor.after(node);
+    for (const [node, anchor] of this.anchors) {
+      node.style.translate = '';
+      anchor.after(node);
+    }
     this.utilities.remove();
     this.voice.remove();
     this.voice.open = this.members.open = false;
@@ -61,7 +94,10 @@ export class DaylightLayout {
     this.move(document.getElementById('cache-options'), this.utilities);
     this.move(document.getElementById('active-source'), this.utilities);
     this.move(document.querySelector('.screen-foot'), this.utilities);
-    this.move(document.getElementById('sidebar-invite'), document.getElementById('chat-drag')!);
+    this.move(
+      document.getElementById('sidebar-invite'),
+      document.getElementById('chat-heading-actions')!,
+    );
     const help = document.getElementById('link-capability');
     if (help) document.getElementById('source-url')!.title = help.textContent || '';
   }

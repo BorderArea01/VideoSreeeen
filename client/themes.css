@@ -1,6 +1,35 @@
 @import './daylight.css';
 @import './signal.css';
 
+:root:is([data-theme='glitch'], [data-theme='signal']) .workspace:has(#sidebar[hidden]) {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+/* The source card isolates glitch decorations; lift its whole context while a
+   real voice panel is open so the next grid row cannot paint through it. */
+:root:is([data-theme='glitch'], [data-theme='signal']) .source-card:has(.daylight-voice[open]) {
+  z-index: 40;
+}
+.daylight-voice .voice-card,
+.daylight-members > .members-card {
+  max-height: min(520px, 65dvh);
+  max-width: calc(100vw - 24px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+:root:is([data-theme='glitch'], [data-theme='signal']) .daylight-members[open] {
+  z-index: 40;
+}
+:root[data-theme='glitch'] .chat-restore {
+  background: #f4f8ff;
+  color: #163a70;
+  border-color: #a4c2e7;
+}
+:root[data-theme='signal'] .chat-restore {
+  border-radius: 0;
+  color: #c9ff4b;
+}
+
 /* Appearance controls share the original palette, even when the theme is changed. */
 .appearance-settings {
   padding: 16px 0 20px;

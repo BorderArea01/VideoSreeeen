@@ -628,7 +628,7 @@ body.page-cinema {
 .page-cinema #sidebar .voice-card {
   flex-shrink: 0;
 }
-.page-cinema #sidebar .chat-panel:not(.floating) {
+.page-cinema #sidebar .chat-panel {
   height: auto;
   min-height: 300px;
   flex: 1 0 300px;
@@ -1092,8 +1092,7 @@ input[type='range'] {
   align-items: center;
   padding: 15px 16px;
   border-bottom: 1px solid #2d2933;
-  cursor: grab;
-  touch-action: none;
+  cursor: default;
   font-size: 12px;
 }
 .chat-heading > div {
@@ -1106,10 +1105,6 @@ input[type='range'] {
   height: 4px;
   border-radius: 50%;
   background: #9d917e;
-}
-.drag-hint {
-  font-size: 8px;
-  color: #746878;
 }
 .chat-heading .icon-button {
   width: 22px;
@@ -1301,16 +1296,30 @@ input[type='range'] {
   font-size: 20px;
   padding: 3px;
 }
-.floating {
+.chat-restore {
   position: fixed;
-  z-index: 20;
-  width: 330px;
-  height: 460px;
-  min-height: 300px;
-  max-height: 85vh;
-  box-shadow: 0 15px 65px #0009;
-  flex: none;
-  resize: both;
+  right: 0;
+  top: 50%;
+  z-index: 35;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 16px 9px;
+  writing-mode: vertical-rl;
+  border: 1px solid var(--line);
+  border-right: 0;
+  border-radius: 8px 0 0 8px;
+  background: var(--panel);
+  color: var(--text);
+  box-shadow: 0 4px 20px #0003;
+  font-size: 12px;
+}
+.chat-restore:hover {
+  color: var(--orange);
+}
+.page-cinema #chat-restore,
+body:has(:fullscreen) #chat-restore {
+  display: none;
 }
 .chat-hidden .workspace {
   grid-template-columns: minmax(0, 1fr);
@@ -1776,9 +1785,6 @@ button {
   .sidebar-foot {
     grid-column: 1/-1;
   }
-  .drag-hint {
-    display: none;
-  }
   .app-foot {
     margin: 0 20px;
     padding: 15px 0 20px;
@@ -2022,14 +2028,6 @@ button {
   .browser-hint p,
   .cache-overlay p {
     font-size: 11px;
-  }
-  .floating {
-    position: fixed;
-    width: calc(100vw - 28px);
-    max-width: 330px;
-    height: 400px;
-    resize: none;
-    max-height: 80vh;
   }
   .chat-heading {
     cursor: default;
@@ -2296,7 +2294,7 @@ button {
     grid-column: 1;
     grid-row: 2;
   }
-  .sidebar > .chat-panel:not(.floating) {
+  .sidebar > .chat-panel {
     grid-column: 2;
     grid-row: 1 / span 2;
     height: 450px;

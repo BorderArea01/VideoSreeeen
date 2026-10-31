@@ -214,7 +214,7 @@
 :root[data-theme='signal'] .signal-panel-counter {
   background: var(--text);
 }
-:root[data-theme='signal'] .chat-panel:not(.floating) {
+:root[data-theme='signal'] .chat-panel {
   grid-column: 2;
   grid-row: 2;
   height: auto;
@@ -222,11 +222,6 @@
   flex: none;
   border-color: #9164ad;
   overflow: hidden;
-}
-:root[data-theme='signal'] .chat-panel.floating {
-  width: 330px;
-  height: 460px;
-  background: #211729;
 }
 :root[data-theme='signal'] .chat-heading {
   padding: 21px 21px 18px;
@@ -469,6 +464,9 @@
   width: 20px;
   height: 20px;
 }
+:root[data-theme='signal'] .daylight-voice[open] > summary .daylight-mic {
+  background: #c9ff4b14;
+}
 :root[data-theme='signal'] .daylight-voice .voice-card {
   position: absolute;
   top: calc(100% + 12px);
@@ -597,9 +595,8 @@
   color: var(--muted);
 }
 :root[data-theme='signal']
-  :is(.floating, .daylight-voice[open], .daylight-members[open])
+  :is(.daylight-voice[open], .daylight-members[open])
   :is(.signal-copy, .signal-counter, .signal-panel-fragments),
-:root[data-theme='signal'] .floating > .signal-panel-fragments,
 :root[data-theme='signal']
   .page-cinema
   :is(#signal-field, .signal-copy, .signal-counter, .signal-panel-fragments),
@@ -624,7 +621,7 @@
 :root[data-theme='signal'] .page-cinema #sidebar {
   display: flex;
 }
-:root[data-theme='signal'] .page-cinema .chat-panel:not(.floating) {
+:root[data-theme='signal'] .page-cinema .chat-panel {
   height: auto;
   min-height: 300px;
 }
@@ -701,7 +698,7 @@
     grid-row: 3;
     grid-column: 1;
   }
-  :root[data-theme='signal'] .chat-panel:not(.floating) {
+  :root[data-theme='signal'] .chat-panel {
     grid-row: 4;
     grid-column: 1;
     height: 420px;

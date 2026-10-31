@@ -1,3 +1,4 @@
+import { checkChatCollapse, checkRoomPopovers } from './sidebar-checks';
 import assert from 'node:assert/strict';
 import { once } from 'node:events';
 import { createRequire } from 'node:module';
@@ -160,6 +161,11 @@ try {
   await owner.locator('#voice-mic').waitFor({ state: 'visible' });
   await owner.locator('.daylight-voice > summary').click();
   watching = true;
+  evidence.playingSidebar = await checkChatCollapse(owner);
+  assert.equal(await owner.locator('#video').evaluate((v: HTMLVideoElement) => v.paused), false);
+  await owner.locator('.daylight-voice > summary').click();
+  assert.equal(await owner.locator('#voice-mic').isVisible(), true);
+  await owner.locator('.daylight-voice > summary').click();
   for (const name of ['classic', 'glitch', 'signal']) await select(owner, name);
   watching = false;
   assert.deepEqual(commands, []);
@@ -258,23 +264,16 @@ try {
     delete (window as any).__animations;
   });
   evidence.videoGuard = { samples: 31, maxChannelDifference: difference, tolerance: 1 };
-  const drag = await owner.locator('#chat-drag').boundingBox();
-  assert.ok(drag);
-  await owner.mouse.move(drag.x + 50, drag.y + 15);
-  await owner.mouse.down();
-  await owner.mouse.move(film.x + 150, film.y + 70, { steps: 5 });
-  await owner.mouse.up();
-  assert.equal(
-    await owner.locator('#chat-panel').evaluate((el) => el.classList.contains('floating')),
-    true,
-  );
-  assert.equal(
-    await owner
-      .locator('#chat-panel > .signal-panel-fragments')
-      .evaluate((el) => getComputedStyle(el).display),
-    'none',
-  );
-  await owner.locator('#chat-dock').click();
+  evidence.sidebar = {};
+  watching = true;
+  for (const theme of ['signal', 'glitch', 'classic']) {
+    await select(owner, theme);
+    evidence.sidebar[theme] = await checkChatCollapse(owner);
+    if (theme !== 'classic') await checkRoomPopovers(owner);
+  }
+  await select(owner, 'signal');
+  watching = false;
+  assert.deepEqual(commands, []);
   await owner.locator('#page-fullscreen').click();
   await owner.waitForFunction(() => document.body.classList.contains('page-cinema'));
   assert.equal(await owner.locator('#signal-field').isVisible(), false);
@@ -283,6 +282,15 @@ try {
     true,
   );
   await owner.keyboard.press('Escape');
+  await owner.locator('#chat-collapse').click();
+  await owner.locator('#page-fullscreen').click();
+  await owner.locator('#page-sidebar-toggle').click();
+  assert.equal(await owner.locator('#chat-panel').isVisible(), true);
+  await owner.locator('#chat-collapse').click();
+  assert.equal(await owner.locator('#chat-panel').isVisible(), false);
+  await owner.keyboard.press('Escape');
+  assert.equal(await owner.locator('#chat-restore').isVisible(), true);
+  await owner.locator('#chat-restore').click();
   await owner.locator('#player-shell').evaluate((el) => el.requestFullscreen());
   await owner.waitForFunction(() => !!document.fullscreenElement);
   assert.equal(await owner.locator('#signal-field').isVisible(), false);
@@ -302,6 +310,8 @@ try {
       true,
       'Room heading stays above the video after fullscreen',
     );
+    await checkChatCollapse(owner);
+    await checkRoomPopovers(owner);
     await owner.locator('#appearance-button').click();
     assert.equal(await owner.locator('input[name=appearance]').count(), 3);
     await owner

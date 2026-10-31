@@ -1,3 +1,4 @@
+import { checkChatCollapse } from './sidebar-checks';
 import { choosePlayback, configureRoomServer, openRoom, closeInvitation } from './room-ui';
 import { chromium, _electron as electron } from 'playwright';
 import assert from 'node:assert/strict';
@@ -73,14 +74,7 @@ try {
   await first.locator('#emoji-button').click();
   await first.getByRole('button', { name: '🍿', exact: true }).click();
   assert.equal(await first.locator('#chat-input').inputValue(), '🍿');
-  const drag = await first.locator('#chat-drag').boundingBox();
-  assert.ok(drag);
-  await first.mouse.move(drag.x + 50, drag.y + 20);
-  await first.mouse.down();
-  await first.mouse.move(drag.x - 140, drag.y + 50);
-  await first.mouse.up();
-  assert.ok(await first.locator('#chat-panel').evaluate((e) => e.classList.contains('floating')));
-  await first.locator('#chat-dock').click();
+  evidence.chatCollapse = await checkChatCollapse(first);
   await first.screenshot({ path: resolve(output, 'desktop-room.png'), fullPage: true });
   // Real public CC0 video: verifies that the production relay and real decoders work.
   await choosePlayback(first, 'link');
@@ -153,16 +147,7 @@ try {
   evidence.browserCacheStorageEmpty = true;
   await second.close();
   await first.setViewportSize({ width: 390, height: 844 });
-  await first.locator('#chat-drag').scrollIntoViewIfNeeded();
-  const mobileDrag = await first.locator('#chat-drag').boundingBox();
-  assert.ok(mobileDrag);
-  await first.mouse.move(mobileDrag.x + 30, mobileDrag.y + 20);
-  await first.mouse.down();
-  await first.mouse.move(70, 180);
-  await first.mouse.up();
-  assert.ok(await first.locator('#chat-panel').evaluate((e) => e.classList.contains('floating')));
-  await first.locator('#chat-dock').click();
-  evidence.mobileChatDrag = true;
+  evidence.mobileChatCollapse = await checkChatCollapse(first);
   await first.screenshot({ path: resolve(output, 'mobile-room.png'), fullPage: true });
   assert.ok(await first.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
   await context.close();

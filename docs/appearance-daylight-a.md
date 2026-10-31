@@ -2,7 +2,7 @@
 
 按用户提供的[参考 A 图](design/glitch-concepts/01-daylight-rupture.png)实现真实观影界面。2026-10-31 根据「条块像软糖、云朵不应写死、数据故障应由鼠标掠过产生」的反馈，重写动态绘制，移除固定断层 PNG 与平滑弹性拉伸。
 
-独立预览：<https://daylight-a.videosreeeen.pages.dev/?skin=glitch>。只更新此预览，正式入口、房间服务和已发布客户端保持原版本。
+旧 `daylight-a` 独立预览已于 2026-10-31 按用户要求删除，包含该分支的全部 5 次部署；删除后地址返回 404。本文以下保留当时设计及验证的历史记录。当前请使用[正式入口的天光主题](https://videosreeeen.pages.dev/?skin=glitch)，删除回执见 [daylight-preview-removal.json](daylight-preview-removal.json)。
 
 ## 实际界面
 

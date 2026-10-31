@@ -72,7 +72,7 @@ export class SignalScene {
           return;
         if (
           event.target.closest(
-            '.player-shell, dialog, input, textarea, select, .floating, .daylight-voice[open], .daylight-members[open]',
+            '.player-shell, dialog, input, textarea, select, .daylight-voice[open], .daylight-members[open]',
           )
         )
           return;
@@ -125,8 +125,7 @@ export class SignalScene {
   private burst(el: HTMLElement) {
     if (this.suspended() || this.timers.has(el) || el.matches(':disabled') || !el.checkVisibility())
       return;
-    if (el.closest('.player-shell, .floating, .daylight-voice[open], .daylight-members[open]'))
-      return;
+    if (el.closest('.player-shell, .daylight-voice[open], .daylight-members[open]')) return;
     if (el !== this.field) {
       const film = document.getElementById('player-shell')?.getBoundingClientRect(),
         rect = el.getBoundingClientRect();
