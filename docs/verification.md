@@ -1,5 +1,7 @@
 # 0.4.0 验证记录
 
+2026-10-31 紫电主题字体、霓虹标题、约 50% 随机悬停与天光按钮断层收尾，见[交互与字体验收](verification-theme-interaction.md)。
+
 2026-10-31 天光断层进一步细化为原色 / 反色对冲、细密照片碎片，见[精细断层验收](verification-daylight-detail.md)。
 
 2026-10-31 天光断层的边角遮挡修正与其他按钮动态切片统一，见[边缘与按钮验收](verification-daylight-edges.md)。

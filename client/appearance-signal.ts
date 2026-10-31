@@ -1,3 +1,5 @@
+import { HoverGlitch, type GlitchVariation } from './hover-glitch';
+
 const buttons = [
   '#room-button',
   '#hero-create',
@@ -25,6 +27,7 @@ export class SignalScene {
   private last = new WeakMap<HTMLElement, number>();
   private motion = matchMedia('(prefers-reduced-motion: reduce)');
   private contrast = matchMedia('(forced-colors: active)');
+  private hover = new HoverGlitch();
   private observer = new MutationObserver((records) => {
     if (!this.active) return;
     const dirty = new Set<HTMLElement>();
@@ -57,13 +60,22 @@ export class SignalScene {
           target &&
           !(event.relatedTarget instanceof Node && target.contains(event.relatedTarget))
         )
-          this.burst(target);
+          this.hoverBurst(target);
+        else if (!target) this.hover.reset();
       },
       { passive: true },
     );
     document.addEventListener('focusin', (event) => {
       if (event.target instanceof HTMLElement && event.target.matches('.signal-control'))
         this.burst(event.target);
+    });
+    document.addEventListener('pointerout', (event) => {
+      const control = event.target instanceof Element && event.target.closest('.signal-control');
+      if (
+        control &&
+        !(event.relatedTarget instanceof Node && control.contains(event.relatedTarget))
+      )
+        this.hover.reset();
     });
     // Native click also covers keyboard activation. Hover/focus decorate only
     // the control or panel; the page background flashes on button activation.
@@ -87,14 +99,18 @@ export class SignalScene {
           event.target.closest(
             '.player-shell, dialog, input, textarea, select, .daylight-voice[open], .daylight-members[open]',
           )
-        )
+        ) {
+          this.hover.reset();
           return;
+        }
         const panel = event.target.closest<HTMLElement>('.signal-panel');
+        if (event.target.closest('.signal-control')) return;
         if (panel) {
           const rect = panel.getBoundingClientRect(),
             y = event.clientY - rect.top;
-          if (y < 20 || y > rect.height - 20) this.burst(panel);
-        }
+          if (y < 20 || y > rect.height - 20) this.hoverBurst(panel);
+          else this.hover.reset();
+        } else this.hover.reset();
       },
       { passive: true },
     );
@@ -129,13 +145,20 @@ export class SignalScene {
     );
   }
   private clear() {
+    this.hover.reset();
     for (const [el, timer] of this.timers) {
       clearTimeout(timer);
       el.classList.remove('signal-active');
+      for (const key of ['--signal-travel', '--signal-jump', '--signal-size'])
+        el.style.removeProperty(key);
     }
     this.timers.clear();
   }
-  private burst(el: HTMLElement) {
+  private hoverBurst(el: HTMLElement) {
+    const variation = this.hover.enter(el);
+    if (variation.enabled) this.burst(el, variation);
+  }
+  private burst(el: HTMLElement, variation?: GlitchVariation) {
     if (this.suspended() || this.timers.has(el) || el.matches(':disabled') || !el.checkVisibility())
       return;
     if (el.closest('.player-shell, .daylight-voice[open], .daylight-members[open]')) return;
@@ -153,11 +176,18 @@ export class SignalScene {
     }
     if (performance.now() - (this.last.get(el) ?? -Infinity) < 1100) return;
     this.last.set(el, performance.now());
+    if (variation) {
+      el.style.setProperty('--signal-travel', `${48 * variation.travel}px`);
+      el.style.setProperty('--signal-jump', String(variation.travel));
+      el.style.setProperty('--signal-size', String(variation.size));
+    }
     el.classList.add('signal-active');
     this.timers.set(
       el,
       setTimeout(() => {
         el.classList.remove('signal-active');
+        for (const key of ['--signal-travel', '--signal-jump', '--signal-size'])
+          el.style.removeProperty(key);
         this.timers.delete(el);
       }, 950),
     );

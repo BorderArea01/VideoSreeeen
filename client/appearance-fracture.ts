@@ -4,6 +4,8 @@ export type GlitchBurst = {
   elapsed: number;
   dx: number;
   samples: Map<string, HTMLCanvasElement>;
+  travel?: number;
+  size?: number;
 };
 const hash = (n: number) => {
   const value = Math.sin(n * 91.713 + 17.1) * 43758.5453;
@@ -182,6 +184,7 @@ export function fractureEdge(
     blue: boolean;
     left?: boolean;
     surface: string;
+    exclusions?: DOMRect[];
   },
 ) {
   if (burst.elapsed < 0 || burst.elapsed >= glitchLifetime) return;
@@ -189,13 +192,15 @@ export function fractureEdge(
   const step = packet(burst.elapsed),
     seed = burst.seed;
   if (quiet(step)) return;
-  const activeHeight = Math.min(r.height, compact ? r.height : 330);
+  const travel = burst.travel ?? 1,
+    size = burst.size ?? 1;
+  const activeHeight = Math.min(r.height, compact ? r.height : 330 * size);
   const top =
     r.top + Math.max(0, Math.min(r.height - activeHeight, r.height * impact - activeHeight * 0.5));
   const anchor = left ? r.left : r.right,
     direction = left ? -1 : 1;
-  const inside = Math.min(compact ? 26 : 68, r.width * 0.16);
-  const reach = compact ? 76 : 164;
+  const inside = Math.min(compact ? 26 : 68, r.width * 0.16) * Math.min(1, size);
+  const reach = (compact ? 76 : 164) * travel;
   const origin = left ? anchor - reach : anchor - inside;
   const width = inside + reach;
   const plate = edgeMaterial(
@@ -225,7 +230,27 @@ export function fractureEdge(
     sourceOffset = 0,
     sampleAt?: number,
   ) => {
-    const sx = Math.max(0, Math.min(width - w, sampleAt ?? x - origin));
+    // Shorten each fragment before protected UI with an unequal, porous tail.
+    // Avoid painting long strips and then erasing them along a common hard wall.
+    let end = x + shift + w;
+    let begin = x + shift;
+    for (const obstacle of edge.exclusions ?? []) {
+      if (y + h <= obstacle.top - 10 || y >= obstacle.bottom + 10) continue;
+      const slack = 2 + hash(seed + Math.floor(y) * 7 + step * 11) * 10;
+      if (begin < obstacle.left - 10 && end > obstacle.left - 10)
+        end = Math.min(end, obstacle.left - 10 - slack);
+      if (end > obstacle.right + 10 && begin < obstacle.right + 10)
+        begin = Math.max(begin, obstacle.right + 10 + slack);
+      if (begin >= obstacle.left - 10 && end <= obstacle.right + 10) return;
+    }
+    if (end - begin < 1) return;
+    const trim = begin - (x + shift);
+    x += trim;
+    w = end - begin;
+    const sx = Math.max(
+      0,
+      Math.min(width - w, sampleAt === undefined ? x - origin : sampleAt + trim),
+    );
     const sy = Math.max(0, Math.min(activeHeight - h, y - top + sourceOffset));
     ctx.drawImage(
       plate,
@@ -253,14 +278,14 @@ export function fractureEdge(
     const y = Math.round(top + j * pitch + hash(n + 70) * 1.8);
     const h = Math.min(
       activeHeight - (y - top),
-      j % 23 === 0 ? 5 : j % 9 === 0 ? 3 : 1 + Math.floor(hash(n + 2) * 2),
+      Math.max(1, (j % 23 === 0 ? 5 : j % 9 === 0 ? 3 : 1 + Math.floor(hash(n + 2) * 2)) * size),
     );
     if (h <= 0) continue;
     const depth = Math.min(inside, 2 + hash(n + 3) * inside);
     const length = 5 + hash(n + 8) ** 1.7 * (reach - 16) + Math.floor(beat * 3) * 4;
     const run = Math.min(width, depth + length);
     const x = left ? anchor - length : anchor - depth;
-    const shift = direction * (Math.floor(beat * 7) - 3) * 6;
+    const shift = direction * (Math.floor(beat * 7) - 3) * 6 * travel;
     const reorder =
       j % 4 === 0
         ? Math.floor(hash(seed + group * 17 + step * 7) * Math.max(1, activeHeight - 5)) - (y - top)
@@ -330,6 +355,9 @@ export function fractureSky(
   ctx.save();
   ctx.imageSmoothingEnabled = false;
   ctx.globalAlpha = burst.elapsed < 630 ? 0.88 : 0.42;
+  ctx.translate(x, y);
+  ctx.scale(burst.travel ?? 1, burst.size ?? 1);
+  ctx.translate(-x, -y);
   // Preserve photo structure in displaced layers before adding sorted-pixel tails.
   for (let layer = 0; layer < 3; layer++) {
     const n = seed + layer * 47;
@@ -541,19 +569,34 @@ export function fractureControl(
   button: HTMLElement,
   burst: GlitchBurst,
   surface: string,
+  exclusions: DOMRect[] = [],
 ) {
   const beat = packet(burst.elapsed);
   if (burst.elapsed >= glitchLifetime || quiet(beat) || beat === 0) return;
   const box = button.getBoundingClientRect(),
     plate = controlPlate(button, burst, surface);
   const ratio = plate.width / box.width;
-  const shift = Math.round(
-    (beat % 2 ? -1 : 1) * Math.min(14, box.width * 0.07) * (0.6 + hash(burst.seed + beat) * 0.4),
+  let shift = Math.round(
+    (beat % 2 ? -1 : 1) *
+      Math.min(14, box.width * 0.07) *
+      (0.6 + hash(burst.seed + beat) * 0.4) *
+      (burst.travel ?? 1),
   );
   const dy = ((beat % 3) - 1) * 2;
   const position = [0.14, 0.32, 0.46, 0.72, 0.6][beat % 5]!;
   const sourceY = Math.round(box.height * position);
   const height = Math.round(Math.min(7, Math.max(3, box.height * 0.12)));
+  for (const obstacle of exclusions) {
+    if (
+      box.top + sourceY + dy + height <= obstacle.top - 10 ||
+      box.top + sourceY + dy >= obstacle.bottom + 10
+    )
+      continue;
+    if (obstacle.left >= box.right)
+      shift = Math.min(shift, Math.max(0, obstacle.left - 14 - box.right));
+    if (obstacle.right <= box.left)
+      shift = Math.max(shift, Math.min(0, obstacle.right + 14 - box.left));
+  }
   ctx.save();
   ctx.globalAlpha = 0.8;
   ctx.fillStyle = '#43deef';

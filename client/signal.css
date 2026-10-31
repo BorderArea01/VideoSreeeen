@@ -1,4 +1,5 @@
 @import './signal-motion.css';
+@import './signal-fonts.css';
 
 :root[data-theme='signal'] .signal-active > .signal-copy {
   animation: signal-control-cut var(--signal-duration) steps(1, end);
@@ -32,6 +33,9 @@
   --signal-surface: linear-gradient(120deg, #211729, #261a31);
   --signal-travel: 48px;
   --signal-duration: 680ms;
+  --signal-ui-font: 'Bahnschrift', 'Segoe UI', 'Microsoft YaHei UI', 'PingFang SC', sans-serif;
+  --signal-tube-glow: 0 0 1px #fff, 0 0 5px #e78cffb3, 0 0 13px #a849d866;
+  font-family: var(--signal-ui-font);
 }
 :root[data-theme='signal'] body {
   background: #18111f;
@@ -79,9 +83,18 @@
 }
 :root[data-theme='signal'] .brand {
   font-size: clamp(29px, 3.4vw, 48px);
-  font-weight: 750;
-  letter-spacing: -2px;
+  font-family: 'Signal Tech', var(--signal-ui-font);
+  font-weight: 600;
+  letter-spacing: -0.025em;
   gap: 13px;
+}
+:root[data-theme='signal'] .brand > span:last-child {
+  color: #fff0ff;
+  -webkit-text-stroke: 0.35px #fff4ff;
+  text-shadow:
+    0 0 2px #fff,
+    0 0 8px #ef8aff9c,
+    0 0 22px #a849d86b;
 }
 :root[data-theme='signal'] .brand-light {
   font-weight: inherit;
@@ -132,6 +145,10 @@
 :root[data-theme='signal'] .room-heading h1 {
   font-size: 20px;
   font-weight: 650;
+  color: #f9eaff;
+  text-shadow:
+    0 0 1px #fff,
+    0 0 7px #d884f34d;
 }
 :root[data-theme='signal'] .room-heading p {
   font-size: 10px;
@@ -140,10 +157,11 @@
 }
 :root[data-theme='signal'] .eyebrow {
   font:
-    9px Consolas,
-    monospace;
+    600 10px 'Signal Tech',
+    sans-serif;
   letter-spacing: 0.16em;
-  color: var(--muted);
+  color: #d2a9ec;
+  text-shadow: 0 0 6px #ba73e652;
   margin-bottom: 8px;
 }
 :root[data-theme='signal'] .player-shell {
@@ -232,6 +250,23 @@
   font-size: 15px;
   font-weight: 650;
 }
+:root[data-theme='signal'] .chat-heading > div:first-child {
+  font-family: 'Signal Tube', var(--signal-ui-font);
+  font-weight: 400;
+  font-size: 20px;
+  letter-spacing: 0.12em;
+  color: #fceaff;
+  text-shadow: var(--signal-tube-glow);
+}
+:root[data-theme='signal'] .voice-card > .section-heading,
+:root[data-theme='signal'] .source-card > .section-heading > span:first-child {
+  font-family: 'Signal Tube', var(--signal-ui-font);
+  font-weight: 400;
+  font-size: 15px;
+  letter-spacing: 0.08em;
+  color: #ead3ff;
+  text-shadow: var(--signal-tube-glow);
+}
 :root[data-theme='signal'] .chat-heading > div > svg {
   display: none;
 }
@@ -283,6 +318,8 @@
   color: var(--text);
   font-size: 12px;
   line-height: 1.75;
+  font-family: 'Segoe UI', 'Microsoft YaHei UI', 'PingFang SC', sans-serif;
+  text-shadow: none;
 }
 :root[data-theme='signal'] .chat-compose {
   padding: 14px 19px 19px;
@@ -296,6 +333,7 @@
   border-radius: 0;
   color: var(--text);
   font-size: 12px;
+  font-family: 'Segoe UI', 'Microsoft YaHei UI', 'PingFang SC', sans-serif;
 }
 :root[data-theme='signal'] .chat-empty {
   color: var(--muted);
@@ -426,6 +464,7 @@
   pointer-events: none;
   z-index: 3;
   clip-path: inset(50% 0 50%);
+  scale: 1 var(--signal-size, 1);
 }
 :root[data-theme='signal'] .signal-copy {
   filter: invert(1);
@@ -451,6 +490,19 @@
   font-size: 11px;
   font-weight: 500;
   gap: 10px;
+}
+:root[data-theme='signal'] .daylight-voice > summary > span:not(.daylight-mic) {
+  color: #f4d8ff;
+  text-shadow:
+    0 0 2px #edc9ff88,
+    0 0 8px #b665e666;
+}
+:root[data-theme='signal'] .playback-tabs button[aria-selected='false'] {
+  color: #d8bde8;
+  text-shadow: 0 0 6px #bd6ae53d;
+}
+:root[data-theme='signal'] .signal-panel-fragments > span {
+  scale: 1 var(--signal-size, 1);
 }
 :root[data-theme='signal'] .daylight-mic {
   width: 28px;
@@ -791,6 +843,10 @@
   }
 }
 @media (forced-colors: active) {
+  :root[data-theme='signal'] * {
+    text-shadow: none !important;
+    -webkit-text-stroke: 0 !important;
+  }
   #signal-field,
   [data-signal-layer] {
     display: none !important;

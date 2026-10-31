@@ -1,0 +1,70 @@
+{
+  "version": "5.3.0",
+  "headings": "聊天室房间语音播放方式共同本地视频缓存成员连接紫电噪讯邀请放映室多人观影",
+  "fonts": [
+    {
+      "family": "Signal Tech",
+      "file": "chakra-petch-latin-600-normal.woff2",
+      "url": "https://cdn.jsdelivr.net/npm/@fontsource/chakra-petch@5.3.0/files/chakra-petch-latin-600-normal.woff2",
+      "bytes": 9968,
+      "sha256": "a5888696e9eb1b4bbbecc8eb3922b8369f49d4bddb72263e033cbd17f399be76",
+      "license": "OFL-1.1"
+    },
+    {
+      "family": "Signal Tube",
+      "file": "zcool-qingke-huangyou-105-400-normal.woff2",
+      "url": "https://cdn.jsdelivr.net/npm/@fontsource/zcool-qingke-huangyou@5.3.0/files/zcool-qingke-huangyou-105-400-normal.woff2",
+      "bytes": 58900,
+      "sha256": "84219e245fdd6d8fcf667c33529703932fddc8ae2b138ff00f4e7a3b5e95b5ce",
+      "license": "OFL-1.1"
+    },
+    {
+      "family": "Signal Tube",
+      "file": "zcool-qingke-huangyou-111-400-normal.woff2",
+      "url": "https://cdn.jsdelivr.net/npm/@fontsource/zcool-qingke-huangyou@5.3.0/files/zcool-qingke-huangyou-111-400-normal.woff2",
+      "bytes": 60660,
+      "sha256": "db0924c0159b58de219bf0c9fb98b3cd8017215b3c1e8f158eb3d3e88ca1d3ca",
+      "license": "OFL-1.1"
+    },
+    {
+      "family": "Signal Tube",
+      "file": "zcool-qingke-huangyou-112-400-normal.woff2",
+      "url": "https://cdn.jsdelivr.net/npm/@fontsource/zcool-qingke-huangyou@5.3.0/files/zcool-qingke-huangyou-112-400-normal.woff2",
+      "bytes": 54844,
+      "sha256": "2c068c40672a659268e0a183c45c50df23320e3744f60d89ad3b68e8d382fb66",
+      "license": "OFL-1.1"
+    },
+    {
+      "family": "Signal Tube",
+      "file": "zcool-qingke-huangyou-115-400-normal.woff2",
+      "url": "https://cdn.jsdelivr.net/npm/@fontsource/zcool-qingke-huangyou@5.3.0/files/zcool-qingke-huangyou-115-400-normal.woff2",
+      "bytes": 51392,
+      "sha256": "dd994d4092069a0d34915196712c2e88133fd6d1d88ed8b9d4b3baf1430a54c2",
+      "license": "OFL-1.1"
+    },
+    {
+      "family": "Signal Tube",
+      "file": "zcool-qingke-huangyou-116-400-normal.woff2",
+      "url": "https://cdn.jsdelivr.net/npm/@fontsource/zcool-qingke-huangyou@5.3.0/files/zcool-qingke-huangyou-116-400-normal.woff2",
+      "bytes": 47160,
+      "sha256": "a9488d9cf64f3f59c89434519d6a572adbbf20174701d131610f14a42936a342",
+      "license": "OFL-1.1"
+    },
+    {
+      "family": "Signal Tube",
+      "file": "zcool-qingke-huangyou-117-400-normal.woff2",
+      "url": "https://cdn.jsdelivr.net/npm/@fontsource/zcool-qingke-huangyou@5.3.0/files/zcool-qingke-huangyou-117-400-normal.woff2",
+      "bytes": 47080,
+      "sha256": "5ef1387f70328f660b12ca2ee99a09673a690d1901a3f4885ba97974cc411ad3",
+      "license": "OFL-1.1"
+    },
+    {
+      "family": "Signal Tube",
+      "file": "zcool-qingke-huangyou-118-400-normal.woff2",
+      "url": "https://cdn.jsdelivr.net/npm/@fontsource/zcool-qingke-huangyou@5.3.0/files/zcool-qingke-huangyou-118-400-normal.woff2",
+      "bytes": 41436,
+      "sha256": "16a3a95ae3a8d860f0c40d85ca8c3f92ffed3e60f9ab898c927932f96fa6277e",
+      "license": "OFL-1.1"
+    }
+  ]
+}

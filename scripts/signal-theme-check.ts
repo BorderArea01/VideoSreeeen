@@ -51,6 +51,8 @@ let watching = false;
 async function context(roll: number) {
   const ctx = await browser.newContext({ viewport: { width: 1440, height: 1060 } });
   await ctx.addInitScript((roll) => {
+    // Explicitly cover accepted/rejected entries without flaky visual fixtures.
+    Math.random = () => (window as any).__glitchRoll ?? 0.25;
     const random = crypto.getRandomValues.bind(crypto);
     crypto.getRandomValues = ((array: ArrayBufferView) => {
       if (array instanceof Uint32Array && array.length === 1) {
@@ -89,6 +91,7 @@ async function select(page: Page, value: string) {
   await page.locator('.theme-choice:has(input[value="' + value + '"])').click();
   assert.equal(await page.locator('html').getAttribute('data-theme'), value);
   await page.locator('[data-close="settings-dialog"]').first().click();
+  await page.evaluate(() => document.fonts.ready);
 }
 try {
   await mkdir('.local/screenshots', { recursive: true });
@@ -236,6 +239,90 @@ try {
     microphoneRequests: 0,
     viewerTheme: 'classic',
   };
+  evidence.typography = await owner.evaluate(async () => {
+    await document.fonts.load('600 32px "Signal Tech"', 'VideoSreeeen');
+    await document.fonts.load('400 20px "Signal Tube"', '聊天室');
+    const styles = Object.fromEntries(
+      [
+        ['brand', '.brand > span:last-child'],
+        ['chatTitle', '.chat-heading > div:first-child'],
+        ['bubble', '.bubble'],
+        ['transport', '.transport'],
+      ].map(([name, selector]) => {
+        const style = getComputedStyle(document.querySelector(selector!)!);
+        return [name, { font: style.fontFamily, glow: style.textShadow }];
+      }),
+    );
+    return {
+      techLoaded: document.fonts.check('600 32px "Signal Tech"', 'VideoSreeeen'),
+      tubeLoaded: document.fonts.check('400 20px "Signal Tube"', '聊天室'),
+      ...styles,
+      sources: performance
+        .getEntriesByType('resource')
+        .filter((e) => e.name.includes('.woff2'))
+        .map((e) => new URL(e.name).origin),
+    };
+  });
+  assert.equal(evidence.typography.techLoaded, true);
+  assert.equal(evidence.typography.tubeLoaded, true);
+  assert.match(evidence.typography.brand.font, /Signal Tech/);
+  assert.match(evidence.typography.chatTitle.font, /Signal Tube/);
+  assert.notEqual(evidence.typography.brand.glow, 'none');
+  assert.notEqual(evidence.typography.chatTitle.glow, 'none');
+  assert.equal(evidence.typography.bubble.glow, 'none');
+  assert.equal(evidence.typography.transport.glow, 'none');
+  assert.ok(evidence.typography.sources.length > 0);
+  assert.ok(evidence.typography.sources.every((s: string) => s === origin));
+  await owner.evaluate(() => ((window as any).__glitchRoll = 0.5));
+  await owner.locator('#source-url').hover();
+  await owner.waitForTimeout(1200);
+  await owner.locator('#source-form button').hover();
+  assert.equal(
+    await owner
+      .locator('#source-form button')
+      .evaluate((e) => e.classList.contains('signal-active')),
+    false,
+  );
+  await owner.evaluate(() => ((window as any).__glitchRoll = 0.1));
+  const randomControl = await owner.locator('#source-form button').boundingBox();
+  assert.ok(randomControl);
+  await owner.mouse.move(
+    randomControl.x + randomControl.width * 0.6,
+    randomControl.y + randomControl.height * 0.5,
+  );
+  assert.equal(
+    await owner
+      .locator('#source-form button')
+      .evaluate((e) => e.classList.contains('signal-active')),
+    false,
+  );
+  await owner.locator('#source-url').hover();
+  await owner.locator('#source-form button').hover();
+  const variation = await owner.locator('#source-form button').evaluate((e) => ({
+    active: e.classList.contains('signal-active'),
+    travel: Number((e as HTMLElement).style.getPropertyValue('--signal-jump')),
+    size: Number((e as HTMLElement).style.getPropertyValue('--signal-size')),
+  }));
+  assert.equal(variation.active, true);
+  assert.ok(variation.travel >= 0.7 && variation.travel <= 1.3);
+  assert.ok(variation.size >= 0.8 && variation.size <= 1.2);
+  await owner.locator('#source-url').hover();
+  await owner.waitForTimeout(1200);
+  await owner.evaluate(() => ((window as any).__glitchRoll = 0.45));
+  await owner.locator('#source-form button').hover();
+  const changedVariation = await owner.locator('#source-form button').evaluate((e) => ({
+    travel: Number((e as HTMLElement).style.getPropertyValue('--signal-jump')),
+    size: Number((e as HTMLElement).style.getPropertyValue('--signal-size')),
+  }));
+  assert.notEqual(changedVariation.travel, variation.travel);
+  assert.notEqual(changedVariation.size, variation.size);
+  evidence.hoverChance = {
+    rejectedAtHalf: true,
+    noRerollWithinControl: true,
+    variation,
+    changedVariation,
+  };
+  await owner.evaluate(() => delete (window as any).__glitchRoll);
   await owner.mouse.move(0, 0);
   await owner.waitForTimeout(1200);
   await owner.locator('#source-form button').hover();

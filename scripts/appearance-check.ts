@@ -57,6 +57,8 @@ const proof: Record<string, unknown> = {
 async function context(roll: number) {
   const result = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
   await result.addInitScript((value) => {
+    // Fixed only in isolated visual fixtures, never in the real application.
+    Math.random = () => (window as any).__glitchRoll ?? 0.25;
     const original = crypto.getRandomValues.bind(crypto);
     crypto.getRandomValues = ((array: ArrayBufferView) => {
       if (array instanceof Uint32Array && array.length === 1) {
@@ -531,10 +533,82 @@ try {
   await owner.waitForTimeout(250);
   assert.equal(await signature('#theme-fragments'), settledButton);
   proof.buttonMaterialAfterimage = true;
+  // A rejected hover stays rejected for this entire entry, even after moving.
+  await owner.evaluate(() => ((window as any).__glitchRoll = 0.5));
+  await owner.locator('#source-url').hover();
+  await owner.waitForTimeout(1200);
+  const quietCanvas = await signature('#theme-fragments');
+  await owner.locator('#choose-file').hover();
+  await owner.waitForTimeout(155);
+  assert.equal(await signature('#theme-fragments'), quietCanvas);
+  await owner.evaluate(() => ((window as any).__glitchRoll = 0.1));
+  const fileButton = await owner.locator('#choose-file').boundingBox();
+  assert.ok(fileButton);
+  await owner.mouse.move(
+    fileButton.x + fileButton.width * 0.6,
+    fileButton.y + fileButton.height * 0.5,
+  );
+  await owner.waitForTimeout(155);
+  assert.equal(await signature('#theme-fragments'), quietCanvas);
+  await owner.locator('#source-url').hover();
+  await owner.locator('#choose-file').hover();
+  await owner.waitForTimeout(155);
+  assert.notEqual(await signature('#theme-fragments'), quietCanvas);
+  proof.hoverChance = {
+    rejectedAtHalf: true,
+    noRerollWithinControl: true,
+    reentryCanTrigger: true,
+  };
+  await owner.evaluate(() => delete (window as any).__glitchRoll);
+  await owner.locator('#source-url').hover();
+  await owner.waitForTimeout(1200);
+  await owner.locator('#choose-file').hover();
+  await owner.waitForTimeout(155);
+  const fragmentTails = await owner.evaluate(() => {
+    const canvas = document.querySelector<HTMLCanvasElement>('#theme-fragments')!;
+    const ratio = canvas.width / canvas.getBoundingClientRect().width;
+    const r = document.getElementById('choose-file')!.getBoundingClientRect();
+    const input = document.getElementById('source-url')!.getBoundingClientRect();
+    const data = canvas.getContext('2d')!.getImageData(0, 0, canvas.width, canvas.height).data;
+    const tails = new Set<number>();
+    let pixels = 0,
+      inputPixels = 0;
+    for (let y = Math.ceil(r.top * ratio); y < Math.floor(r.bottom * ratio); y++) {
+      let end = -1;
+      for (let x = Math.ceil(r.right * ratio); x < Math.floor(input.left * ratio); x++) {
+        if (data[(y * canvas.width + x) * 4 + 3]! > 80) {
+          end = x;
+          pixels++;
+        }
+      }
+      if (end >= 0) tails.add(end);
+    }
+    for (let y = Math.ceil(input.top * ratio); y < Math.floor(input.bottom * ratio); y++)
+      for (let x = Math.ceil(input.left * ratio); x < Math.floor(input.right * ratio); x++)
+        if (data[(y * canvas.width + x) * 4 + 3]! > 0) inputPixels++;
+    return { pixels, differentEnds: tails.size, inputPixels };
+  });
+  assert.ok(fragmentTails.pixels > 15, JSON.stringify(fragmentTails));
+  assert.ok(
+    fragmentTails.differentEnds >= 3,
+    'Fragment tails must not end at one flat clipping wall',
+  );
+  assert.equal(fragmentTails.inputPixels, 0);
+  proof.fileButtonFragmentTails = fragmentTails;
+  await owner.screenshot({
+    path: '.local/screenshots/daylight-file-button.png',
+    clip: {
+      x: Math.max(0, fileButton.x - 8),
+      y: Math.max(0, fileButton.y - 12),
+      width: Math.min(340, owner.viewportSize()!.width - fileButton.x + 8),
+      height: fileButton.height + 24,
+    },
+  });
   const unifiedControls: Record<string, unknown> = {};
   for (const selector of [
     '#sidebar-invite',
     '#choose-link',
+    '#choose-file',
     '.daylight-voice > summary',
     '#settings-button',
     '#send-button',

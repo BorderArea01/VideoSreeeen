@@ -1,5 +1,6 @@
 import skyUrl from './assets/themes/daylight-sky.png';
 import { fractureControl, fractureEdge, fractureSky, glitchLifetime } from './appearance-fracture';
+import { HoverGlitch } from './hover-glitch';
 
 type Wake = {
   x: number;
@@ -9,6 +10,8 @@ type Wake = {
   seed: number;
   target?: HTMLElement;
   impact: number;
+  travel: number;
+  size: number;
   samples: Map<string, HTMLCanvasElement>;
 };
 const controlSelector = 'button, summary, a.button, [role="button"]';
@@ -67,6 +70,7 @@ export class GlitchScene {
   private nodes: HTMLElement[] = [];
   private materialLayout = '';
   private hadMotion = false;
+  private hover = new HoverGlitch();
   private motion = matchMedia('(prefers-reduced-motion: reduce)');
   private contrast = matchMedia('(forced-colors: active)');
   constructor() {
@@ -119,12 +123,14 @@ export class GlitchScene {
     });
     this.contrast.addEventListener('change', () => this.resize());
     document.addEventListener('pointermove', this.pointer, { passive: true });
+    document.addEventListener('pointerleave', () => this.hover.reset());
     window.addEventListener('pagehide', () => this.stop());
     window.addEventListener('pageshow', () => this.resize());
   }
   setActive(active: boolean) {
     this.active = active;
     this.wakes = [];
+    this.hover.reset();
     this.stop();
     if (active) {
       this.nodes = materials();
@@ -190,7 +196,10 @@ export class GlitchScene {
   private pointer = (event: PointerEvent) => {
     if (this.suspended() || this.motion.matches || event.pointerType === 'touch') return;
     const target = event.target instanceof Element ? event.target : null;
-    if (!target || target.closest('.player-shell, dialog, input, textarea, select')) return;
+    if (!target || target.closest('.player-shell, dialog, input, textarea, select')) {
+      this.hover.reset();
+      return;
+    }
     const now = performance.now();
     const dx = Math.max(-50, Math.min(50, event.clientX - this.lastPointer.x));
     const node =
@@ -207,6 +216,10 @@ export class GlitchScene {
       });
     const box = node?.getBoundingClientRect();
     if (node?.matches(':disabled,[aria-disabled="true"]')) return;
+    const variation = this.hover.enter(
+      node ?? `sky:${Math.floor(event.clientX / 160)}:${Math.floor(event.clientY / 160)}`,
+    );
+    if (!variation.enabled) return;
     if (now - this.lastPointer.at < 75 && node === this.lastPointer.target) return;
     this.wakes.push({
       x: event.clientX,
@@ -216,6 +229,8 @@ export class GlitchScene {
       seed: now % 997,
       target: node ?? undefined,
       impact: box ? Math.max(0, Math.min(1, (event.clientY - box.top) / box.height)) : 0.5,
+      travel: variation.travel,
+      size: variation.size,
       samples: new Map(),
     });
     this.wakes = this.wakes.slice(-8);
@@ -328,6 +343,7 @@ export class GlitchScene {
               ? wake.impact
               : Math.max(0, Math.min(1, (wake.y - r.top) / r.height)),
           left: !compact && node.matches('.source-card') && wake.x < r.left + r.width * 0.5,
+          exclusions: protectedRects,
         };
         fractureEdge(ink, this.base, this.scale, { ...wake, elapsed: now - wake.at }, edge);
       }
@@ -360,7 +376,7 @@ export class GlitchScene {
     for (const { rects } of content) eraseGlyphs(rects);
     eraseGlyphs(headerRects);
     for (const { node, wake, surface } of labels)
-      fractureControl(ink, node, { ...wake, elapsed: now - wake.at }, surface);
+      fractureControl(ink, node, { ...wake, elapsed: now - wake.at }, surface, protectedRects);
     const animated = new Set(labels.map(({ node }) => node));
     for (const { node, rects } of content) if (!animated.has(node)) eraseGlyphs(rects);
     eraseGlyphs(headerRects);
