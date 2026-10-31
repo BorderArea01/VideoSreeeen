@@ -483,7 +483,51 @@ try {
         )
           channels++;
       }
-      return { text, changedRows: rows.size, height: pixels.height, channels };
+      const buttonRect = button.getBoundingClientRect();
+      const glyph = button.querySelector('svg');
+      const pseudo = getComputedStyle(button, '::after');
+      const iw = Number.parseFloat(pseudo.width),
+        ih = Number.parseFloat(pseudo.height);
+      const icon = glyph
+        ? glyph.getBoundingClientRect()
+        : {
+            left: r.left - (Number.parseFloat(getComputedStyle(button).columnGap) || 0) - iw,
+            top: buttonRect.top + (buttonRect.height - ih) / 2,
+            width: iw,
+            height: ih,
+          };
+      const iconPixels = canvas
+        .getContext('2d')!
+        .getImageData(
+          Math.floor(icon.left * scale),
+          Math.floor(icon.top * scale),
+          Math.ceil(icon.width * scale),
+          Math.ceil(icon.height * scale),
+        );
+      const iconRows = new Set<number>();
+      let iconGlyphPixels = 0;
+      for (let i = 0; i < iconPixels.data.length; i += 4)
+        if (iconPixels.data[i + 3]) {
+          iconRows.add(Math.floor(icon.top * scale) + Math.floor(i / 4 / iconPixels.width));
+          if (
+            iconPixels.data[i]! > 180 &&
+            iconPixels.data[i + 1]! > 180 &&
+            iconPixels.data[i + 2]! > 180
+          )
+            iconGlyphPixels++;
+        }
+      const sharedRows = [...rows].filter((row) =>
+        iconRows.has(Math.floor(r.top * scale) + row),
+      ).length;
+      return {
+        text,
+        changedRows: rows.size,
+        height: pixels.height,
+        channels,
+        iconRows: iconRows.size,
+        iconGlyphPixels,
+        sharedRows,
+      };
     }
     return null;
   });
@@ -493,6 +537,10 @@ try {
     JSON.stringify(labelSlices),
   );
   assert.equal(await owner.locator('#source-form .button').innerText(), labelSlices.text);
+  assert.ok(
+    labelSlices.iconRows > 0 && labelSlices.sharedRows > 0 && labelSlices.iconGlyphPixels > 0,
+    JSON.stringify(labelSlices),
+  );
   proof.referenceLabelSlices = labelSlices;
   const afterimage = await signature('#theme-fragments');
   await owner.waitForTimeout(180);

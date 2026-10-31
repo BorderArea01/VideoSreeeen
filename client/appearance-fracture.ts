@@ -221,7 +221,27 @@ export function fractureSky(
   ctx.save();
   ctx.imageSmoothingEnabled = false;
   ctx.globalAlpha = burst.elapsed < 630 ? 0.88 : 0.42;
-  for (let j = 0; j < 38; j++) {
+  // Preserve photo structure in displaced layers before adding sorted-pixel tails.
+  for (let layer = 0; layer < 3; layer++) {
+    const n = seed + layer * 47;
+    const sx = Math.max(0, Math.min(sky.width / scale - 1, x - 120 + hash(n) * 60));
+    const sy = Math.max(0, Math.min(sky.height / scale - 1, y - 90 + hash(n + 2) * 170));
+    const w = Math.min(120 + hash(n + 3) * 150, sky.width / scale - sx);
+    const h = Math.min(layer === 0 ? 12 : 3 + hash(n + 4) * 5, sky.height / scale - sy);
+    const shift = (step % 2 ? -1 : 1) * (8 + Math.floor(hash(n + step) * 4) * 6);
+    ctx.drawImage(
+      sky,
+      sx * scale,
+      sy * scale,
+      w * scale,
+      h * scale,
+      sx + shift,
+      sy + ((step % 3) - 1) * 2,
+      w,
+      h,
+    );
+  }
+  for (let j = 0; j < 24; j++) {
     const n = seed + j * 13;
     if (hash(n) > density(burst.elapsed)) continue;
     const width = 20 + hash(n + 3) ** 1.7 * 205;
@@ -230,7 +250,7 @@ export function fractureSky(
       (Math.floor(hash(seed + Math.floor(j / 4) * 11 + step * 31) * 7) - 3) * 9 +
       Math.sign(burst.dx) * (step % 3) * 6;
     const px = x - width * 0.5 + (hash(n + 7) - 0.5) * 150 + offset;
-    const py = y - 100 + (j / 38) * 200;
+    const py = y - 100 + (j / 24) * 200;
     ctx.drawImage(
       field,
       Math.floor(hash(n + 9) * 55),
@@ -250,8 +270,148 @@ export function fractureSky(
   ctx.restore();
 }
 
-/** Repaint at most two thin strips of an app-owned button label, never chat text. */
-export function fractureLabel(
+/** An app-owned surface/text/icon plate; no DOM clones, external capture or media. */
+function controlPlate(button: HTMLElement, burst: GlitchBurst, surface: string) {
+  const box = button.getBoundingClientRect();
+  const ratio = Math.min(2, devicePixelRatio || 1, 768 / box.width, 192 / box.height);
+  const style = getComputedStyle(button);
+  const key = [
+    'control',
+    button.id,
+    box.width,
+    box.height,
+    surface,
+    style.font,
+    button.textContent,
+  ].join(':');
+  const cached = burst.samples.get(key);
+  if (cached) return cached;
+  const plate = document.createElement('canvas');
+  plate.width = Math.ceil(box.width * ratio);
+  plate.height = Math.ceil(box.height * ratio);
+  const p = plate.getContext('2d')!;
+  p.scale(ratio, ratio);
+  p.fillStyle = surface;
+  p.beginPath();
+  if (button.matches('#source-form .button')) {
+    p.moveTo(0, 0);
+    p.lineTo(box.width, 0);
+    p.lineTo(box.width, box.height);
+    p.lineTo(10, box.height);
+    p.lineTo(0, box.height - 10);
+    p.closePath();
+  } else
+    p.roundRect(
+      0,
+      0,
+      box.width,
+      box.height,
+      Math.min(10, Number.parseFloat(style.borderRadius) || 2),
+    );
+  p.fill();
+  const walker = document.createTreeWalker(button, NodeFilter.SHOW_TEXT, {
+    acceptNode(node) {
+      const text = node.textContent?.trim() ?? '';
+      return text &&
+        text.length <= 40 &&
+        node.parentElement?.checkVisibility() &&
+        !node.parentElement.closest('svg, small, [aria-hidden="true"]')
+        ? NodeFilter.FILTER_ACCEPT
+        : NodeFilter.FILTER_REJECT;
+    },
+  });
+  let node: Node | null;
+  let firstLabel: DOMRect | undefined;
+  while ((node = walker.nextNode())) {
+    const text = node.textContent!.trim(),
+      offset = node.textContent!.indexOf(text);
+    const range = document.createRange();
+    range.setStart(node, offset);
+    range.setEnd(node, offset + text.length);
+    const r = range.getBoundingClientRect(),
+      font = getComputedStyle(node.parentElement!);
+    firstLabel ??= r;
+    p.font = `${font.fontStyle} ${font.fontWeight} ${font.fontSize} ${font.fontFamily}`;
+    p.textBaseline = 'middle';
+    const x = r.left - box.left,
+      y = r.top - box.top + r.height / 2;
+    p.fillStyle = '#43deef';
+    p.fillText(text, x + 2, y + 1);
+    p.fillStyle = '#ed7097';
+    p.fillText(text, x - 2, y - 1);
+    p.fillStyle = font.color;
+    p.fillText(text, x, y);
+  }
+  // The sync link glyph is our CSS mask rather than a DOM svg. Reuse its own
+  // inline paths so it travels in the same surface/text packet.
+  const pseudo = getComputedStyle(button, '::after');
+  const mask = /^url\("(data:image\/svg\+xml,[\s\S]+)"\)$/.exec(pseudo.maskImage);
+  if (firstLabel && button.matches('#source-form .button') && mask) {
+    const vector = new DOMParser().parseFromString(
+      decodeURIComponent(mask[1]!.split(',').slice(1).join(',')),
+      'image/svg+xml',
+    ).documentElement;
+    const size = (vector.getAttribute('viewBox') || '0 0 24 24').split(/\s+/).map(Number);
+    const iw = Number.parseFloat(pseudo.width),
+      ih = Number.parseFloat(pseudo.height);
+    if (iw > 0 && ih > 0 && size[2]) {
+      p.save();
+      p.translate(
+        firstLabel.left - box.left - (Number.parseFloat(style.columnGap) || 0) - iw,
+        (box.height - ih) / 2,
+      );
+      p.scale(iw / size[2]!, ih / size[3]!);
+      p.strokeStyle = style.color;
+      p.lineWidth = Number(vector.getAttribute('stroke-width') || 2);
+      p.lineCap = 'round';
+      p.lineJoin = 'round';
+      for (const path of vector.querySelectorAll('path[d]'))
+        p.stroke(new Path2D(path.getAttribute('d')!));
+      p.restore();
+    }
+  }
+  for (const svg of button.querySelectorAll<SVGSVGElement>('svg[viewBox]')) {
+    const r = svg.getBoundingClientRect(),
+      view = svg.viewBox.baseVal;
+    if (!r.width || !view.width) continue;
+    p.save();
+    p.translate(r.left - box.left, r.top - box.top);
+    p.scale(r.width / view.width, r.height / view.height);
+    p.lineWidth = Number(svg.getAttribute('stroke-width') || 1.7);
+    p.lineCap = 'round';
+    p.lineJoin = 'round';
+    p.strokeStyle = getComputedStyle(svg).color;
+    for (const shape of svg.querySelectorAll('path,circle,line,rect,polyline,polygon')) {
+      const a = (name: string) => Number(shape.getAttribute(name) || 0);
+      const path = new Path2D(shape.tagName === 'path' ? shape.getAttribute('d') || '' : '');
+      if (shape.tagName === 'circle') path.arc(a('cx'), a('cy'), a('r'), 0, Math.PI * 2);
+      if (shape.tagName === 'rect') path.rect(a('x'), a('y'), a('width'), a('height'));
+      if (shape.tagName === 'line') {
+        path.moveTo(a('x1'), a('y1'));
+        path.lineTo(a('x2'), a('y2'));
+      }
+      if (shape.tagName === 'polyline' || shape.tagName === 'polygon') {
+        const points = (shape.getAttribute('points') || '')
+          .trim()
+          .split(/[\s,]+/)
+          .map(Number);
+        for (let i = 0; i + 1 < points.length; i += 2) {
+          if (i === 0) path.moveTo(points[i]!, points[i + 1]!);
+          else path.lineTo(points[i]!, points[i + 1]!);
+        }
+        if (shape.tagName === 'polygon') path.closePath();
+      }
+      p.stroke(path);
+    }
+    p.restore();
+  }
+  if (burst.samples.size >= 4) burst.samples.delete(burst.samples.keys().next().value!);
+  burst.samples.set(key, plate);
+  return plate;
+}
+
+/** A single cropped control layer moves as a unit: surface, icon and lettering. */
+export function fractureControl(
   ctx: CanvasRenderingContext2D,
   button: HTMLElement,
   burst: GlitchBurst,
@@ -259,48 +419,33 @@ export function fractureLabel(
 ) {
   const beat = packet(burst.elapsed);
   if (burst.elapsed >= glitchLifetime || quiet(beat) || beat === 0) return;
-  const walker = document.createTreeWalker(button, NodeFilter.SHOW_TEXT, {
-    acceptNode(node) {
-      const text = node.textContent?.trim() ?? '';
-      return text &&
-        text.length <= 40 &&
-        !node.parentElement?.closest('svg, small, [aria-hidden="true"]')
-        ? NodeFilter.FILTER_ACCEPT
-        : NodeFilter.FILTER_REJECT;
-    },
-  });
-  const node = walker.nextNode();
-  if (!node) return;
-  const text = node.textContent!.trim();
-  const offset = node.textContent!.indexOf(text);
-  const range = document.createRange();
-  range.setStart(node, offset);
-  range.setEnd(node, offset + text.length);
-  const rect = range.getBoundingClientRect();
-  if (!rect.width || !rect.height) return;
-  const style = getComputedStyle(node.parentElement!);
-  const fontSize = Number.parseFloat(style.fontSize);
-  const shift = (beat % 2 ? -1 : 1) * (2 + Math.floor(hash(burst.seed + beat) * 4));
+  const box = button.getBoundingClientRect(),
+    plate = controlPlate(button, burst, surface);
+  const ratio = plate.width / box.width;
+  const shift = Math.round(
+    (beat % 2 ? -1 : 1) * Math.min(14, box.width * 0.07) * (0.6 + hash(burst.seed + beat) * 0.4),
+  );
+  const dy = ((beat % 3) - 1) * 2;
+  const position = [0.14, 0.32, 0.46, 0.72, 0.6][beat % 5]!;
+  const sourceY = Math.round(box.height * position);
+  const height = Math.round(Math.min(7, Math.max(3, box.height * 0.12)));
   ctx.save();
-  ctx.font = `${style.fontStyle} ${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
-  ctx.textBaseline = 'middle';
-  const bandHeight = Math.max(1, Math.min(2, fontSize * 0.1));
-  for (let strip = 0; strip < (beat === 2 || beat === 4 ? 2 : 1); strip++) {
-    const y = rect.top + rect.height * (strip ? 0.68 : 0.35 + (beat % 3) * 0.1);
-    ctx.save();
-    ctx.beginPath();
-    ctx.rect(rect.left - 6, y, rect.width + 12, bandHeight);
-    ctx.clip();
-    ctx.fillStyle = surface;
-    ctx.fillRect(rect.left - 6, y, rect.width + 12, bandHeight);
-    ctx.globalAlpha = 0.92;
-    ctx.fillStyle = '#43deef';
-    ctx.fillText(text, rect.left + shift + 2, rect.top + rect.height / 2);
-    ctx.fillStyle = '#ed7097';
-    ctx.fillText(text, rect.left + shift - 2, rect.top + rect.height / 2);
-    ctx.fillStyle = style.color;
-    ctx.fillText(text, rect.left + shift, rect.top + rect.height / 2);
-    ctx.restore();
-  }
+  ctx.globalAlpha = 0.8;
+  ctx.fillStyle = '#43deef';
+  ctx.fillRect(box.left + shift + 3, box.top + sourceY + dy, box.width, height);
+  ctx.fillStyle = '#ed7097';
+  ctx.fillRect(box.left + shift - 3, box.top + sourceY + dy, box.width, height);
+  ctx.globalAlpha = 1;
+  ctx.drawImage(
+    plate,
+    0,
+    sourceY * ratio,
+    plate.width,
+    height * ratio,
+    box.left + shift,
+    box.top + sourceY + dy,
+    box.width,
+    height,
+  );
   ctx.restore();
 }

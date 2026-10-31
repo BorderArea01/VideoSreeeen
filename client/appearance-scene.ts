@@ -1,5 +1,5 @@
 import skyUrl from './assets/themes/daylight-sky.png';
-import { fractureEdge, fractureLabel, fractureSky, glitchLifetime } from './appearance-fracture';
+import { fractureControl, fractureEdge, fractureSky, glitchLifetime } from './appearance-fracture';
 
 type Wake = {
   x: number;
@@ -274,13 +274,14 @@ export class GlitchScene {
       const blue = node.matches('.accent, .send-button');
       const cssSurface = getComputedStyle(node).backgroundColor;
       const pseudoSurface = getComputedStyle(node, '::before').backgroundColor;
-      const surface = blue
-        ? '#0053e6'
-        : pseudoSurface !== 'rgba(0, 0, 0, 0)'
+      const surface =
+        pseudoSurface !== 'rgba(0, 0, 0, 0)'
           ? pseudoSurface
           : cssSurface !== 'rgba(0, 0, 0, 0)'
             ? cssSurface
-            : '#f5f7fb';
+            : blue
+              ? '#0053e6'
+              : '#f5f7fb';
       if (compact && !this.motion.matches) labels.push({ node, wake: candidates[0]!, surface });
       for (const wake of packets) {
         const edge = {
@@ -328,7 +329,7 @@ export class GlitchScene {
       );
     }
     for (const { node, wake, surface } of labels)
-      fractureLabel(ink, node, { ...wake, elapsed: now - wake.at }, surface);
+      fractureControl(ink, node, { ...wake, elapsed: now - wake.at }, surface);
     // Label slices are strictly decorative and obey the same protected areas.
     for (const r of protectedRects)
       ink.clearRect(r.left - 10, r.top - 10, r.width + 20, r.height + 20);
