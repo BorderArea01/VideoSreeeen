@@ -341,14 +341,10 @@
 :root[data-theme='glitch'] .compose-actions .icon-button {
   width: 24px;
   height: 25px;
-  color: #7893b9;
 }
 :root[data-theme='glitch'] .send-button {
   width: 64px;
   height: 43px;
-  border-radius: 6px;
-  background: #0053e6;
-  color: #fff;
   font-size: 13px;
   font-weight: 650;
 }
@@ -385,12 +381,8 @@
   border-right: 1px solid #a8bbd87d;
 }
 :root[data-theme='glitch'] .playback-tabs button {
-  background: #f5f8fc80;
-  color: #0c2b69;
   font-size: 13px;
   font-weight: 650;
-  border: 1px solid #ccdbef;
-  border-radius: 5px;
   padding: 13px 10px;
   min-height: 48px;
   white-space: nowrap;
@@ -399,11 +391,6 @@
 }
 :root[data-theme='glitch'] .playback-tabs button small {
   display: none;
-}
-:root[data-theme='glitch'] .playback-tabs button[aria-selected='true'] {
-  background: linear-gradient(110deg, #0040a9, #0058f2);
-  border-color: #004fd8;
-  color: #fff;
 }
 :root[data-theme='glitch'] .playback-tabs button > svg {
   width: 23px;
@@ -476,73 +463,7 @@
 :root[data-theme='glitch'] .source-card:has(.active-source:not([hidden])) {
   row-gap: 9px;
 }
-:root[data-theme='glitch'] .button {
-  border-radius: 5px;
-}
-:root[data-theme='glitch'] .accent {
-  background: #0053e6;
-  color: #fff;
-}
-:root[data-theme='glitch'] .accent:hover {
-  background: #0047ca;
-}
-:root[data-theme='glitch'] .soft {
-  background: #e5eefb;
-  color: #214e8f;
-}
-:root[data-theme='glitch'] .soft:hover {
-  background: #d1e1f8;
-}
-:root[data-theme='glitch'] .outline {
-  color: #205198;
-  border-color: #a1bcdf;
-}
-:root[data-theme='glitch'] :is(.icon-button, .text-button) {
-  color: #476b9d;
-}
-:root[data-theme='glitch'] .icon-button:hover {
-  background: #c1d7f488;
-  color: #003fb5;
-}
-.daylight-voice {
-  grid-column: 3;
-  grid-row: 1;
-  position: relative;
-  align-self: stretch;
-  display: flex;
-  align-items: center;
-  padding-left: 18px;
-  border-left: 1px solid #8da5ca99;
-}
-.daylight-voice > summary {
-  list-style: none;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 13px;
-  min-height: 52px;
-  color: #092766;
-  font-size: 15px;
-  font-weight: 650;
-  cursor: pointer;
-}
-.daylight-voice > summary::-webkit-details-marker {
-  display: none;
-}
-.daylight-mic {
-  width: 48px;
-  height: 48px;
-  display: grid;
-  place-items: center;
-  border: 1px solid #9dc2ff;
-  border-radius: 50%;
-  background: #cbe0ffb5;
-  color: #0053dc;
-}
-.daylight-voice[open] > summary .daylight-mic {
-  background: #b6d4ff;
-}
-:root[data-theme='glitch'] .daylight-voice .voice-card {
+:root[data-theme='glitch'] .theme-voice .voice-card {
   position: absolute;
   top: calc(100% + 12px);
   right: 0;
@@ -552,41 +473,7 @@
   border-radius: 9px;
   box-shadow: 0 10px 40px #123b7860;
 }
-.daylight-utilities {
-  grid-column: 1 / -1;
-  grid-row: 3;
-  display: flex;
-  align-items: flex-start;
-  gap: 18px;
-  flex-wrap: wrap;
-  padding: 0 3px;
-}
-.daylight-members {
-  position: relative;
-  color: #163a78;
-  font-size: 11px;
-}
-.daylight-members > summary {
-  list-style: none;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  padding: 9px 12px;
-  background: #f5f9ffd9;
-  border-radius: 4px;
-}
-.daylight-members > .members-card {
-  width: 320px;
-  position: absolute;
-  top: calc(100% + 8px);
-  left: 0;
-  z-index: 25;
-  border-radius: 7px;
-  padding: 18px;
-  box-shadow: 0 10px 35px #123b7840;
-}
-:root[data-theme='glitch'] .daylight-utilities .cache-options {
+:root[data-theme='glitch'] .theme-utilities .cache-options {
   margin: 0;
   min-width: 200px;
   border-radius: 4px;
@@ -594,14 +481,14 @@
 }
 :root[data-theme='glitch']
   .workspace:has(#choose-link[aria-selected='false'])
-  .daylight-utilities
+  .theme-utilities
   .cache-options {
   display: none;
 }
-:root[data-theme='glitch'] .daylight-utilities .cache-options > summary {
+:root[data-theme='glitch'] .theme-utilities .cache-options > summary {
   padding: 9px 12px;
 }
-:root[data-theme='glitch'] .daylight-utilities .screen-foot {
+:root[data-theme='glitch'] .theme-utilities .screen-foot {
   margin: 0 0 0 auto;
   padding: 10px 12px;
   color: #204c85;
@@ -664,11 +551,6 @@
 :root[data-theme='glitch'] .latency.slow {
   color: #9c650a;
 }
-:root[data-theme='glitch'] .voice-actions :is(.active, .is-muted) {
-  background: #d9e7fb;
-  color: #124b92;
-  border-color: #a0bfe7;
-}
 :root[data-theme='glitch'] .voice-peer-speaking .avatar {
   color: #147950;
   border-color: #147950;
@@ -697,7 +579,7 @@
 :root[data-theme='glitch'] .welcome {
   background:
     linear-gradient(105deg, #e9f7fff2, #d7f1ff88),
-    url('./assets/themes/daylight-sky.png') center / cover;
+    url('./assets/daylight-sky.png') center / cover;
   color: #0f3f83;
 }
 :root[data-theme='glitch'] .welcome h2 {
@@ -725,13 +607,6 @@
 :root[data-theme='glitch'] .room-tabs {
   background: #e1edfd;
   border-color: #aec6e9;
-}
-:root[data-theme='glitch'] .room-tabs button {
-  color: #4e6e9b;
-}
-:root[data-theme='glitch'] .room-tabs button[aria-pressed='true'] {
-  color: #0052cf;
-  background: #fafdff;
 }
 :root[data-theme='glitch'] .toast {
   color: #173d75;
@@ -845,17 +720,6 @@
   :root[data-theme='glitch'] #source-form .button {
     font-size: 13px;
   }
-  .daylight-voice {
-    padding-left: 9px;
-  }
-  .daylight-voice > summary {
-    font-size: 12px;
-    gap: 6px;
-  }
-  .daylight-mic {
-    width: 38px;
-    height: 38px;
-  }
   :root[data-theme='glitch'] .chat-heading {
     padding-inline: 17px;
   }
@@ -916,21 +780,12 @@
     grid-column: 1;
     grid-row: 2;
   }
-  .daylight-voice {
-    grid-column: 2;
-    grid-row: 2;
-  }
   :root[data-theme='glitch'] .chat-panel {
     grid-row: 3;
     grid-column: 1;
     height: 430px;
   }
-  .daylight-utilities {
-    grid-row: 4;
-    grid-column: 1;
-    gap: 10px;
-  }
-  :root[data-theme='glitch'] .daylight-utilities .screen-foot {
+  :root[data-theme='glitch'] .theme-utilities .screen-foot {
     width: 100%;
     margin: 0;
     justify-content: space-between;
@@ -1066,37 +921,13 @@
   :root[data-theme='glitch'] #source-form .button {
     font-size: 10px;
   }
-  .daylight-voice {
-    padding-left: 0;
-    border-left: 0;
-    align-self: center;
-  }
-  .daylight-voice > summary {
-    min-height: 42px;
-  }
-  .daylight-voice > summary > :not(.daylight-mic) {
-    display: none;
-  }
-  .daylight-mic {
-    width: 36px;
-    height: 36px;
-  }
-  .daylight-mic svg {
-    width: 22px;
-  }
-  :root[data-theme='glitch'] .daylight-voice .voice-card {
+  :root[data-theme='glitch'] .theme-voice .voice-card {
     width: min(310px, calc(100vw - 40px));
     right: -2px;
   }
-  :root[data-theme='glitch'] .daylight-utilities .cache-options {
+  :root[data-theme='glitch'] .theme-utilities .cache-options {
     min-width: 170px;
     flex: 1;
-  }
-  .daylight-members > summary {
-    padding: 10px 9px;
-  }
-  .daylight-members > .members-card {
-    width: min(310px, calc(100vw - 36px));
   }
   :root[data-theme='glitch'] .chat-panel {
     height: 420px;
@@ -1109,7 +940,7 @@
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  :root[data-theme='glitch'] .daylight-voice > summary,
+  :root[data-theme='glitch'] .theme-voice > summary,
   :root[data-theme='glitch'] .accent {
     transition: none;
   }
@@ -1130,7 +961,7 @@
       .chat-panel,
       .cache-options,
       .top-actions,
-      .daylight-members > summary
+      .theme-members > summary
     ) {
     background: Canvas;
     border: 1px solid CanvasText;

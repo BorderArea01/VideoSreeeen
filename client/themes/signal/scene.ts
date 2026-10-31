@@ -1,4 +1,5 @@
-import { HoverGlitch, type GlitchVariation } from './hover-glitch';
+import { HoverGlitch, type GlitchVariation } from '../shared/hover-glitch';
+import { ThemeScope } from '../core/scope';
 
 const buttons = [
   '#room-button',
@@ -44,14 +45,17 @@ export class SignalScene {
     }
     if (scan) this.refresh(dirty);
   });
-  constructor() {
+  constructor(private scope: ThemeScope) {
+    scope.own(this.field);
+    scope.observe(this.observer);
     this.field.id = 'signal-field';
     this.field.setAttribute('aria-hidden', 'true');
     this.field.innerHTML =
       '<span class="signal-field-base"></span><span class="signal-field-inverse"></span><span class="signal-field-counter"></span>';
     this.field.hidden = true;
     document.body.prepend(this.field);
-    document.addEventListener(
+    scope.listen(
+      document,
       'pointerover',
       (event) => {
         if (!(event.target instanceof Element) || event.pointerType === 'touch') return;
@@ -65,11 +69,11 @@ export class SignalScene {
       },
       { passive: true },
     );
-    document.addEventListener('focusin', (event) => {
+    scope.listen(document, 'focusin', (event) => {
       if (event.target instanceof HTMLElement && event.target.matches('.signal-control'))
         this.burst(event.target);
     });
-    document.addEventListener('pointerout', (event) => {
+    scope.listen(document, 'pointerout', (event) => {
       const control = event.target instanceof Element && event.target.closest('.signal-control');
       if (
         control &&
@@ -79,7 +83,8 @@ export class SignalScene {
     });
     // Native click also covers keyboard activation. Hover/focus decorate only
     // the control or panel; the page background flashes on button activation.
-    document.addEventListener(
+    scope.listen(
+      document,
       'click',
       (event) => {
         if (!event.isTrusted || !(event.target instanceof Element)) return;
@@ -90,14 +95,15 @@ export class SignalScene {
       },
       { capture: true, passive: true },
     );
-    document.addEventListener(
+    scope.listen(
+      document,
       'pointermove',
       (event) => {
         if (this.suspended() || !(event.target instanceof Element) || event.pointerType === 'touch')
           return;
         if (
           event.target.closest(
-            '.player-shell, dialog, input, textarea, select, .daylight-voice[open], .daylight-members[open]',
+            '.player-shell, dialog, input, textarea, select, .theme-voice[open], .theme-members[open]',
           )
         ) {
           this.hover.reset();
@@ -115,9 +121,9 @@ export class SignalScene {
       { passive: true },
     );
     for (const name of ['visibilitychange', 'fullscreenchange', 'cinemachange', 'pagehide'])
-      document.addEventListener(name, () => this.clear(), true);
-    this.motion.addEventListener('change', () => this.clear());
-    this.contrast.addEventListener('change', () => this.clear());
+      scope.listen(document, name, () => this.clear(), true);
+    scope.listen(this.motion, 'change', () => this.clear());
+    scope.listen(this.contrast, 'change', () => this.clear());
   }
   setActive(active: boolean) {
     if (active === this.active) return;
@@ -147,7 +153,7 @@ export class SignalScene {
   private clear() {
     this.hover.reset();
     for (const [el, timer] of this.timers) {
-      clearTimeout(timer);
+      this.scope.clearTimeout(timer);
       el.classList.remove('signal-active');
       for (const key of ['--signal-travel', '--signal-jump', '--signal-size'])
         el.style.removeProperty(key);
@@ -161,7 +167,7 @@ export class SignalScene {
   private burst(el: HTMLElement, variation?: GlitchVariation) {
     if (this.suspended() || this.timers.has(el) || el.matches(':disabled') || !el.checkVisibility())
       return;
-    if (el.closest('.player-shell, .daylight-voice[open], .daylight-members[open]')) return;
+    if (el.closest('.player-shell, .theme-voice[open], .theme-members[open]')) return;
     if (el !== this.field) {
       const film = document.getElementById('player-shell')?.getBoundingClientRect(),
         rect = el.getBoundingClientRect();
@@ -184,7 +190,7 @@ export class SignalScene {
     el.classList.add('signal-active');
     this.timers.set(
       el,
-      setTimeout(() => {
+      this.scope.timeout(() => {
         el.classList.remove('signal-active');
         for (const key of ['--signal-travel', '--signal-jump', '--signal-size'])
           el.style.removeProperty(key);

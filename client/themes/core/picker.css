@@ -1,35 +1,5 @@
-@import './daylight.css';
-@import './signal.css';
-@import './daylight-controls.css';
-
-:root:is([data-theme='glitch'], [data-theme='signal']) .workspace:has(#sidebar[hidden]) {
-  grid-template-columns: minmax(0, 1fr);
-}
-
 /* The source card isolates glitch decorations; lift its whole context while a
    real voice panel is open so the next grid row cannot paint through it. */
-:root:is([data-theme='glitch'], [data-theme='signal']) .source-card:has(.daylight-voice[open]) {
-  z-index: 40;
-}
-.daylight-voice .voice-card,
-.daylight-members > .members-card {
-  max-height: min(520px, 65dvh);
-  max-width: calc(100vw - 24px);
-  overflow-y: auto;
-  overscroll-behavior: contain;
-}
-:root:is([data-theme='glitch'], [data-theme='signal']) .daylight-members[open] {
-  z-index: 40;
-}
-:root[data-theme='glitch'] .chat-restore {
-  background: #f4f8ff;
-  color: #163a70;
-  border-color: #a4c2e7;
-}
-:root[data-theme='signal'] .chat-restore {
-  border-radius: 0;
-  color: #c9ff4b;
-}
 
 /* Appearance controls share the original palette, even when the theme is changed. */
 .appearance-settings {
@@ -102,15 +72,6 @@ dialog .theme-choice input {
   border-radius: 5px;
   overflow: hidden;
 }
-.theme-swatch-classic {
-  background: linear-gradient(125deg, #16151b, #47343b);
-}
-.theme-swatch-glitch {
-  background: #438bd0 url('./assets/themes/daylight-sky.png') center / cover;
-}
-.theme-swatch-signal {
-  background: linear-gradient(125deg, #18111f, #30203b);
-}
 .theme-swatch i,
 .theme-swatch b,
 .theme-swatch em {
@@ -135,28 +96,6 @@ dialog .theme-choice input {
   inset: 17px 14px 12px 70%;
   background: #1a1922cc;
   border-radius: 3px;
-}
-.theme-swatch-glitch i {
-  border-color: #bbf5ff;
-  background: #f7fbffed;
-}
-.theme-swatch-glitch b {
-  background: #0646d6;
-  box-shadow:
-    5px -4px 0 -2px #ef78ff,
-    -5px 5px 0 -2px #61f1ff;
-}
-.theme-swatch-signal i {
-  background: #211729;
-  border-color: #9164ad;
-}
-.theme-swatch-signal b {
-  background: #c9ff4b;
-  border-radius: 0;
-  box-shadow: 8px -5px 0 -3px #3600b4;
-}
-.theme-swatch-signal em {
-  background: #30203b;
 }
 .theme-choice-name {
   display: flex;
@@ -184,18 +123,28 @@ dialog .theme-choice input {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 9px;
   }
-  dialog .theme-choice:last-child {
+  dialog .theme-choice:last-child:nth-of-type(odd) {
     grid-column: 1 / -1;
     display: grid;
     grid-template-columns: 82px minmax(0, 1fr);
     align-items: center;
     gap: 10px;
   }
-  .theme-choice:last-child .theme-swatch {
+  .theme-choice:last-child:nth-of-type(odd) .theme-swatch {
     height: 64px;
   }
   .theme-choice-name {
     font-size: 11px;
     padding-inline: 3px;
   }
+}
+.theme-swatch {
+  background: var(--theme-preview-background);
+}
+.theme-swatch i {
+  background: var(--theme-preview-panel);
+  border-color: var(--theme-preview-border);
+}
+.theme-swatch b {
+  background: var(--theme-preview-accent);
 }

@@ -5,7 +5,7 @@ import { createServer } from 'node:http';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { chromium, type Page } from 'playwright';
 import { createApp } from '../server/index';
-import { closeInvitation, selectSource } from './room-ui';
+import { closeInvitation, selectSource, waitForTheme } from './room-ui';
 
 const app = createApp();
 app.server.listen(0, '127.0.0.1');
@@ -80,11 +80,12 @@ async function context(roll: number) {
   result.on('page', (page) => page.on('pageerror', (cause) => failures.push(cause.message)));
   return result;
 }
-const theme = (page: Page) => page.evaluate(() => document.documentElement.dataset.theme);
+const theme = (page: Page) => waitForTheme(page);
 async function select(page: Page, value: string) {
   if (!(await page.locator('#settings-dialog').isVisible()))
     await page.locator('#appearance-button').click();
   await page.locator(`.theme-choice:has(input[value="${value}"])`).click();
+  await waitForTheme(page,value);
   assert.equal(await theme(page), value);
   await page.waitForTimeout(180); // Let the existing 150 ms color transition settle before screenshots.
 }
@@ -195,13 +196,13 @@ try {
       .querySelector('#video')!
       .addEventListener('loadstart', () => (window as any).__appearanceLoads++);
   });
-  await owner.locator('.daylight-voice > summary').click();
+  await owner.locator('.theme-voice > summary').click();
   await owner.evaluate(() => {
     (window as any).__appearanceVoice = document.getElementById('voice-panel');
   });
   await owner.locator('#voice-join').click();
   await owner.locator('#voice-mic').waitFor({ state: 'visible' });
-  await owner.locator('.daylight-voice > summary').click();
+  await owner.locator('.theme-voice > summary').click();
   watchingAppearance = true;
   const stateBefore = await owner
     .locator('#video')
@@ -211,7 +212,7 @@ try {
   assert.equal(await theme(viewer), 'classic');
   await select(owner, 'glitch');
   await close(owner);
-  await owner.locator('.daylight-voice > summary').click();
+  await owner.locator('.theme-voice > summary').click();
   assert.equal(
     await owner.evaluate(
       () => document.getElementById('voice-panel') === (window as any).__appearanceVoice,
@@ -221,7 +222,7 @@ try {
   await owner.locator('#voice-mic').waitFor({ state: 'visible' });
   assert.equal(await owner.locator('#voice-mic').innerText(), '开麦');
   await owner.locator('#voice-leave').click();
-  await owner.locator('.daylight-voice > summary').click();
+  await owner.locator('.theme-voice > summary').click();
   proof.voiceReceiveSurvivesSkinSwitch = true;
   const uninterrupted = await owner.evaluate(() => {
     const v = document.querySelector<HTMLVideoElement>('#video')!;
@@ -609,7 +610,7 @@ try {
     '#sidebar-invite',
     '#choose-link',
     '#choose-file',
-    '.daylight-voice > summary',
+    '.theme-voice > summary',
     '#settings-button',
     '#send-button',
     '#chat-collapse',
@@ -749,9 +750,9 @@ try {
     inversePixels: liveSample.inverse,
     noBakedCloudTexture: true,
   };
-  await owner.locator('.daylight-members > summary').click();
+  await owner.locator('.theme-members > summary').click();
   await owner.locator('#members').hover();
-  const frame = owner.locator('.daylight-members .members-card');
+  const frame = owner.locator('.theme-members .members-card');
   await owner.waitForTimeout(140);
   assert.notEqual(await signature('#theme-fragments'), buttonBefore);
   assert.equal(await frame.evaluate((e) => getComputedStyle(e, '::before').pointerEvents), 'none');
@@ -776,7 +777,7 @@ try {
   });
   assert.equal(protectedPixels, true);
   proof.materialEdgesAndVideoExclusion = true;
-  await owner.locator('.daylight-members > summary').click();
+  await owner.locator('.theme-members > summary').click();
   assert.equal(
     await owner.locator('#theme-scene').evaluate((e) => getComputedStyle(e).pointerEvents),
     'none',

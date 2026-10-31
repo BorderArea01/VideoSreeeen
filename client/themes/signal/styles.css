@@ -1,5 +1,5 @@
-@import './signal-motion.css';
-@import './signal-fonts.css';
+@import './motion.css';
+@import './fonts.css';
 
 :root[data-theme='signal'] .signal-active > .signal-copy {
   animation: signal-control-cut var(--signal-duration) steps(1, end);
@@ -505,7 +505,7 @@
     -1px 0 #ee76f4,
     1px 0 #c9ff4b;
 }
-:root[data-theme='signal'] .daylight-voice {
+:root[data-theme='signal'] .theme-voice {
   grid-column: 1;
   grid-row: 3;
   align-self: center;
@@ -514,14 +514,14 @@
   border-left: 1px solid var(--line);
   display: block;
 }
-:root[data-theme='signal'] .daylight-voice > summary {
+:root[data-theme='signal'] .theme-voice > summary {
   min-height: 36px;
   color: var(--text);
   font-size: 11px;
   font-weight: 500;
   gap: 10px;
 }
-:root[data-theme='signal'] .daylight-voice > summary > span:not(.daylight-mic) {
+:root[data-theme='signal'] .theme-voice > summary > span:not(.theme-mic) {
   color: #f4d8ff;
   text-shadow:
     0 0 2px #edc9ff88,
@@ -534,7 +534,7 @@
 :root[data-theme='signal'] .signal-panel-fragments > span {
   scale: 1 var(--signal-size, 1);
 }
-:root[data-theme='signal'] .daylight-mic {
+:root[data-theme='signal'] .theme-mic {
   width: 28px;
   height: 28px;
   border: 0;
@@ -542,14 +542,14 @@
   background: transparent;
   color: #c9ff4b;
 }
-:root[data-theme='signal'] .daylight-mic svg {
+:root[data-theme='signal'] .theme-mic svg {
   width: 20px;
   height: 20px;
 }
-:root[data-theme='signal'] .daylight-voice[open] > summary .daylight-mic {
+:root[data-theme='signal'] .theme-voice[open] > summary .theme-mic {
   background: #c9ff4b14;
 }
-:root[data-theme='signal'] .daylight-voice .voice-card {
+:root[data-theme='signal'] .theme-voice .voice-card {
   position: absolute;
   top: calc(100% + 12px);
   left: 0;
@@ -560,7 +560,7 @@
   background: #211729;
   box-shadow: 0 14px 40px #0008;
 }
-:root[data-theme='signal'] .daylight-utilities {
+:root[data-theme='signal'] .theme-utilities {
   grid-column: 1/-1;
   grid-row: 4;
   display: flex;
@@ -569,28 +569,28 @@
   align-items: flex-start;
   padding: 0;
 }
-:root[data-theme='signal'] .daylight-members {
+:root[data-theme='signal'] .theme-members {
   color: var(--text);
   z-index: 10;
 }
-:root[data-theme='signal'] .daylight-members > summary {
+:root[data-theme='signal'] .theme-members > summary {
   background: #211729;
   border: 1px solid #594167;
   border-radius: 0;
   color: var(--text);
   font-size: 10px;
 }
-:root[data-theme='signal'] .daylight-members > .members-card {
+:root[data-theme='signal'] .theme-members > .members-card {
   background: #211729;
   border-radius: 0;
   box-shadow: 0 12px 35px #0007;
 }
-:root[data-theme='signal'] .daylight-utilities .cache-options {
+:root[data-theme='signal'] .theme-utilities .cache-options {
   margin: 0;
   min-width: 200px;
   max-width: 620px;
 }
-:root[data-theme='signal'] .daylight-utilities .screen-foot {
+:root[data-theme='signal'] .theme-utilities .screen-foot {
   margin: 0 0 0 auto;
   padding: 10px 0;
   color: var(--muted);
@@ -599,7 +599,7 @@
 }
 :root[data-theme='signal']
   .workspace:has(#choose-link[aria-selected='false'])
-  .daylight-utilities
+  .theme-utilities
   .cache-options {
   display: none;
 }
@@ -677,7 +677,7 @@
   color: var(--muted);
 }
 :root[data-theme='signal']
-  :is(.daylight-voice[open], .daylight-members[open])
+  :is(.theme-voice[open], .theme-members[open])
   :is(.signal-copy, .signal-counter, .signal-panel-fragments),
 :root[data-theme='signal']
   .page-cinema
@@ -707,9 +707,6 @@
   height: auto;
   min-height: 300px;
 }
-:root[data-theme='signal'] .workspace:has(#sidebar[hidden]) {
-  grid-template-columns: minmax(0, 1fr);
-}
 
 /* One theme face across real content, with stronger light only on emphasis. */
 :root[data-theme='signal']
@@ -718,10 +715,10 @@
     .message-meta,
     .source-card > .section-heading,
     .playback-copy,
-    .daylight-voice > summary,
-    .daylight-members > summary,
-    .daylight-utilities,
-    .daylight-utilities .screen-foot,
+    .theme-voice > summary,
+    .theme-members > summary,
+    .theme-utilities,
+    .theme-utilities .screen-foot,
     #sidebar-invite
   ) {
   font-size: 12px;
@@ -751,7 +748,7 @@
     .button:not(.accent),
     .text-button,
     .advanced > summary,
-    .daylight-members > summary,
+    .theme-members > summary,
     .cache-options > summary,
     .member-info strong,
     .voice-member strong,
@@ -816,7 +813,7 @@
     grid-column: 1;
     grid-row: 3;
   }
-  :root[data-theme='signal'] .daylight-voice {
+  :root[data-theme='signal'] .theme-voice {
     grid-column: 1;
     grid-row: 4;
   }
@@ -865,15 +862,15 @@
     grid-column: 1;
     height: 420px;
   }
-  :root[data-theme='signal'] .daylight-utilities {
+  :root[data-theme='signal'] .theme-utilities {
     grid-row: 5;
     grid-column: 1;
   }
-  :root[data-theme='signal'] .daylight-voice .voice-card {
+  :root[data-theme='signal'] .theme-voice .voice-card {
     left: 0;
     right: auto;
   }
-  :root[data-theme='signal'] .daylight-utilities .screen-foot {
+  :root[data-theme='signal'] .theme-utilities .screen-foot {
     width: 100%;
     margin: 0;
     justify-content: space-between;
@@ -943,7 +940,7 @@
   :root[data-theme='signal'] .chat-compose {
     padding: 13px 15px 15px;
   }
-  :root[data-theme='signal'] .daylight-voice .voice-card {
+  :root[data-theme='signal'] .theme-voice .voice-card {
     max-width: calc(100vw - 42px);
   }
 }
@@ -968,4 +965,9 @@
     color: CanvasText;
     border-color: CanvasText;
   }
+}
+
+:root[data-theme='signal'] .chat-restore {
+  border-radius: 0;
+  color: #c9ff4b;
 }

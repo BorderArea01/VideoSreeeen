@@ -3,7 +3,7 @@ import { once } from 'node:events';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { chromium } from 'playwright';
 import { createApp } from '../server/index';
-import { closeInvitation } from './room-ui';
+import { closeInvitation, waitForTheme } from './room-ui';
 
 const app = process.env.VS_PUBLIC_URL ? undefined : createApp();
 if (app) {
@@ -44,6 +44,7 @@ try {
     }),
   );
   await page.goto(origin);
+  await waitForTheme(page,'glitch');
   await page.locator('#hero-create').click();
   await page.locator('#name-input').fill('天光按钮验收');
   await page.locator('#create-button').click();
@@ -88,13 +89,13 @@ try {
     await page.mouse.move(1, 1);
     await page.waitForTimeout(160);
   }
-  await page.locator('.daylight-voice > summary').click();
+  await page.locator('.theme-voice > summary').click();
   await inspect();
   assert.equal(
     await page.locator('#voice-join').evaluate((n) => getComputedStyle(n).backgroundColor),
     'rgb(0, 83, 230)',
   );
-  await page.locator('.daylight-voice > summary').click();
+  await page.locator('.theme-voice > summary').click();
   await page.locator('#invite-button').click();
   await inspect();
   await closeInvitation(page);

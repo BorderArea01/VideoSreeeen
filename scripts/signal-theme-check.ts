@@ -7,7 +7,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { chromium, type Page } from 'playwright';
 import { createApp } from '../server/index';
-import { closeInvitation, selectSource } from './room-ui';
+import { closeInvitation, selectSource, waitForTheme } from './room-ui';
 
 const { PNG } = createRequire(import.meta.url)(
   resolve('node_modules/playwright-core/lib/utilsBundle.js'),
@@ -89,7 +89,8 @@ async function select(page: Page, value: string) {
   if (!(await page.locator('#settings-dialog').isVisible()))
     await page.locator('#appearance-button').click();
   await page.locator('.theme-choice:has(input[value="' + value + '"])').click();
-  assert.equal(await page.locator('html').getAttribute('data-theme'), value);
+  await waitForTheme(page,value);
+  assert.equal(await waitForTheme(page), value);
   await page.locator('[data-close="settings-dialog"]').first().click();
   await page.evaluate(() => document.fonts.ready);
 }
@@ -139,16 +140,16 @@ try {
     }),
   );
   await owner.goto(origin);
-  assert.equal(await owner.locator('html').getAttribute('data-theme'), 'signal');
+  assert.equal(await waitForTheme(owner), 'signal');
   await owner.reload();
-  assert.equal(await owner.locator('html').getAttribute('data-theme'), 'signal');
+  assert.equal(await waitForTheme(owner), 'signal');
   const linkedContext = await context(0),
     linked = await linkedContext.newPage();
   await linked.goto(origin + '/?skin=signal');
-  assert.equal(await linked.locator('html').getAttribute('data-theme'), 'signal');
+  assert.equal(await waitForTheme(linked), 'signal');
   assert.equal(new URL(linked.url()).searchParams.has('skin'), false);
   await linked.reload();
-  assert.equal(await linked.locator('html').getAttribute('data-theme'), 'signal');
+  assert.equal(await waitForTheme(linked), 'signal');
   await linkedContext.unrouteAll({ behavior: 'wait' });
   await linkedContext.close();
   evidence.themeLinkAndPreference = true;
@@ -227,16 +228,16 @@ try {
       (window as any).__loads++;
     });
   });
-  await owner.locator('.daylight-voice > summary').click();
+  await owner.locator('.theme-voice > summary').click();
   await owner.locator('#voice-join').click();
   await owner.locator('#voice-mic').waitFor({ state: 'visible' });
-  await owner.locator('.daylight-voice > summary').click();
+  await owner.locator('.theme-voice > summary').click();
   watching = true;
   evidence.playingSidebar = await checkChatCollapse(owner);
   assert.equal(await owner.locator('#video').evaluate((v: HTMLVideoElement) => v.paused), false);
-  await owner.locator('.daylight-voice > summary').click();
+  await owner.locator('.theme-voice > summary').click();
   assert.equal(await owner.locator('#voice-mic').isVisible(), true);
-  await owner.locator('.daylight-voice > summary').click();
+  await owner.locator('.theme-voice > summary').click();
   for (const name of ['classic', 'glitch', 'signal']) await select(owner, name);
   watching = false;
   assert.deepEqual(commands, []);
@@ -250,11 +251,11 @@ try {
     ),
     true,
   );
-  assert.equal(await viewer.locator('html').getAttribute('data-theme'), 'classic');
-  await owner.locator('.daylight-voice > summary').click();
+  assert.equal(await waitForTheme(viewer), 'classic');
+  await owner.locator('.theme-voice > summary').click();
   assert.equal(await owner.locator('#voice-mic').isVisible(), true);
   await owner.locator('#voice-leave').click();
-  await owner.locator('.daylight-voice > summary').click();
+  await owner.locator('.theme-voice > summary').click();
   assert.equal(await owner.evaluate(() => (window as any).__micRequests), 0);
   await owner.locator('#chat-input').fill('C 主题真实房间聊天与播放。🟩');
   await owner.locator('#send-button').click();
@@ -560,7 +561,7 @@ try {
   );
   await owner.emulateMedia({ forcedColors: 'none' });
   await owner.reload();
-  assert.equal(await owner.locator('html').getAttribute('data-theme'), 'signal');
+  assert.equal(await waitForTheme(owner), 'signal');
   assert.deepEqual(errors, []);
   evidence.checksPassed = true;
 } finally {

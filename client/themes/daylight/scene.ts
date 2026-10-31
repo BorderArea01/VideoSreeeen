@@ -1,6 +1,7 @@
-import skyUrl from './assets/themes/daylight-sky.png';
-import { fractureControl, fractureEdge, fractureSky, glitchLifetime } from './appearance-fracture';
-import { HoverGlitch } from './hover-glitch';
+import skyUrl from './assets/daylight-sky.png';
+import { fractureControl, fractureEdge, fractureSky, glitchLifetime } from './fracture';
+import { HoverGlitch } from '../shared/hover-glitch';
+import { ThemeScope } from '../core/scope';
 
 type Wake = {
   x: number;
@@ -73,7 +74,15 @@ export class GlitchScene {
   private hover = new HoverGlitch();
   private motion = matchMedia('(prefers-reduced-motion: reduce)');
   private contrast = matchMedia('(forced-colors: active)');
-  constructor() {
+  constructor(private scope: ThemeScope) {
+    for (const node of [this.image, this.canvas, this.fragments]) scope.own(node);
+    scope.defer(() => {
+      this.image.onload = null;
+      this.image.removeAttribute('src');
+      this.nodes = [];
+      this.wakes = [];
+      this.materialLayout = '';
+    });
     this.canvas.id = 'theme-scene';
     this.fragments.id = 'theme-fragments';
     this.image.id = 'theme-photo';
@@ -84,30 +93,39 @@ export class GlitchScene {
     document.body.append(this.fragments);
     this.image.onload = () => this.resize();
     this.image.src = skyUrl;
-    new ResizeObserver(() => this.resize()).observe(this.canvas);
-    window.addEventListener('resize', () => this.resize());
-    window.visualViewport?.addEventListener('resize', () => this.resize());
-    window.visualViewport?.addEventListener('scroll', this.invalidate);
-    window.addEventListener('scroll', this.invalidate, { passive: true, capture: true });
-    new MutationObserver((records) => {
-      const layout = records.filter((r) => {
-        if (r.target === this.canvas || r.target === this.fragments) return false;
-        const element = r.target instanceof Element ? r.target : r.target.parentElement;
-        return !element?.closest('.player-shell, .chat-messages, .members, .voice-members');
+    scope.observe(new ResizeObserver(scope.guard(() => this.resize()))).observe(this.canvas);
+    scope.listen(window, 'resize', () => this.resize());
+    if (window.visualViewport) {
+      scope.listen(window.visualViewport, 'resize', () => this.resize());
+      scope.listen(window.visualViewport, 'scroll', this.invalidate);
+    }
+    scope.listen(window, 'scroll', this.invalidate, { passive: true, capture: true });
+    scope
+      .observe(
+        new MutationObserver(
+          scope.guard((records: MutationRecord[]) => {
+            const layout = records.filter((r) => {
+              if (r.target === this.canvas || r.target === this.fragments) return false;
+              const element = r.target instanceof Element ? r.target : r.target.parentElement;
+              return !element?.closest('.player-shell, .chat-messages, .members, .voice-members');
+            });
+            if (!layout.length) return;
+            if (layout.some((r) => r.type === 'childList' || r.attributeName === 'open'))
+              this.nodes = materials();
+            this.invalidate();
+          }),
+        ),
+      )
+      .observe(document.body, {
+        childList: true,
+        subtree: true,
+        attributes: true,
+        attributeFilter: ['class', 'style', 'hidden', 'open'],
       });
-      if (!layout.length) return;
-      if (layout.some((r) => r.type === 'childList' || r.attributeName === 'open'))
-        this.nodes = materials();
-      this.invalidate();
-    }).observe(document.body, {
-      childList: true,
-      subtree: true,
-      attributes: true,
-      attributeFilter: ['class', 'style', 'hidden', 'open'],
-    });
-    new ResizeObserver(this.invalidate).observe(document.body);
+    scope.observe(new ResizeObserver(scope.guard(this.invalidate))).observe(document.body);
     for (const event of ['visibilitychange', 'fullscreenchange', 'cinemachange']) {
-      document.addEventListener(
+      scope.listen(
+        document,
         event,
         () => {
           this.wakes = [];
@@ -116,16 +134,16 @@ export class GlitchScene {
         true,
       );
     }
-    this.motion.addEventListener('change', () => {
+    scope.listen(this.motion, 'change', () => {
       this.wakes = [];
       this.materialLayout = '';
       this.invalidate();
     });
-    this.contrast.addEventListener('change', () => this.resize());
-    document.addEventListener('pointermove', this.pointer, { passive: true });
-    document.addEventListener('pointerleave', () => this.hover.reset());
-    window.addEventListener('pagehide', () => this.stop());
-    window.addEventListener('pageshow', () => this.resize());
+    scope.listen(this.contrast, 'change', () => this.resize());
+    scope.listen(document, 'pointermove', this.pointer, { passive: true });
+    scope.listen(document, 'pointerleave', () => this.hover.reset());
+    scope.listen(window, 'pagehide', () => this.stop());
+    scope.listen(window, 'pageshow', () => this.resize());
   }
   setActive(active: boolean) {
     this.active = active;
@@ -156,12 +174,12 @@ export class GlitchScene {
     );
   }
   private stop() {
-    cancelAnimationFrame(this.frame);
+    this.scope.cancelFrame(this.frame);
     this.frame = 0;
   }
   private invalidate = () => {
     this.dirty = true;
-    if (this.active && !this.frame) this.frame = requestAnimationFrame(this.tick);
+    if (this.active && !this.frame) this.frame = this.scope.frame(this.tick);
   };
   private resize() {
     this.stop();
@@ -251,7 +269,7 @@ export class GlitchScene {
       this.dirty = false;
     }
     // A finite afterimage, no idle animation loop or persistent cursor attachment.
-    if (this.wakes.length) this.frame = requestAnimationFrame(this.tick);
+    if (this.wakes.length) this.frame = this.scope.frame(this.tick);
   };
   private paint(now: number) {
     const visible = this.nodes.flatMap((node, i) => {
@@ -267,7 +285,7 @@ export class GlitchScene {
     });
     const protectedRects = Array.from(
       document.querySelectorAll<HTMLElement>(
-        '.player-shell, dialog[open], .daylight-voice[open] > .voice-card, .daylight-members[open] > .members-card, input:not([type="range"]), textarea, select, .bubble, .message-meta',
+        '.player-shell, dialog[open], .theme-voice[open] > .voice-card, .theme-members[open] > .members-card, input:not([type="range"]), textarea, select, .bubble, .message-meta',
       ),
     )
       .filter((e) => e.checkVisibility())

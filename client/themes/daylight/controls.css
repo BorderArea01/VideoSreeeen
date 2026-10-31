@@ -46,7 +46,7 @@
     .send-button,
     .playback-tabs button[aria-selected='true'],
     .room-tabs button[aria-pressed='true']
-  ):not(:where(.transport *, .stage-tools *, .player-settings-panel *)) {
+  ) {
   background: var(--daylight-control-blue);
   border-color: var(--daylight-control-blue);
   color: #fff;

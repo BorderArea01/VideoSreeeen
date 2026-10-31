@@ -1,18 +1,9 @@
-import './themes.css';
-import { GlitchScene } from './appearance-scene';
-import { DaylightLayout } from './appearance-layout';
-import { SignalScene } from './appearance-signal';
+import './themes/core/picker.css';
+import { themeRegistry } from './themes/catalog';
+import { ThemeController } from './themes/core/controller';
 
-const themes = ['classic', 'glitch', 'signal'] as const;
-type Theme = (typeof themes)[number];
 const preferenceKey = 'videosreeeen.appearance';
 const sessionKey = 'videosreeeen.appearance.session';
-const names: Record<Theme, string> = {
-  classic: '暖夜 · 原版',
-  glitch: '天光断层',
-  signal: '紫电噪讯',
-};
-const valid = (value: string | null): value is Theme => themes.includes(value as Theme);
 function read(kind: 'localStorage' | 'sessionStorage', key: string) {
   try {
     return window[kind].getItem(key);
@@ -25,105 +16,142 @@ function write(kind: 'localStorage' | 'sessionStorage', key: string, value: stri
     if (value === null) window[kind].removeItem(key);
     else window[kind].setItem(key, value);
   } catch {
-    // Appearance remains usable when browser storage is unavailable.
+    /* Appearance works when storage is blocked. */
   }
 }
-function randomTheme(): Theme {
-  return themes[crypto.getRandomValues(new Uint32Array(1))[0]! % themes.length]!;
+function randomTheme() {
+  const themes = themeRegistry.list();
+  return themes[crypto.getRandomValues(new Uint32Array(1))[0]! % themes.length]!.id;
 }
-const preference = read('localStorage', preferenceKey);
-const session = read('sessionStorage', sessionKey);
+const preference = read('localStorage', preferenceKey),
+  session = read('sessionStorage', sessionKey);
 const navigation = performance.getEntriesByType('navigation')[0] as
   PerformanceNavigationTiming | undefined;
-// A shareable preview can select a skin without changing the invitation hash.
-const pageUrl = new URL(location.href);
-const requested = pageUrl.searchParams.get('skin');
-let automatic = !valid(preference);
-let current: Theme = valid(preference)
+const pageUrl = new URL(location.href),
+  requested = pageUrl.searchParams.get('skin');
+let automatic = !themeRegistry.has(preference);
+let initial = themeRegistry.has(preference)
   ? preference
-  : valid(session) && navigation?.type !== 'navigate'
+  : themeRegistry.has(session) && navigation?.type !== 'navigate'
     ? session
     : randomTheme();
-if (valid(requested)) {
-  current = requested;
+if (themeRegistry.has(requested)) {
+  initial = requested;
   automatic = false;
-  write('localStorage', preferenceKey, current);
+  write('localStorage', preferenceKey, initial);
   pageUrl.searchParams.delete('skin');
   history.replaceState(history.state, '', pageUrl);
 }
-let scene: GlitchScene | undefined;
-let signal: SignalScene | undefined;
-let layout: DaylightLayout | undefined;
-function apply() {
-  document.documentElement.dataset.theme = current;
-  if (current === 'glitch') scene ??= new GlitchScene();
-  if (current === 'signal') signal ??= new SignalScene();
-  scene?.setActive(current === 'glitch');
-  signal?.setActive(current === 'signal');
-  layout?.setActive(current !== 'classic', current === 'signal' ? 'signal' : 'glitch');
-  document
-    .querySelector('meta[name="theme-color"]')
-    ?.setAttribute(
-      'content',
-      current === 'signal' ? '#18111f' : current === 'glitch' ? '#1768ce' : '#101014',
-    );
-  write('sessionStorage', sessionKey, current);
-}
-// Set the theme before main.ts builds the application. Never touches a player or room state.
-apply();
+
+export const themeController = new ThemeController(themeRegistry);
 
 export function setupAppearance(settings: HTMLElement) {
-  // main.ts creates the real voice and player controls synchronously after this call.
-  queueMicrotask(() => {
-    layout = new DaylightLayout();
-    layout.setActive(current !== 'classic', current === 'signal' ? 'signal' : 'glitch');
-  });
   settings.querySelector('.dialog-heading')!.insertAdjacentHTML(
     'afterend',
     `
     <section class="appearance-settings" aria-labelledby="appearance-title">
       <div class="appearance-heading"><h3 id="appearance-title">界面皮肤</h3><span>仅本机</span></div>
-      <fieldset class="theme-choices"><legend class="theme-sr-only">选择界面皮肤</legend>
-        <label class="theme-choice"><input type="radio" name="appearance" value="classic"><span class="theme-swatch theme-swatch-classic" aria-hidden="true"><i></i><b></b><em></em></span><span class="theme-choice-name">暖夜 <small>原版</small></span></label>
-        <label class="theme-choice"><input type="radio" name="appearance" value="glitch"><span class="theme-swatch theme-swatch-glitch" aria-hidden="true"><i></i><b></b><em></em></span><span class="theme-choice-name">天光断层</span></label>
-        <label class="theme-choice"><input type="radio" name="appearance" value="signal"><span class="theme-swatch theme-swatch-signal" aria-hidden="true"><i></i><b></b><em></em></span><span class="theme-choice-name">紫电噪讯</span></label>
-      </fieldset>
+      <fieldset class="theme-choices"><legend class="theme-sr-only">选择界面皮肤</legend></fieldset>
       <div class="appearance-auto"><span id="appearance-status" role="status"></span><button id="appearance-random" type="button" class="text-button" title="重新随机选择皮肤；未手动选择时，新标签页自动分配">随机选择</button></div>
     </section>`,
   );
-  const choices = settings.querySelectorAll<HTMLInputElement>('input[name="appearance"]');
-  const update = () => {
-    for (const choice of choices) choice.checked = choice.value === current;
-    settings.querySelector('#appearance-status')!.textContent = automatic
-      ? '随机分配 · 刷新保持'
-      : '已记住你的选择';
+  const choices = settings.querySelector('.theme-choices')!;
+  function renderChoices() {
+    choices.querySelectorAll('.theme-choice').forEach((node) => node.remove());
+    for (const definition of themeRegistry.list()) {
+      const label = document.createElement('label');
+      label.className = 'theme-choice';
+      const input = document.createElement('input');
+      input.type = 'radio';
+      input.name = 'appearance';
+      input.value = definition.id;
+      const swatch = document.createElement('span');
+      swatch.className = 'theme-swatch';
+      swatch.setAttribute('aria-hidden', 'true');
+      for (const [key, value] of Object.entries(definition.preview))
+        swatch.style.setProperty('--theme-preview-' + key, value);
+      swatch.append(
+        document.createElement('i'),
+        document.createElement('b'),
+        document.createElement('em'),
+      );
+      const name = document.createElement('span');
+      name.className = 'theme-choice-name';
+      name.textContent = definition.name;
+      if (definition.hint) {
+        const hint = document.createElement('small');
+        hint.textContent = definition.hint;
+        name.append(hint);
+      }
+      label.append(input, swatch, name);
+      choices.append(label);
+    }
+  }
+  function update() {
+    const state = themeController.snapshot();
+    const selected = state.loading ? state.requested : state.active;
+    for (const input of choices.querySelectorAll<HTMLInputElement>('input'))
+      input.checked = input.value === selected;
+    if (state.loading) document.documentElement.dataset.themeLoading = 'true';
+    else delete document.documentElement.dataset.themeLoading;
+    settings.querySelector('#appearance-status')!.textContent = state.loading
+      ? '正在加载主题…'
+      : state.failed
+        ? '主题暂不可用'
+        : automatic
+          ? '随机分配 · 刷新保持'
+          : '已记住你的选择';
+    const definition = themeRegistry.get(selected) ?? themeRegistry.get(themeRegistry.defaultId)!;
+    const name = definition.name + (definition.hint ? ' · ' + definition.hint : '');
     settings
       .querySelector('#appearance-random')!
-      .setAttribute('aria-label', `随机选择皮肤，当前${names[current]}`);
+      .setAttribute('aria-label', `随机选择皮肤，当前${name}`);
     const entry = document.getElementById('appearance-button');
     if (entry) {
-      entry.title = `切换皮肤 · ${names[current]}`;
-      entry.setAttribute('aria-label', `切换皮肤，当前${names[current]}`);
+      entry.title = `切换皮肤 · ${name}`;
+      entry.setAttribute('aria-label', `切换皮肤，当前${name}`);
     }
-  };
-  const select = (choice: HTMLInputElement) => {
-    if (!choice.checked || !valid(choice.value)) return;
-    if (!automatic && current === choice.value) return;
-    current = choice.value;
-    automatic = false;
-    write('localStorage', preferenceKey, current);
-    apply();
-    update();
-  };
-  for (const choice of choices) {
-    choice.addEventListener('click', () => select(choice));
-    choice.addEventListener('change', () => select(choice));
+    if (!state.loading) write('sessionStorage', sessionKey, state.active);
   }
-  settings.querySelector('#appearance-random')!.addEventListener('click', () => {
-    current = randomTheme();
-    automatic = true;
-    write('localStorage', preferenceKey, null);
-    apply();
+  let selection = 0;
+  function select(id: string, random = false) {
+    const ticket = ++selection;
+    automatic = random;
+    if (random) write('localStorage', preferenceKey, null);
+    void themeController.select(id).then((applied) => {
+      if (applied && ticket === selection && !random) write('localStorage', preferenceKey, id);
+      update();
+    });
+  }
+  choices.addEventListener('change', (event) => {
+    if (
+      event.target instanceof HTMLInputElement &&
+      event.target.checked &&
+      themeRegistry.has(event.target.value)
+    )
+      select(event.target.value);
+  });
+  // Clicking an already selected automatic choice still makes it a preference.
+  choices.addEventListener('click', (event) => {
+    if (
+      event.target instanceof HTMLInputElement &&
+      event.target.checked &&
+      automatic &&
+      themeRegistry.has(event.target.value)
+    )
+      select(event.target.value);
+  });
+  settings
+    .querySelector('#appearance-random')!
+    .addEventListener('click', () => select(randomTheme(), true));
+  themeController.subscribe(update);
+  themeRegistry.subscribe(() => {
+    const saved = read('localStorage', preferenceKey);
+    if (saved && !themeRegistry.has(saved)) {
+      write('localStorage', preferenceKey, null);
+      automatic = true;
+    }
+    renderChoices();
     update();
   });
   const entry = document.createElement('button');
@@ -135,10 +163,13 @@ export function setupAppearance(settings: HTMLElement) {
   entry.onclick = () => {
     document.getElementById('settings-button')!.click();
     settings.querySelector('.appearance-settings')!.scrollIntoView({ block: 'nearest' });
-    settings
-      .querySelector<HTMLInputElement>('input[name="appearance"]:checked')!
-      .focus({ preventScroll: true });
+    choices.querySelector<HTMLInputElement>('input:checked')?.focus({ preventScroll: true });
   };
   document.getElementById('settings-button')!.before(entry);
+  renderChoices();
   update();
+  // The application finishes creating its real controls before theme portals mount.
+  queueMicrotask(() => {
+    void themeController.select(initial);
+  });
 }

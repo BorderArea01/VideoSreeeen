@@ -1,5 +1,5 @@
 import type Hls from 'hls.js';
-import './style.css';
+import './themes/classic/base.css';
 import { setupAppearance } from './appearance';
 import { icon } from './icons';
 import { PlaybackPicker, playbackPickerMarkup } from './playback-picker';

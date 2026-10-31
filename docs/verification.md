@@ -1,5 +1,7 @@
 # 0.4.0 验证记录
 
+2026-11-01 主题按目录独立维护、清单注册与资源生命周期、运行时装卸及隔离回归，见[主题框架验收](verification-theme-framework.md)和[维护指南](theme-framework.md)。
+
 2026-11-01 天光按钮视觉统一及主题选项副标题删除，见[控件统一验收](verification-daylight-controls.md)。
 
 2026-11-01 播放方式按钮随错误提示被拉高的修正，以及三主题 / 响应式布局检查，见[播放方式按钮布局](verification-playback-tabs-layout.md)。

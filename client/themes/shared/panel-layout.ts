@@ -1,31 +1,42 @@
-import { icon } from './icons';
+import { icon } from '../../icons';
+import { ThemeScope } from '../core/scope';
 
 /** Repositions existing controls only; media and voice objects keep their original identity. */
-export class DaylightLayout {
+export class PanelLayout {
   private anchors = new Map<HTMLElement, Comment>();
   private active = false;
-  private kind: 'glitch' | 'signal' = 'glitch';
   private utilities = document.createElement('div');
   private members = document.createElement('details');
   private voice = document.createElement('details');
-  constructor() {
-    this.utilities.className = 'daylight-utilities';
-    this.members.className = 'daylight-members';
+  constructor(
+    private scope: ThemeScope,
+    private options: { moveHeading: boolean },
+  ) {
+    for (const node of [this.utilities, this.members, this.voice]) scope.own(node);
+    scope.attribute(document.documentElement, 'data-theme-layout', 'panels');
+    scope.defer(() => {
+      this.active = false;
+      this.restore();
+      for (const anchor of this.anchors.values()) anchor.remove();
+      this.anchors.clear();
+    });
+    this.utilities.className = 'theme-utilities';
+    this.members.className = 'theme-members';
     this.members.innerHTML = `<summary>${icon('users', 16)} 成员与连接</summary>`;
-    this.voice.className = 'daylight-voice';
-    this.voice.innerHTML = `<summary><span class="daylight-mic">${icon('mic', 26)}</span><span>语音</span>${icon('chevron', 15)}</summary>`;
+    this.voice.className = 'theme-voice';
+    this.voice.innerHTML = `<summary><span class="theme-mic">${icon('mic', 26)}</span><span>语音</span>${icon('chevron', 15)}</summary>`;
     for (const panel of [this.voice, this.members]) {
-      panel.addEventListener('toggle', () => {
+      scope.listen(panel, 'toggle', () => {
         if (!panel.open) return;
         (panel === this.voice ? this.members : this.voice).open = false;
         this.fitPanel(panel);
       });
     }
-    document.addEventListener('pointerdown', (event) => {
+    scope.listen(document, 'pointerdown', (event) => {
       for (const panel of [this.voice, this.members])
         if (!panel.contains(event.target as Node)) panel.open = false;
     });
-    document.addEventListener('keydown', (event) => {
+    scope.listen(document, 'keydown', (event) => {
       if (event.key !== 'Escape') return;
       for (const panel of [this.voice, this.members]) {
         if (!panel.open) continue;
@@ -33,12 +44,13 @@ export class DaylightLayout {
         panel.querySelector('summary')?.focus({ preventScroll: true });
       }
     });
-    window.addEventListener('resize', () => {
+    scope.listen(window, 'resize', () => {
       for (const panel of [this.voice, this.members]) if (panel.open) this.fitPanel(panel);
     });
-    document.addEventListener('fullscreenchange', () => this.arrange());
+    scope.listen(document, 'fullscreenchange', () => this.arrange());
     // PageFullscreen emits this event on the player shell without bubbling.
-    document.getElementById('player-shell')?.addEventListener('cinemachange', () => this.arrange());
+    const player = document.getElementById('player-shell');
+    if (player) scope.listen(player, 'cinemachange', () => this.arrange());
   }
   private fitPanel(panel: HTMLDetailsElement) {
     const card = panel.querySelector<HTMLElement>('.members-card');
@@ -48,9 +60,7 @@ export class DaylightLayout {
     const offset = Math.max(12 - rect.left, Math.min(0, innerWidth - 12 - rect.right));
     if (offset) card.style.translate = offset + 'px 0';
   }
-  setActive(active: boolean, kind: 'glitch' | 'signal' = 'glitch') {
-    if (this.kind !== kind) this.restore();
-    this.kind = kind;
+  setActive(active: boolean) {
     this.active = active;
     this.arrange();
   }
@@ -88,7 +98,7 @@ export class DaylightLayout {
     workspace.append(this.utilities);
     picker.append(this.voice);
     this.utilities.append(this.members);
-    if (this.kind === 'glitch') this.move(document.querySelector('.room-heading'), topbar);
+    if (this.options.moveHeading) this.move(document.querySelector('.room-heading'), topbar);
     this.move(document.getElementById('voice-panel'), this.voice);
     this.move(document.querySelector('.sidebar > .members-card:not(.voice-card)'), this.members);
     this.move(document.getElementById('cache-options'), this.utilities);
@@ -99,6 +109,7 @@ export class DaylightLayout {
       document.getElementById('chat-heading-actions')!,
     );
     const help = document.getElementById('link-capability');
-    if (help) document.getElementById('source-url')!.title = help.textContent || '';
+    if (help)
+      this.scope.attribute(document.getElementById('source-url')!, 'title', help.textContent || '');
   }
 }

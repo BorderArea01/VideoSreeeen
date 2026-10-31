@@ -73,7 +73,7 @@ export async function checkRoomPopovers(page: Page) {
     });
     assert.deepEqual(failures, [], 'Other controls paint over the open popover');
   }
-  await page.locator('.daylight-voice > summary').click();
+  await page.locator('.theme-voice > summary').click();
   await page.locator('#voice-panel').scrollIntoViewIfNeeded();
   await foreground('#voice-panel');
   await page.screenshot({
@@ -87,22 +87,22 @@ export async function checkRoomPopovers(page: Page) {
   });
   // This trigger can sit beneath the open voice card; keyboard activation tests
   // mutual exclusion without pretending a pointer can click through a popup.
-  await page.locator('.daylight-members > summary').focus();
+  await page.locator('.theme-members > summary').focus();
   await page.keyboard.press('Enter');
   await page.waitForFunction(
-    () => !document.querySelector<HTMLDetailsElement>('.daylight-voice')!.open,
+    () => !document.querySelector<HTMLDetailsElement>('.theme-voice')!.open,
   );
-  await page.locator('.daylight-members > .members-card').scrollIntoViewIfNeeded();
-  await foreground('.daylight-members > .members-card');
+  await page.locator('.theme-members > .members-card').scrollIntoViewIfNeeded();
+  await foreground('.theme-members > .members-card');
   await page.keyboard.press('Escape');
   assert.equal(
-    await page.locator('.daylight-members').evaluate((el: HTMLDetailsElement) => el.open),
+    await page.locator('.theme-members').evaluate((el: HTMLDetailsElement) => el.open),
     false,
   );
-  await page.locator('.daylight-voice > summary').click();
+  await page.locator('.theme-voice > summary').click();
   await page.locator('#chat-input').click();
   assert.equal(
-    await page.locator('.daylight-voice').evaluate((el: HTMLDetailsElement) => el.open),
+    await page.locator('.theme-voice').evaluate((el: HTMLDetailsElement) => el.open),
     false,
   );
 }

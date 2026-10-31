@@ -3,7 +3,7 @@ import { once } from 'node:events';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { chromium } from 'playwright';
 import { createApp } from '../server/index';
-import { choosePlayback, closeInvitation, selectSource } from './room-ui';
+import { choosePlayback, closeInvitation, selectSource, waitForTheme } from './room-ui';
 
 const baseline = process.env.VS_LAYOUT_BASELINE === '1';
 const app = process.env.VS_PUBLIC_URL ? undefined : createApp();
@@ -71,6 +71,7 @@ try {
   for (const theme of ['signal', 'glitch', 'classic']) {
     await page.locator('#appearance-button').click();
     await page.locator(`.theme-choice:has(input[value="${theme}"])`).click();
+    await waitForTheme(page,theme);
     await page.locator('[data-close="settings-dialog"]').first().click();
     await page.evaluate(() => document.fonts.ready);
     for (const width of [1556, 1920, 1200, 1160, 850, 600, 390, 320]) {

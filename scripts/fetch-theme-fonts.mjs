@@ -4,7 +4,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 
 const version = '5.3.0';
-const target = 'client/assets/fonts';
+const target = 'client/themes/signal/assets/fonts';
 const licenses = 'client/public/licenses/fonts';
 const previous = JSON.parse(await readFile(`${target}/SOURCES.json`, 'utf8').catch(() => '{}'));
 await mkdir(target, { recursive: true });
@@ -63,7 +63,7 @@ for (const [name, family, weight, entry] of [
   }
 }
 await writeFile(
-  'client/signal-fonts.css',
+  'client/themes/signal/fonts.css',
   '/* Self-hosted OFL fonts; regenerate with scripts/fetch-theme-fonts.mjs. */\n' +
     faces.join('\n') +
     '\n',

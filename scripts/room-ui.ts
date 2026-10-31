@@ -39,6 +39,23 @@ export async function choosePlayback(page: Page, mode: 'screen' | 'link' | 'file
   await page.locator('#choose-' + mode).click();
 }
 
+export async function waitForTheme(page: Page, expected?: string) {
+  await page.waitForFunction(
+    (expected) => {
+      const root = document.documentElement;
+      return (
+        !!root.dataset.theme &&
+        !root.dataset.themeLoading &&
+        (!expected || root.dataset.theme === expected)
+      );
+    },
+    expected,
+    { timeout: 15000 },
+  );
+  await page.evaluate(() => document.fonts.ready);
+  return page.locator('html').getAttribute('data-theme');
+}
+
 export async function selectSource(page: Page, url: string, provideScreen = false) {
   await choosePlayback(page, 'link');
   await page.locator('#source-url').fill(url);
