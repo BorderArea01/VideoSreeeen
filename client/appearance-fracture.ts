@@ -90,7 +90,86 @@ function sortedField(
   return field;
 }
 
-/** Stepwise scan corruption, packet loss and reordered rows. Never elastic easing. */
+/** A bounded high-detail material atlas, with an exact RGB inverse beside it.
+ * Only our own photo and theme surface are sampled; never video or page pixels. */
+function edgeMaterial(
+  sky: HTMLCanvasElement,
+  scale: number,
+  burst: GlitchBurst,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  inside: number,
+  left: boolean,
+  surface: string,
+) {
+  const key = ['edge-pair', x, y, width, height, inside, left, surface].join(':');
+  const cached = burst.samples.get(key);
+  if (cached) return cached;
+  const ratio = Math.min(scale, 1.5);
+  const w = Math.max(1, Math.ceil(width * ratio)),
+    h = Math.max(1, Math.ceil(height * ratio));
+  const plate = document.createElement('canvas');
+  plate.width = w * 2;
+  plate.height = h;
+  const p = plate.getContext('2d', { willReadFrequently: true })!;
+  const rx = w / width,
+    ry = h / height;
+  const sx = Math.max(0, x),
+    sy = Math.max(0, y);
+  const sw = Math.max(0, Math.min(x + width, sky.width / scale) - sx);
+  const sh = Math.max(0, Math.min(y + height, sky.height / scale) - sy);
+  if (sw && sh)
+    p.drawImage(
+      sky,
+      sx * scale,
+      sy * scale,
+      sw * scale,
+      sh * scale,
+      (sx - x) * rx,
+      (sy - y) * ry,
+      sw * rx,
+      sh * ry,
+    );
+  p.fillStyle = surface === 'rgba(0, 0, 0, 0)' ? '#f5f7fbeb' : surface;
+  p.fillRect(left ? w - inside * rx : 0, 0, inside * rx, h);
+  const image = p.getImageData(0, 0, w, h),
+    pixels = image.data;
+  // Sparse one-pixel rows undergo real luminance sorting. Most photo rows retain
+  // native detail instead of stretching the old 96 px sample into broad slabs.
+  for (let row = 3; row < h; row += 7) {
+    const seam = left ? w - inside * rx : inside * rx;
+    const from = Math.max(0, Math.floor(seam - 26 * rx));
+    const to = Math.min(w, Math.ceil(seam + 74 * rx));
+    for (let col = from; col < to; col += 24) {
+      const colors: number[][] = [];
+      for (let k = col; k < Math.min(to, col + 24); k++) {
+        const o = (row * w + k) * 4;
+        colors.push([pixels[o]!, pixels[o + 1]!, pixels[o + 2]!, pixels[o + 3]!]);
+      }
+      const direction = row % 2 ? 1 : -1;
+      colors.sort(
+        (a, b) =>
+          direction *
+          ((a[0]! - b[0]!) * 0.2126 + (a[1]! - b[1]!) * 0.7152 + (a[2]! - b[2]!) * 0.0722),
+      );
+      colors.forEach((color, k) => pixels.set(color, (row * w + col + k) * 4));
+    }
+  }
+  p.putImageData(image, 0, 0);
+  for (let i = 0; i < pixels.length; i += 4) {
+    pixels[i] = 255 - pixels[i]!;
+    pixels[i + 1] = 255 - pixels[i + 1]!;
+    pixels[i + 2] = 255 - pixels[i + 2]!;
+  }
+  p.putImageData(image, w, 0);
+  if (burst.samples.size >= 4) burst.samples.delete(burst.samples.keys().next().value!);
+  burst.samples.set(key, plate);
+  return plate;
+}
+
+/** Fine original/inverse scan fragments. Discrete data beats, no elastic motion. */
 export function fractureEdge(
   ctx: CanvasRenderingContext2D,
   sky: HTMLCanvasElement,
@@ -106,103 +185,130 @@ export function fractureEdge(
   },
 ) {
   if (burst.elapsed < 0 || burst.elapsed >= glitchLifetime) return;
-  const { box: r, compact, impact, blue, left = false, surface } = edge;
+  const { box: r, compact, impact, left = false, surface } = edge;
   const step = packet(burst.elapsed),
     seed = burst.seed;
   if (quiet(step)) return;
   const activeHeight = Math.min(r.height, compact ? r.height : 330);
   const top =
     r.top + Math.max(0, Math.min(r.height - activeHeight, r.height * impact - activeHeight * 0.5));
-  const anchor = left ? r.left : r.right;
+  const anchor = left ? r.left : r.right,
+    direction = left ? -1 : 1;
   const inside = Math.min(compact ? 26 : 68, r.width * 0.16);
-  const reach = compact ? 88 : 178;
-  const field = sortedField(sky, scale, burst, anchor - 70, top, 210, activeHeight, surface);
-  const rows = compact ? 8 : Math.min(42, Math.max(12, Math.round(activeHeight / 7.5)));
+  const reach = compact ? 76 : 164;
+  const origin = left ? anchor - reach : anchor - inside;
+  const width = inside + reach;
+  const plate = edgeMaterial(
+    sky,
+    scale,
+    burst,
+    origin,
+    top,
+    width,
+    activeHeight,
+    inside,
+    left,
+    surface,
+  );
+  const half = plate.width / 2,
+    rx = half / width,
+    ry = plate.height / activeHeight;
+  const rows = Math.max(10, Math.round(activeHeight / (compact ? 2.15 : 2.8)));
+  const pitch = activeHeight / rows;
+  const draw = (
+    x: number,
+    y: number,
+    w: number,
+    h: number,
+    shift: number,
+    inverse = false,
+    sourceOffset = 0,
+    sampleAt?: number,
+  ) => {
+    const sx = Math.max(0, Math.min(width - w, sampleAt ?? x - origin));
+    const sy = Math.max(0, Math.min(activeHeight - h, y - top + sourceOffset));
+    ctx.drawImage(
+      plate,
+      (inverse ? half : 0) + sx * rx,
+      sy * ry,
+      Math.max(0.5, w * rx),
+      Math.max(0.5, h * ry),
+      x + shift,
+      y,
+      w,
+      h,
+    );
+  };
   ctx.save();
   ctx.imageSmoothingEnabled = false;
-  // A narrow misregistered silhouette precedes the broken packets, like the
-  // supplied button reference. It never translates the actual control or card.
-  for (let rim = 0; rim < 3; rim++) {
-    const ry = top + activeHeight * (0.08 + rim * 0.3);
-    const rh = Math.max(2, activeHeight * (compact ? 0.18 : 0.12));
-    ctx.globalAlpha = 0.76;
-    ctx.fillStyle = '#4bd8ef';
-    ctx.fillRect(anchor + (left ? -4 : 2), ry, 3, rh);
-    ctx.fillStyle = '#ed7599';
-    ctx.fillRect(anchor + (left ? 1 : -2), ry + 2, 2, rh * 0.7);
-  }
+  // Keep every inward fragment within the perimeter's outer 16%.
+  ctx.beginPath();
+  ctx.rect(left ? anchor - reach - 24 : anchor - inside, top, width + 24, activeHeight);
+  ctx.clip();
   for (let j = 0; j < rows; j++) {
     const n = seed + j * 19;
-    // Drop whole packets as the burst expires; no shrinking or springing back.
-    if (hash(n + 4) > density(burst.elapsed)) continue;
-    const group = Math.floor(j / 5);
-    const glitch = hash(seed + group * 41 + step * 23);
-    const y = top + ((j + hash(n + 70) * 0.65) / rows) * activeHeight;
-    const h = Math.max(
-      1,
-      (activeHeight / rows) * (j % 8 === 0 ? 2.6 : j % 5 === 0 ? 1.8 : 0.25 + hash(n + 2) * 0.8),
+    if (hash(n + 4) > density(burst.elapsed) || hash(n + 12) < 0.2) continue;
+    const group = Math.floor(j / 7);
+    const beat = hash(seed + group * 43 + step * 29);
+    const y = Math.round(top + j * pitch + hash(n + 70) * 1.8);
+    const h = Math.min(
+      activeHeight - (y - top),
+      j % 23 === 0 ? 5 : j % 9 === 0 ? 3 : 1 + Math.floor(hash(n + 2) * 2),
     );
-    const depth = Math.round(4 + hash(n + 3) * Math.max(0, inside - 4));
-    const length = Math.round(15 + hash(n + 8) ** 1.5 * reach + Math.floor(glitch * 5) * 9);
+    if (h <= 0) continue;
+    const depth = Math.min(inside, 2 + hash(n + 3) * inside);
+    const length = 5 + hash(n + 8) ** 1.7 * (reach - 16) + Math.floor(beat * 3) * 4;
+    const run = Math.min(width, depth + length);
     const x = left ? anchor - length : anchor - depth;
-    const width = length + depth;
-    ctx.globalAlpha = burst.elapsed < 630 ? 0.97 : 0.64;
-    // Erode a small part of the real perimeter by revealing its current backdrop.
-    if (j % 3 === 0) {
-      const rootX = left ? anchor : anchor - depth;
-      if (compact) {
-        ctx.fillStyle = '#f5f7fb';
-        ctx.fillRect(rootX, y, depth, h);
-      } else {
-        const sx = Math.max(0, Math.min(sky.width - 1, rootX * scale));
-        const sy = Math.max(0, Math.min(sky.height - 1, y * scale));
-        ctx.drawImage(
-          sky,
-          sx,
-          sy,
-          Math.max(1, Math.min(sky.width - sx, depth * scale)),
-          Math.max(1, Math.min(sky.height - sy, h * scale)),
-          rootX,
-          y,
-          depth,
-          h,
-        );
-      }
-    }
-    // Transparent controls borrow their panel's light packet, without turning
-    // the control's own glyph plate into an opaque rectangular sticker.
-    const packetSurface = surface === 'rgba(0, 0, 0, 0)' ? '#f5f7fb' : surface;
-    // Dark decode-loss plates, original surface packets and live sorted photo rows
-    // interleave densely; nested slices give broad slabs an irregular torn contour.
-    const kind = j % 7;
-    if (kind === 0 || kind === 3) {
-      ctx.fillStyle = kind === 0 ? '#07264c' : blue ? '#0053e6' : '#0750aa';
-      ctx.fillRect(x, y, width * (0.6 + glitch * 0.25), h);
-    } else if (kind === 1 || kind === 5) {
-      ctx.fillStyle = packetSurface;
-      ctx.fillRect(x, y, width, h);
-    } else {
-      const sampleX = Math.floor(hash(n + step * 7) * 65);
-      const sampleY = (j * 7 + step * (group % 2 ? 5 : 2)) % 48;
-      ctx.drawImage(field, sampleX, sampleY, 8 + Math.floor(hash(n + 33) * 22), 1, x, y, width, h);
-    }
-    if (j % 4 === 0) {
-      ctx.fillStyle = blue ? '#e8f5ff' : '#f5f7fb';
-      ctx.fillRect(left ? anchor - length * 0.7 : anchor - 2, y + h, length * 0.7, 1 + (j % 3));
-    }
-    if (j % 13 === 0) {
-      ctx.globalAlpha = 0.65;
-      ctx.fillStyle = j % 2 ? '#e56c7c' : '#48cdff';
-      ctx.fillRect(x + width * 0.68 + 3, y - 1, width * 0.2, 1);
-      // Detached decode blocks jump on the same packet clock, then disappear.
-      const drift = 10 + Math.floor(glitch * 6) * 5;
-      ctx.fillStyle = j % 2 ? '#edf6ff' : '#0750aa';
-      ctx.fillRect(
-        left ? anchor - length - drift : anchor + length + drift,
-        y + Math.floor(hash(n + step) * 4) * 3,
-        4 + hash(n + 11) * 12,
-        2 + (j % 4),
+    const shift = direction * (Math.floor(beat * 7) - 3) * 6;
+    const reorder =
+      j % 4 === 0
+        ? Math.floor(hash(seed + group * 17 + step * 7) * Math.max(1, activeHeight - 5)) - (y - top)
+        : (Math.floor(hash(n + step * 7) * 7) - 3) * 3;
+    // Exchange the two sides of the seam: photo fragments intrude into the
+    // light perimeter while displaced surface fragments extend over the photo.
+    // A nearly aligned copy would disappear against its own backdrop and leave
+    // only the black inverse visible, creating a regular barcode.
+    const photoAt = left ? Math.max(0, reach - run - 8) : inside + 4;
+    const sourceAt = j % 3 === 0 ? photoAt : undefined;
+    ctx.globalAlpha = burst.elapsed < 630 ? 1 : 0.62;
+    // Small gaps and unequal starts make an eroded contour rather than a ladder
+    // of broad rectangles. The original material keeps photographic detail.
+    if (j % 5 === 0 && run > 30) {
+      const cut = run * (0.3 + hash(n + 5) * 0.3),
+        gap = 2 + hash(n + 6) * 5;
+      draw(x, y, cut, h, shift, false, reorder, sourceAt);
+      draw(
+        x + cut + gap,
+        y,
+        Math.max(1, run - cut - gap),
+        h,
+        shift,
+        false,
+        reorder,
+        sourceAt === undefined ? undefined : sourceAt + cut + gap,
       );
+    } else draw(x, y, run, h, shift, false, reorder, sourceAt);
+    // The exact inverse of that same photo/surface travels in the opposite
+    // direction; use short, mostly one-pixel counterstrips instead of fat neon bars.
+    if (j % 7 === 0 || (j % 11 === 0 && h > 1)) {
+      const counter = Math.min(run, 5 + hash(n + 11) * (compact ? 18 : 32));
+      const cx = left ? anchor - counter * 0.65 : anchor - Math.min(depth, counter * 0.65);
+      draw(
+        cx,
+        y + (j % 2 ? 0 : 1),
+        counter,
+        j % 14 === 0 ? 2 : 1,
+        -shift - direction * (2 + Math.floor(beat * 3) * 2),
+        true,
+        reorder,
+        j % 2 ? undefined : photoAt,
+      );
+    }
+    if (j % 11 === 0) {
+      const tail = 3 + hash(n + 31) * 9;
+      const tx = anchor + direction * (length + 4 + Math.floor(beat * 4) * 3);
+      draw(tx, y + 1, tail, 1, -shift, j % 22 === 0, reorder);
     }
   }
   ctx.restore();

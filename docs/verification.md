@@ -1,5 +1,7 @@
 # 0.4.0 验证记录
 
+2026-10-31 天光断层进一步细化为原色 / 反色对冲、细密照片碎片，见[精细断层验收](verification-daylight-detail.md)。
+
 2026-10-31 天光断层的边角遮挡修正与其他按钮动态切片统一，见[边缘与按钮验收](verification-daylight-edges.md)。
 
 2026-10-31 最新反馈：聊天室改为右侧收起 / 展开、语音弹层遮挡修正，以及旧 daylight-a 预览删除，见[布局修订记录](verification-sidebar-layout.md)。

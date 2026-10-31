@@ -597,6 +597,18 @@ try {
   assert.ok(cornerInk > 10, 'Chat header must not rectangularly erase the corner fracture');
   proof.chatCornerFracturePixels = cornerInk;
   await owner.screenshot({ path: '.local/screenshots/daylight-chat-corner.png' });
+  await owner.screenshot({
+    path: '.local/screenshots/daylight-fine-edge.png',
+    clip: {
+      x: Math.max(0, chatCorner.x + chatCorner.width - 75),
+      y: Math.max(0, chatCorner.y),
+      width: Math.min(
+        230,
+        owner.viewportSize()!.width - Math.max(0, chatCorner.x + chatCorner.width - 75),
+      ),
+      height: Math.min(330, owner.viewportSize()!.height - Math.max(0, chatCorner.y)),
+    },
+  });
   const originalPhoto = await owner.locator('#theme-photo').getAttribute('src');
   assert.ok(originalPhoto);
   await owner.evaluate(async () => {
@@ -618,8 +630,9 @@ try {
     .locator('#theme-fragments')
     .evaluate((canvas: HTMLCanvasElement) => {
       const pixels = canvas.getContext('2d')!.getImageData(0, 0, canvas.width, canvas.height).data;
-      let gold = 0;
-      for (let i = 0; i < pixels.length; i += 4)
+      let gold = 0,
+        inverse = 0;
+      for (let i = 0; i < pixels.length; i += 4) {
         if (
           pixels[i]! > 220 &&
           pixels[i + 1]! > 120 &&
@@ -628,9 +641,25 @@ try {
           pixels[i + 3]! > 160
         )
           gold++;
-      return gold;
+        // Exact RGB inverse of this fixture's (245,160,24), not a blue accent.
+        if (
+          Math.abs(pixels[i]! - 10) <= 1 &&
+          Math.abs(pixels[i + 1]! - 95) <= 1 &&
+          Math.abs(pixels[i + 2]! - 231) <= 1 &&
+          pixels[i + 3]! > 160
+        )
+          inverse++;
+      }
+      return { gold, inverse };
     });
-  assert.ok(liveSample > 40, 'Fragments must sample the actual current photo, not a cloud atlas');
+  assert.ok(
+    liveSample.gold > 40,
+    'Fragments must sample the actual current photo, not a cloud atlas',
+  );
+  assert.ok(
+    liveSample.inverse > 20,
+    'Counterstrips must contain the exact RGB inverse of that material',
+  );
   await owner.locator('#theme-photo').evaluate(async (image: HTMLImageElement, src) => {
     image.src = src;
     await image.decode();
@@ -641,7 +670,11 @@ try {
     ),
     false,
   );
-  proof.liveSourceSampling = { goldPixels: liveSample, noBakedCloudTexture: true };
+  proof.liveSourceSampling = {
+    goldPixels: liveSample.gold,
+    inversePixels: liveSample.inverse,
+    noBakedCloudTexture: true,
+  };
   await owner.locator('.daylight-members > summary').click();
   await owner.locator('#members').hover();
   const frame = owner.locator('.daylight-members .members-card');
