@@ -248,6 +248,11 @@ try {
   proof.independentViewerAndChat = true;
   const edgeHome = await owner.locator('#chat-panel').boundingBox();
   assert.ok(edgeHome);
+  await owner.mouse.move(4, 100);
+  await owner.waitForTimeout(1100);
+  assert.deepEqual(await edgeTones(owner, edgeHome), { dark: 0, light: 0 });
+  await owner.mouse.move(edgeHome.x + edgeHome.width - 7, edgeHome.y + edgeHome.height * 0.5);
+  await owner.waitForTimeout(110);
   const homeTones = await edgeTones(owner, edgeHome);
   assert.ok(homeTones.dark > 30 && homeTones.light > 30, JSON.stringify(homeTones));
   const drag = await owner.locator('#chat-drag').boundingBox();
@@ -260,9 +265,10 @@ try {
     await owner.locator('#chat-panel').evaluate((e) => getComputedStyle(e).position),
     'fixed',
   );
-  await owner.waitForTimeout(1400);
   const edgeMoved = await owner.locator('#chat-panel').boundingBox();
   assert.ok(edgeMoved);
+  await owner.mouse.move(edgeMoved.x + edgeMoved.width - 7, edgeMoved.y + edgeMoved.height * 0.5);
+  await owner.waitForTimeout(110);
   const movedTones = await edgeTones(owner, edgeMoved);
   const abandonedTones = await edgeTones(owner, edgeHome);
   assert.ok(movedTones.dark > 30);
@@ -271,6 +277,9 @@ try {
     JSON.stringify({ homeTones, movedTones, abandonedTones }),
   );
   proof.edgeAttachedToMovingContainer = { homeTones, movedTones, abandonedTones };
+  await owner.waitForTimeout(1000);
+  assert.deepEqual(await edgeTones(owner, edgeMoved), { dark: 0, light: 0 });
+  proof.idleHasNoFrozenGlitch = true;
   await owner.locator('#chat-dock').click();
   proof.floatingChatPreserved = true;
   await owner.locator('#play-button').click();
@@ -327,8 +336,17 @@ try {
   assert.ok(Math.abs(composition['#playback-picker'].width - 1376) < 5);
   proof.referenceComposition1536 = composition;
   await owner.screenshot({ path: '.local/screenshots/daylight-reference-1536.png' });
-  if (!process.env.VS_PUBLIC_URL)
+  if (!process.env.VS_PUBLIC_URL) {
     await owner.screenshot({ path: 'docs/screenshots/glitch-art.png' });
+    await owner.mouse.move(25, 530);
+    await owner.waitForTimeout(60);
+    const chat = composition['#chat-panel'];
+    await owner.mouse.move(chat.right - 8, chat.top + chat.height * 0.52);
+    await owner.waitForTimeout(60);
+    await owner.locator('#source-form .button').hover();
+    await owner.waitForTimeout(100);
+    await owner.screenshot({ path: 'docs/screenshots/glitch-art-active.png' });
+  }
   for (const width of [390, 320]) {
     await owner.setViewportSize({ width, height: 844 });
     assert.equal(await overflow(owner), false, `overflow at ${width}`);
@@ -366,6 +384,7 @@ try {
   await owner.screenshot({ path: '.local/screenshots/theme-live-interaction.png' });
   await owner.waitForTimeout(1400);
   const settled = await signature();
+  assert.equal(settled, still);
   await owner.waitForTimeout(200);
   assert.equal(await signature(), settled);
   proof.liveCanvasAndIdleStop = true;
@@ -436,9 +455,55 @@ try {
   assert.notEqual(await signature('#theme-fragments'), afterimage);
   await owner.waitForTimeout(1300);
   const settledButton = await signature('#theme-fragments');
+  assert.equal(settledButton, buttonBefore);
   await owner.waitForTimeout(250);
   assert.equal(await signature('#theme-fragments'), settledButton);
   proof.buttonMaterialAfterimage = true;
+  const originalPhoto = await owner.locator('#theme-photo').getAttribute('src');
+  assert.ok(originalPhoto);
+  await owner.evaluate(async () => {
+    const plate = document.createElement('canvas');
+    plate.width = 96;
+    plate.height = 64;
+    const ctx = plate.getContext('2d')!;
+    ctx.fillStyle = 'rgb(245, 160, 24)';
+    ctx.fillRect(0, 0, 96, 64);
+    const image = document.querySelector<HTMLImageElement>('#theme-photo')!;
+    image.src = plate.toDataURL();
+    await image.decode();
+  });
+  await owner.waitForTimeout(100);
+  await owner.mouse.move(4, 100);
+  await owner.locator('#source-form .button').hover();
+  await owner.waitForTimeout(110);
+  const liveSample = await owner
+    .locator('#theme-fragments')
+    .evaluate((canvas: HTMLCanvasElement) => {
+      const pixels = canvas.getContext('2d')!.getImageData(0, 0, canvas.width, canvas.height).data;
+      let gold = 0;
+      for (let i = 0; i < pixels.length; i += 4)
+        if (
+          pixels[i]! > 220 &&
+          pixels[i + 1]! > 120 &&
+          pixels[i + 1]! < 190 &&
+          pixels[i + 2]! < 65 &&
+          pixels[i + 3]! > 160
+        )
+          gold++;
+      return gold;
+    });
+  assert.ok(liveSample > 40, 'Fragments must sample the actual current photo, not a cloud atlas');
+  await owner.locator('#theme-photo').evaluate(async (image: HTMLImageElement, src) => {
+    image.src = src;
+    await image.decode();
+  }, originalPhoto);
+  assert.equal(
+    await owner.evaluate(() =>
+      performance.getEntriesByType('resource').some((e) => e.name.includes('daylight-fracture')),
+    ),
+    false,
+  );
+  proof.liveSourceSampling = { goldPixels: liveSample, noBakedCloudTexture: true };
   await owner.locator('.daylight-members > summary').click();
   await owner.locator('#members').hover();
   const frame = owner.locator('.daylight-members .members-card');

@@ -1,6 +1,5 @@
 import skyUrl from './assets/themes/daylight-sky.png';
-import fractureUrl from './assets/themes/daylight-fracture.png';
-import { fractureEdge } from './appearance-fracture';
+import { fractureEdge, fractureSky, glitchLifetime } from './appearance-fracture';
 
 type Wake = {
   x: number;
@@ -8,15 +7,12 @@ type Wake = {
   dx: number;
   at: number;
   seed: number;
-  box?: DOMRect;
   target?: HTMLElement;
+  impact: number;
+  samples: Map<string, HTMLCanvasElement>;
 };
 const materialSelector =
   '.source-card, .members-card, .chat-panel, .cache-options[open], .top-actions .button, .source-card .button, .welcome .button, .send-button';
-const noise = (n: number) => {
-  const x = Math.sin(n * 127.1 + 311.7) * 43758.5453;
-  return x - Math.floor(x);
-};
 
 /** Decorative photo/material only. Never reads video pixels, captures input, or sends coordinates. */
 export class GlitchScene {
@@ -24,7 +20,6 @@ export class GlitchScene {
   private fragments = document.createElement('canvas');
   private base = document.createElement('canvas');
   private image = new Image();
-  private material = new Image();
   private context = this.canvas.getContext('2d')!;
   private ink = this.fragments.getContext('2d')!;
   private active = false;
@@ -32,7 +27,11 @@ export class GlitchScene {
   private dirty = true;
   private scale = 1;
   private lastPaint = 0;
-  private lastPointer = { x: 0, y: 0, at: -Infinity };
+  private lastPointer: { x: number; y: number; at: number; target?: HTMLElement } = {
+    x: 0,
+    y: 0,
+    at: -Infinity,
+  };
   private wakes: Wake[] = [];
   private nodes: HTMLElement[] = [];
   private materialLayout = '';
@@ -50,11 +49,6 @@ export class GlitchScene {
     document.body.append(this.fragments);
     this.image.onload = () => this.resize();
     this.image.src = skyUrl;
-    this.material.onload = () => {
-      this.materialLayout = '';
-      this.invalidate();
-    };
-    this.material.src = fractureUrl;
     new ResizeObserver(() => this.resize()).observe(this.canvas);
     window.addEventListener('resize', () => this.resize());
     window.visualViewport?.addEventListener('resize', () => this.resize());
@@ -140,6 +134,7 @@ export class GlitchScene {
   };
   private resize() {
     this.stop();
+    this.wakes = [];
     this.materialLayout = '';
     const suspended = this.suspended();
     this.image.hidden = this.canvas.hidden = this.fragments.hidden = suspended;
@@ -172,20 +167,33 @@ export class GlitchScene {
     const target = event.target instanceof Element ? event.target : null;
     if (!target || target.closest('.player-shell, dialog, input, textarea, select')) return;
     const now = performance.now();
-    if (now - this.lastPointer.at < 75) return;
     const dx = Math.max(-50, Math.min(50, event.clientX - this.lastPointer.x));
-    const node = target.closest<HTMLElement>(materialSelector);
+    const node =
+      target.closest<HTMLElement>(materialSelector) ??
+      this.nodes.find((element) => {
+        if (!element.checkVisibility() || element.closest('dialog, [hidden], .player-shell'))
+          return false;
+        const r = element.getBoundingClientRect();
+        return (
+          event.clientY >= r.top - 15 &&
+          event.clientY <= r.bottom + 15 &&
+          Math.min(Math.abs(event.clientX - r.left), Math.abs(event.clientX - r.right)) < 24
+        );
+      });
+    const box = node?.getBoundingClientRect();
+    if (now - this.lastPointer.at < 75 && node === this.lastPointer.target) return;
     this.wakes.push({
       x: event.clientX,
       y: event.clientY,
       dx,
       at: now,
       seed: now % 997,
-      box: node?.getBoundingClientRect(),
       target: node ?? undefined,
+      impact: box ? Math.max(0, Math.min(1, (event.clientY - box.top) / box.height)) : 0.5,
+      samples: new Map(),
     });
     this.wakes = this.wakes.slice(-8);
-    this.lastPointer = { x: event.clientX, y: event.clientY, at: now };
+    this.lastPointer = { x: event.clientX, y: event.clientY, at: now, target: node };
     this.invalidate();
   };
   private tick = (now: number) => {
@@ -195,7 +203,7 @@ export class GlitchScene {
       return;
     }
     const hadWakes = this.wakes.length > 0;
-    this.wakes = this.wakes.filter((w) => now - w.at < 1100);
+    this.wakes = this.wakes.filter((w) => now - w.at < glitchLifetime);
     if (this.dirty || now - this.lastPaint > 32 || (hadWakes && !this.wakes.length)) {
       this.paint(now);
       this.lastPaint = now;
@@ -235,66 +243,75 @@ export class GlitchScene {
       protectedRects.map((r) => [r.x, r.y, r.width, r.height]),
     ]);
     // Ignore clock/chat text updates when all material bounds are unchanged.
-    // Static edges need no repaint; this also avoids repeated subpixel rasterization.
+    // Idle is a clean page, not a frozen glitch frame.
     if (layout === this.materialLayout && !this.wakes.length && !this.hadMotion) return;
     this.materialLayout = layout;
     this.hadMotion = this.wakes.length > 0;
     const ctx = this.context,
       ink = this.ink;
+    ctx.setTransform(this.scale, 0, 0, this.scale, 0, 0);
     ctx.globalAlpha = 1;
-    ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+    ctx.clearRect(0, 0, this.canvas.width / this.scale, this.canvas.height / this.scale);
     ink.setTransform(this.scale, 0, 0, this.scale, 0, 0);
     ink.clearRect(0, 0, this.fragments.width / this.scale, this.fragments.height / this.scale);
-    const vw = this.fragments.width / this.scale,
-      vh = this.fragments.height / this.scale;
-    for (const { node, i, r } of visible) {
-      const wake = this.motion.matches
-        ? undefined
-        : [...this.wakes].reverse().find((w) => w.target === node);
-      const age = wake ? Math.min(1, (now - wake.at) / 1100) : 1;
-      const impact = wake?.box
-        ? Math.max(0, Math.min(1, (wake.y - wake.box.top) / wake.box.height))
-        : 0.5;
-      const edge = {
-        box: r,
-        compact: node.matches('button'),
-        seed: i * 79,
-        age,
-        impact,
-      };
-      fractureEdge(ink, this.base, this.material, this.scale, edge);
-      if (node.matches('.source-card') && r.width > 600)
-        fractureEdge(ink, this.base, this.material, this.scale, { ...edge, left: true });
+    for (const { node, r } of visible) {
+      const compact = node.matches('button');
+      const candidates = this.motion.matches
+        ? []
+        : [...this.wakes].reverse().filter((w) => w.target && node.contains(w.target));
+      if (!candidates.length) continue;
+      // Retain a second passed location, instead of fastening the whole fracture to the cursor.
+      const packets = candidates
+        .filter(
+          (w, i) =>
+            i === 0 ||
+            Math.abs(w.impact - candidates[0]!.impact) > 0.26 ||
+            Math.abs(w.x - candidates[0]!.x) > r.width * 0.35,
+        )
+        .slice(0, compact ? 1 : 2)
+        .reverse();
+      const blue = node.matches('.accent, .send-button');
+      const cssSurface = getComputedStyle(node).backgroundColor;
+      const pseudoSurface = getComputedStyle(node, '::before').backgroundColor;
+      const surface = blue
+        ? '#0053e6'
+        : pseudoSurface !== 'rgba(0, 0, 0, 0)'
+          ? pseudoSurface
+          : cssSurface !== 'rgba(0, 0, 0, 0)'
+            ? cssSurface
+            : '#f5f7fb';
+      for (const wake of packets) {
+        const edge = {
+          box: r,
+          compact,
+          blue,
+          surface,
+          impact:
+            node === wake.target
+              ? wake.impact
+              : Math.max(0, Math.min(1, (wake.y - r.top) / r.height)),
+          left: !compact && node.matches('.source-card') && wake.x < r.left + r.width * 0.5,
+        };
+        fractureEdge(ink, this.base, this.scale, { ...wake, elapsed: now - wake.at }, edge);
+      }
     }
     if (!this.motion.matches)
       for (const wake of this.wakes) {
-        const age = Math.min(1, (now - wake.at) / 1100),
-          life = (1 - age) ** 2;
         if (wake.target) continue;
-        for (let j = 0; j < 12; j++) {
-          const seed = wake.seed + j * 17;
-          const w = Math.min(vw * 0.32, 30 + noise(seed) * 190),
-            h = 2 + noise(seed + 1) * 7;
-          const x = Math.max(0, Math.min(vw - w, wake.x - w / 2 + (noise(seed + 2) - 0.5) * 140));
-          const y = Math.max(0, Math.min(vh - h, wake.y + (noise(seed + 3) - 0.5) * 180));
-          ctx.globalAlpha = life * 0.85;
-          ctx.drawImage(
-            this.base,
-            x * this.scale,
-            y * this.scale,
-            w * this.scale,
-            h * this.scale,
-            (x + age * wake.dx * 1.4 + Math.sin(age * 5 + j) * age * 24) * this.scale,
-            (y - age * 14) * this.scale,
-            w * this.scale * (1 + age * 0.2),
-            h * this.scale,
-          );
-        }
+        fractureSky(
+          ctx,
+          this.base,
+          this.scale,
+          { ...wake, elapsed: now - wake.at },
+          wake.x,
+          wake.y,
+        );
       }
     ctx.globalAlpha = 1;
     // Clip every frame away from the real movie and controls, including floating panels.
     for (const r of protectedRects) {
       ink.clearRect(r.left - 10, r.top - 10, r.width + 20, r.height + 20);
+      ctx.clearRect(r.left - 10, r.top - 10, r.width + 20, r.height + 20);
     }
     // Adjacent labels are readable even when a fractured edge stretches toward them.
     for (const button of document.querySelectorAll<HTMLElement>('button')) {
