@@ -18,4 +18,14 @@
 - 同步链接的图标与文字仍有共同的窄行切片，静止后画布恢复透明；保留照片实时采样和独立于鼠标的有限余迹。
 - 双端视频 / 语音收听保持、真实聊天传递、收起 / 展开、320 / 390 窄屏、缩放、两种全屏、减少动态效果、强制颜色与视频 / 输入区域保护通过。C 的「任何按钮点击触发背景、悬停背景不触发」也通过回归。
 
-证据 `.local/appearance-evidence.json`、`.local/signal-theme-evidence.json`；更新了现有 README 主题截图，没有新增概念图或独立预览资源。正式部署结果完成后补充。
+证据 `.local/appearance-evidence.json`、`.local/signal-theme-evidence.json`；更新了现有 README 主题截图，没有新增概念图或独立预览资源。
+
+## 正式部署
+
+源码 `d596975` 已统一更新正式 Pages 一次，部署 `274a2ee8`。入口为[正式站的天光主题](https://videosreeeen.pages.dev/?skin=glitch)。没有部署房间 Worker、创建独立预览分支或触发客户端 Release，没有刷新用户正在观看的房间。
+
+正式入口的新建双端房间运行 `test:appearance` 通过。六类控件都有实际切片像素，真实点击区域保持不变；聊天室上边角测得 638 个活动像素。视频、输入保护、聊天、收起 / 展开、语音收听保持、两种全屏、窄屏与减少动态效果通过。证据 `.local/appearance-public-evidence.json` 的 target 为正式站，checksPassed、cleanup、passed 均为 true；验证脚本等待路由请求结束再释放浏览器，不把未完成清理的运行记作成功。
+
+正式 HTML 与全部 11 项静态资源逐一核对 SHA-256，房间绑定健康；入口 `assets/index-BgzkVn6o.js`，样式 `assets/index-B7Ep84q5.css`。详见[部署回执](daylight-edges-deployment.json)。浏览器助手 ZIP 保持原哈希。
+
+当前构建约 3.21 MiB，上传目录原位覆盖，没有新增 APK、桌面包或历史构建目录；唯一既有回退由 `.local/rollback/manifest.json` 定位。D 盘检查可用约 49.79 GiB。

@@ -51,7 +51,7 @@ const browser = await chromium.launch({
 const failures: string[] = [];
 const proof: Record<string, unknown> = {
   at: new Date().toISOString(),
-  target: process.env.VS_PUBLIC_URL ? 'public-preview' : 'local',
+  target: process.env.VS_PUBLIC_URL || 'local',
   realPhone: false,
 };
 async function context(roll: number) {
@@ -731,18 +731,28 @@ try {
   assert.equal(new URL(linked.url()).searchParams.has('skin'), false);
   await linked.reload();
   assert.equal(await theme(linked), 'glitch');
+  await linkedContext.unrouteAll({ behavior: 'wait' });
   await linkedContext.close();
   proof.skinLinkAndRememberedChoice = true;
   assert.deepEqual(failures, []);
-  proof.passed = true;
-  console.log(JSON.stringify(proof, null, 2));
+  proof.checksPassed = true;
 } finally {
-  await writeFile(
-    `.local/appearance${process.env.VS_PUBLIC_URL ? '-public' : ''}-evidence.json`,
-    JSON.stringify(proof, null, 2),
-  );
-  await browser.close();
-  source.closeAllConnections();
-  source.close();
-  app.close();
+  try {
+    for (const context of browser.contexts()) {
+      await context.unrouteAll({ behavior: 'wait' });
+      await context.close();
+    }
+    await browser.close();
+    proof.cleanup = true;
+  } finally {
+    proof.passed = proof.checksPassed === true && proof.cleanup === true;
+    await writeFile(
+      `.local/appearance${process.env.VS_PUBLIC_URL ? '-public' : ''}-evidence.json`,
+      JSON.stringify(proof, null, 2),
+    );
+    source.closeAllConnections();
+    source.close();
+    app.close();
+  }
 }
+console.log(JSON.stringify(proof, null, 2));
