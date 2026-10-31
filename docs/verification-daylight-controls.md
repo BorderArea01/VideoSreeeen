@@ -16,3 +16,5 @@
 - 当前助手 ZIP 仍为 0.1.2，SHA-256 `5179bd726d9b9565605f2705448e6346d46210a2f642f251e69ed28f5bf5f84c`；未更新客户端安装包或触发发布工作流。测试截图更新现有 README 插图，只保留当前构建和既有唯一回退。
 
 重复入口为 `npm run test:daylight-controls` 和 `npm run test:appearance`，经受控入口串行执行。原始记录为 `.local/daylight-controls-local-evidence.json` 与 `.local/appearance-evidence.json`；桌面浏览器响应式检查不称为手机真机验证。发布回执另记录正式入口哈希与健康检查；不操作用户观影房间或主动刷新页面，不更新房间后端。
+
+正式网页已发布，部署 `7aae47bc`、源码 `16c323b`。线上 102 个文件的 SHA-256 与已验收构建一致，房间健康检查正常。在正式入口另建独立房间重复控件与主题名称检查，结果见[部署回执](daylight-controls-deployment.json)。现有页面不会主动刷新，结束当前观看后刷新可加载本次样式。
