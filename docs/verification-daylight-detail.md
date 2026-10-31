@@ -19,4 +19,14 @@
 
 增加实际颜色反演检查：将主题照片临时换为测试色 RGB(245,160,24)，渲染层中同时检测到 4437 个原色像素及 138 个 RGB(10,95,231) 反色像素，容差为每通道 1。测试后恢复原照片；没有修改或读取影片像素，也没有操作用户正在观看的房间或麦克风。数值为此轮采样，不固定故障纹理。
 
-本地证据 `.local/appearance-evidence.json`，真实局部截图 `.local/screenshots/daylight-fine-edge.png`。正式部署结果完成后补充。
+本地证据 `.local/appearance-evidence.json`，真实局部截图 `.local/screenshots/daylight-fine-edge.png`。
+
+## 正式部署
+
+源码 `96732a3` 已统一部署正式 Pages 一次，部署 `e1e79bbd`，入口仍为[正式站的天光主题](https://videosreeeen.pages.dev/?skin=glitch)。没有创建独立预览分支、部署房间 Worker、发布客户端或刷新用户房间。
+
+正式入口另建双端房间运行 `test:appearance` 通过，包括反色颜色检查、六类按钮实际动画 / 位置、边角、视频 / 输入保护、聊天、收起 / 展开、语音收听保持、缩放、两种全屏、窄屏、减少动态效果和静止清空。实测 3727 个原色测试像素及 239 个精确反色像素。`.local/appearance-public-evidence.json` 的 target 为正式站，checksPassed、cleanup、passed 均为 true。
+
+线上 HTML 和全部 11 项静态资源已逐一核对 SHA-256，房间绑定健康，回执见 [daylight-detail-deployment.json](daylight-detail-deployment.json)。入口 `assets/index-Df8r9N2f.js`，样式与本轮之前一致，助手 ZIP 未变。
+
+当前 Web 构建约 3.21 MiB，上传目录原位覆盖；测试候选直接重建至同一目录，没有新增历史构建或安装包。唯一既有回退仍由 `.local/rollback/manifest.json` 定位；D 盘可用约 49.78 GiB。
