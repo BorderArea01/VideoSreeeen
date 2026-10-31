@@ -1,0 +1,101 @@
+/* One control family; layout and touch targets remain owned by each component.
+   Playback controls keep their dark video surface and switches keep their shape. */
+:root[data-theme='glitch'] {
+  --daylight-control-radius: 6px;
+  --daylight-control-blue: #0053e6;
+  --daylight-control-ink: #164b94;
+  --daylight-control-line: #b8cdea;
+  --daylight-control-surface: #f5f9ff;
+  --daylight-control-hover: #e1edff;
+}
+:root[data-theme='glitch']
+  :is(button, a.button):not(
+    :where(.transport *, .stage-tools *, .player-settings-panel *, .switch)
+  ) {
+  border: 1px solid transparent;
+  border-radius: var(--daylight-control-radius);
+  background: transparent;
+  color: var(--daylight-control-ink);
+  box-shadow: none;
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease,
+    color 120ms ease;
+}
+:root[data-theme='glitch']
+  :is(.button, .playback-tabs button, .room-tabs button, .site-chips button)
+  :where(svg) {
+  flex-shrink: 0;
+}
+:root[data-theme='glitch']
+  :is(
+    .button,
+    .playback-tabs button,
+    .room-tabs button,
+    .site-chips button,
+    .chat-restore,
+    .invite-line
+  ):not(:where(.transport *, .stage-tools *, .player-settings-panel *)) {
+  border-color: var(--daylight-control-line);
+  background: var(--daylight-control-surface);
+  color: var(--daylight-control-ink);
+}
+:root[data-theme='glitch']
+  :is(
+    .accent,
+    .send-button,
+    .playback-tabs button[aria-selected='true'],
+    .room-tabs button[aria-pressed='true']
+  ):not(:where(.transport *, .stage-tools *, .player-settings-panel *)) {
+  background: var(--daylight-control-blue);
+  border-color: var(--daylight-control-blue);
+  color: #fff;
+}
+:root[data-theme='glitch']
+  :is(button, a.button):not(
+    :where(.transport *, .stage-tools *, .player-settings-panel *, .switch)
+  ):hover:not(:disabled) {
+  background: var(--daylight-control-hover);
+  border-color: #86afe7;
+  color: #003fb5;
+}
+:root[data-theme='glitch']
+  :is(
+    .accent,
+    .send-button,
+    .playback-tabs button[aria-selected='true'],
+    .room-tabs button[aria-pressed='true']
+  ):hover:not(:disabled) {
+  background: #0047ca;
+  border-color: #0047ca;
+  color: #fff;
+}
+:root[data-theme='glitch']
+  :is(button, a.button):not(
+    :where(.transport *, .stage-tools *, .player-settings-panel *, .switch)
+  ):focus-visible {
+  outline: 2px solid var(--daylight-control-blue);
+  outline-offset: 3px;
+}
+:root[data-theme='glitch'] .voice-actions :is(.active, .is-muted) {
+  background: #d9e7fb;
+  color: var(--daylight-control-ink);
+  border-color: #9dbce8;
+}
+:root[data-theme='glitch'] .switch {
+  background: #bdcde3;
+}
+:root[data-theme='glitch'] .switch[aria-checked='true'] {
+  background: var(--daylight-control-blue);
+}
+:root[data-theme='glitch'] :is(button, a.button):disabled {
+  opacity: 0.45;
+}
+:root[data-theme='glitch'] dialog .theme-choice {
+  border-radius: var(--daylight-control-radius);
+}
+@media (prefers-reduced-motion: reduce) {
+  :root[data-theme='glitch'] :is(button, a.button) {
+    transition: none;
+  }
+}

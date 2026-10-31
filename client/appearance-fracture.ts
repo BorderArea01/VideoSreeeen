@@ -430,21 +430,13 @@ function controlPlate(button: HTMLElement, burst: GlitchBurst, surface: string) 
   p.scale(ratio, ratio);
   p.fillStyle = surface;
   p.beginPath();
-  if (button.matches('#source-form .button')) {
-    p.moveTo(0, 0);
-    p.lineTo(box.width, 0);
-    p.lineTo(box.width, box.height);
-    p.lineTo(10, box.height);
-    p.lineTo(0, box.height - 10);
-    p.closePath();
-  } else
-    p.roundRect(
-      0,
-      0,
-      box.width,
-      box.height,
-      Math.min(10, Number.parseFloat(style.borderRadius) || 2),
-    );
+  p.roundRect(
+    0,
+    0,
+    box.width,
+    box.height,
+    Math.min(10, Number.parseFloat(style.borderRadius) || 2),
+  );
   p.fill();
   const walker = document.createTreeWalker(button, NodeFilter.SHOW_TEXT, {
     acceptNode(node) {

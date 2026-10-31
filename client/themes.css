@@ -1,5 +1,6 @@
 @import './daylight.css';
 @import './signal.css';
+@import './daylight-controls.css';
 
 :root:is([data-theme='glitch'], [data-theme='signal']) .workspace:has(#sidebar[hidden]) {
   grid-template-columns: minmax(0, 1fr);

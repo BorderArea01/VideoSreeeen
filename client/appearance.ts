@@ -9,8 +9,8 @@ const preferenceKey = 'videosreeeen.appearance';
 const sessionKey = 'videosreeeen.appearance.session';
 const names: Record<Theme, string> = {
   classic: '暖夜 · 原版',
-  glitch: '天光断层 · Glitch Art',
-  signal: '紫电噪讯 · C',
+  glitch: '天光断层',
+  signal: '紫电噪讯',
 };
 const valid = (value: string | null): value is Theme => themes.includes(value as Theme);
 function read(kind: 'localStorage' | 'sessionStorage', key: string) {
@@ -85,8 +85,8 @@ export function setupAppearance(settings: HTMLElement) {
       <div class="appearance-heading"><h3 id="appearance-title">界面皮肤</h3><span>仅本机</span></div>
       <fieldset class="theme-choices"><legend class="theme-sr-only">选择界面皮肤</legend>
         <label class="theme-choice"><input type="radio" name="appearance" value="classic"><span class="theme-swatch theme-swatch-classic" aria-hidden="true"><i></i><b></b><em></em></span><span class="theme-choice-name">暖夜 <small>原版</small></span></label>
-        <label class="theme-choice"><input type="radio" name="appearance" value="glitch"><span class="theme-swatch theme-swatch-glitch" aria-hidden="true"><i></i><b></b><em></em></span><span class="theme-choice-name">天光断层 <small>Glitch Art</small></span></label>
-        <label class="theme-choice"><input type="radio" name="appearance" value="signal"><span class="theme-swatch theme-swatch-signal" aria-hidden="true"><i></i><b></b><em></em></span><span class="theme-choice-name">紫电噪讯 <small>C · 反相故障</small></span></label>
+        <label class="theme-choice"><input type="radio" name="appearance" value="glitch"><span class="theme-swatch theme-swatch-glitch" aria-hidden="true"><i></i><b></b><em></em></span><span class="theme-choice-name">天光断层</span></label>
+        <label class="theme-choice"><input type="radio" name="appearance" value="signal"><span class="theme-swatch theme-swatch-signal" aria-hidden="true"><i></i><b></b><em></em></span><span class="theme-choice-name">紫电噪讯</span></label>
       </fieldset>
       <div class="appearance-auto"><span id="appearance-status" role="status"></span><button id="appearance-random" type="button" class="text-button" title="重新随机选择皮肤；未手动选择时，新标签页自动分配">随机选择</button></div>
     </section>`,

@@ -1,5 +1,7 @@
 # 0.4.0 验证记录
 
+2026-11-01 天光按钮视觉统一及主题选项副标题删除，见[控件统一验收](verification-daylight-controls.md)。
+
 2026-11-01 播放方式按钮随错误提示被拉高的修正，以及三主题 / 响应式布局检查，见[播放方式按钮布局](verification-playback-tabs-layout.md)。
 
 2026-11-01 B 站大合集视频响应超过 512 KiB 限制的调查、助手 0.1.2 修复及验证，见[大合集响应大小验收](verification-bilibili-metadata-size.md)。
