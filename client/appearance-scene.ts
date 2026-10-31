@@ -1,5 +1,5 @@
 import skyUrl from './assets/themes/daylight-sky.png';
-import { fractureEdge, fractureSky, glitchLifetime } from './appearance-fracture';
+import { fractureEdge, fractureLabel, fractureSky, glitchLifetime } from './appearance-fracture';
 
 type Wake = {
   x: number;
@@ -249,6 +249,7 @@ export class GlitchScene {
     this.hadMotion = this.wakes.length > 0;
     const ctx = this.context,
       ink = this.ink;
+    const labels: { node: HTMLElement; wake: Wake; surface: string }[] = [];
     ctx.setTransform(this.scale, 0, 0, this.scale, 0, 0);
     ctx.globalAlpha = 1;
     ctx.clearRect(0, 0, this.canvas.width / this.scale, this.canvas.height / this.scale);
@@ -280,6 +281,7 @@ export class GlitchScene {
           : cssSurface !== 'rgba(0, 0, 0, 0)'
             ? cssSurface
             : '#f5f7fb';
+      if (compact && !this.motion.matches) labels.push({ node, wake: candidates[0]!, surface });
       for (const wake of packets) {
         const edge = {
           box: r,
@@ -325,5 +327,10 @@ export class GlitchScene {
         Math.max(0, r.height - 6),
       );
     }
+    for (const { node, wake, surface } of labels)
+      fractureLabel(ink, node, { ...wake, elapsed: now - wake.at }, surface);
+    // Label slices are strictly decorative and obey the same protected areas.
+    for (const r of protectedRects)
+      ink.clearRect(r.left - 10, r.top - 10, r.width + 20, r.height + 20);
   }
 }

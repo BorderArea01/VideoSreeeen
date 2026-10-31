@@ -450,6 +450,50 @@ try {
   await owner.locator('#source-form .button').hover();
   await owner.waitForTimeout(140);
   assert.notEqual(await signature('#theme-fragments'), buttonBefore);
+  const labelSlices = await owner.locator('#source-form .button').evaluate((button) => {
+    const walker = document.createTreeWalker(button, NodeFilter.SHOW_TEXT);
+    let node: Node | null;
+    while ((node = walker.nextNode())) {
+      if (!node.textContent?.trim() || node.parentElement?.closest('svg')) continue;
+      const text = node.textContent.trim();
+      const start = node.textContent.indexOf(text);
+      const range = document.createRange();
+      range.setStart(node, start);
+      range.setEnd(node, start + text.length);
+      const r = range.getBoundingClientRect();
+      const canvas = document.querySelector<HTMLCanvasElement>('#theme-fragments')!;
+      const scale = canvas.width / canvas.getBoundingClientRect().width;
+      const pixels = canvas
+        .getContext('2d')!
+        .getImageData(
+          Math.floor(r.left * scale),
+          Math.floor(r.top * scale),
+          Math.ceil(r.width * scale),
+          Math.ceil(r.height * scale),
+        );
+      const rows = new Set<number>();
+      let channels = 0;
+      for (let i = 0; i < pixels.data.length; i += 4) {
+        const data = pixels.data;
+        if (!data[i + 3]) continue;
+        rows.add(Math.floor(i / 4 / pixels.width));
+        if (
+          (data[i]! < 150 && data[i + 1]! > 140 && data[i + 2]! > 150) ||
+          (data[i]! > 150 && data[i + 1]! < 170 && data[i + 2]! > 90)
+        )
+          channels++;
+      }
+      return { text, changedRows: rows.size, height: pixels.height, channels };
+    }
+    return null;
+  });
+  assert.ok(labelSlices && labelSlices.channels > 2, JSON.stringify(labelSlices));
+  assert.ok(
+    labelSlices.changedRows > 0 && labelSlices.changedRows <= labelSlices.height * 0.35,
+    JSON.stringify(labelSlices),
+  );
+  assert.equal(await owner.locator('#source-form .button').innerText(), labelSlices.text);
+  proof.referenceLabelSlices = labelSlices;
   const afterimage = await signature('#theme-fragments');
   await owner.waitForTimeout(180);
   assert.notEqual(await signature('#theme-fragments'), afterimage);

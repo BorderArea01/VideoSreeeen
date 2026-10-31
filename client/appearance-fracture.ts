@@ -9,7 +9,13 @@ const hash = (n: number) => {
   const value = Math.sin(n * 91.713 + 17.1) * 43758.5453;
   return value - Math.floor(value);
 };
-const packet = (elapsed: number) => Math.floor(elapsed / 70);
+const beats = [0, 55, 135, 215, 275, 365, 435, 535, 625, 725];
+const packet = (elapsed: number) => {
+  let index = 0;
+  while (index + 1 < beats.length && elapsed >= beats[index + 1]!) index++;
+  return index;
+};
+const quiet = (beat: number) => beat === 3 || beat === 6 || beat === 9;
 const density = (elapsed: number) =>
   elapsed < 210 ? 1 : elapsed < 420 ? 0.84 : elapsed < 630 ? 0.53 : 0.24;
 
@@ -103,16 +109,28 @@ export function fractureEdge(
   const { box: r, compact, impact, blue, left = false, surface } = edge;
   const step = packet(burst.elapsed),
     seed = burst.seed;
+  if (quiet(step)) return;
   const activeHeight = Math.min(r.height, compact ? r.height : 330);
   const top =
     r.top + Math.max(0, Math.min(r.height - activeHeight, r.height * impact - activeHeight * 0.5));
   const anchor = left ? r.left : r.right;
   const inside = Math.min(compact ? 26 : 68, r.width * 0.16);
-  const reach = compact ? 118 : 178;
+  const reach = compact ? 88 : 178;
   const field = sortedField(sky, scale, burst, anchor - 70, top, 210, activeHeight, surface);
-  const rows = compact ? 22 : Math.min(68, Math.max(24, Math.round(activeHeight / 3.8)));
+  const rows = compact ? 8 : Math.min(42, Math.max(12, Math.round(activeHeight / 7.5)));
   ctx.save();
   ctx.imageSmoothingEnabled = false;
+  // A narrow misregistered silhouette precedes the broken packets, like the
+  // supplied button reference. It never translates the actual control or card.
+  for (let rim = 0; rim < 3; rim++) {
+    const ry = top + activeHeight * (0.08 + rim * 0.3);
+    const rh = Math.max(2, activeHeight * (compact ? 0.18 : 0.12));
+    ctx.globalAlpha = 0.76;
+    ctx.fillStyle = '#4bd8ef';
+    ctx.fillRect(anchor + (left ? -4 : 2), ry, 3, rh);
+    ctx.fillStyle = '#ed7599';
+    ctx.fillRect(anchor + (left ? 1 : -2), ry + 2, 2, rh * 0.7);
+  }
   for (let j = 0; j < rows; j++) {
     const n = seed + j * 19;
     // Drop whole packets as the burst expires; no shrinking or springing back.
@@ -122,9 +140,9 @@ export function fractureEdge(
     const y = top + ((j + hash(n + 70) * 0.65) / rows) * activeHeight;
     const h = Math.max(
       1,
-      (activeHeight / rows) * (j % 9 === 0 ? 3.6 : j % 5 === 0 ? 2.1 : 0.35 + hash(n + 2)),
+      (activeHeight / rows) * (j % 8 === 0 ? 2.6 : j % 5 === 0 ? 1.8 : 0.25 + hash(n + 2) * 0.8),
     );
-    const depth = Math.round(4 + hash(n + 3) * inside);
+    const depth = Math.round(4 + hash(n + 3) * Math.max(0, inside - 4));
     const length = Math.round(15 + hash(n + 8) ** 1.5 * reach + Math.floor(glitch * 5) * 9);
     const x = left ? anchor - length : anchor - depth;
     const width = length + depth;
@@ -198,6 +216,7 @@ export function fractureSky(
   if (burst.elapsed < 0 || burst.elapsed >= glitchLifetime) return;
   const step = packet(burst.elapsed),
     seed = burst.seed;
+  if (quiet(step)) return;
   const field = sortedField(sky, scale, burst, x - 110, y - 85, 220, 170);
   ctx.save();
   ctx.imageSmoothingEnabled = false;
@@ -227,6 +246,61 @@ export function fractureSky(
       ctx.fillStyle = '#092952';
       ctx.fillRect(px + offset, py, width * 0.35, 2);
     }
+  }
+  ctx.restore();
+}
+
+/** Repaint at most two thin strips of an app-owned button label, never chat text. */
+export function fractureLabel(
+  ctx: CanvasRenderingContext2D,
+  button: HTMLElement,
+  burst: GlitchBurst,
+  surface: string,
+) {
+  const beat = packet(burst.elapsed);
+  if (burst.elapsed >= glitchLifetime || quiet(beat) || beat === 0) return;
+  const walker = document.createTreeWalker(button, NodeFilter.SHOW_TEXT, {
+    acceptNode(node) {
+      const text = node.textContent?.trim() ?? '';
+      return text &&
+        text.length <= 40 &&
+        !node.parentElement?.closest('svg, small, [aria-hidden="true"]')
+        ? NodeFilter.FILTER_ACCEPT
+        : NodeFilter.FILTER_REJECT;
+    },
+  });
+  const node = walker.nextNode();
+  if (!node) return;
+  const text = node.textContent!.trim();
+  const offset = node.textContent!.indexOf(text);
+  const range = document.createRange();
+  range.setStart(node, offset);
+  range.setEnd(node, offset + text.length);
+  const rect = range.getBoundingClientRect();
+  if (!rect.width || !rect.height) return;
+  const style = getComputedStyle(node.parentElement!);
+  const fontSize = Number.parseFloat(style.fontSize);
+  const shift = (beat % 2 ? -1 : 1) * (2 + Math.floor(hash(burst.seed + beat) * 4));
+  ctx.save();
+  ctx.font = `${style.fontStyle} ${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
+  ctx.textBaseline = 'middle';
+  const bandHeight = Math.max(1, Math.min(2, fontSize * 0.1));
+  for (let strip = 0; strip < (beat === 2 || beat === 4 ? 2 : 1); strip++) {
+    const y = rect.top + rect.height * (strip ? 0.68 : 0.35 + (beat % 3) * 0.1);
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(rect.left - 6, y, rect.width + 12, bandHeight);
+    ctx.clip();
+    ctx.fillStyle = surface;
+    ctx.fillRect(rect.left - 6, y, rect.width + 12, bandHeight);
+    ctx.globalAlpha = 0.92;
+    ctx.fillStyle = '#43deef';
+    ctx.fillText(text, rect.left + shift + 2, rect.top + rect.height / 2);
+    ctx.fillStyle = '#ed7097';
+    ctx.fillText(text, rect.left + shift - 2, rect.top + rect.height / 2);
+    ctx.fillStyle = style.color;
+    ctx.fillText(text, rect.left + shift, rect.top + rect.height / 2);
+    ctx.restore();
   }
   ctx.restore();
 }

@@ -483,8 +483,8 @@
   z-index: -1;
   pointer-events: none;
   background: linear-gradient(110deg, #0044bd, #0058f5);
-  border-radius: 7px;
-  clip-path: none;
+  border-radius: 2px;
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 10px 100%, 0 calc(100% - 10px));
 }
 :root[data-theme='glitch'] #source-form .button:hover::before {
   background: #0047cc;

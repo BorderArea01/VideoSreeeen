@@ -16,14 +16,17 @@
 
 这两张均为实际浏览器截图。头像使用真实发送者昵称首字符；示例视频不是主题素材。实录保存在本机 `.local/daylight-motion.webm`。
 
+本次另逐帧检查了用户提供的按钮 WebP：29 帧、总长 2,890ms，文字和少量边缘横带突然错位，青红通道偏移之后有清晰的间歇。按这种节奏润色现有天空主题，没有照搬红黄配色，也没有将参考动图作为网站资产分发。此前知乎文章请求返回 403，本文不将未读到的文章内容作为实现依据。
+
 ## 动态规则
 
 - **故障只由本机指针触发。** 静止或动画结束时，两张装饰画布透明，没有冻结的云朵条块或固定损坏。鼠标扫过天空产生当前位置的照片行错位；扫过按钮或容器，故障从它的当前边缘产生。
 - **材质实时生成。** 每次交互只从本主题纯净天空与当前控件底色生成 96×48 小样本，按行、按不等长区间做实际亮度排序，再按组重排 / 重复源行、拉伸像素带。没有读取影片、第三方页面或聊天内容的像素，没有 DOM 截图，也不加载固定的 `daylight-fracture.png`。
-- **离散数据节拍。** 约 70ms 更新一个错位阶段，横片分组突然改变长度、行内容和偏移；深蓝缺损块、白色控件材质、现场照片行、少量脱落小块互相穿插。部分采样行用相邻像素的 R / B 分量错位，形成轻微色偏。它是 datamoshing 风格的 UI 表现，不处理影片编解码。
+- **离散数据节拍。** 使用约 55–100ms 的不等长阶段，故障之间留出清晰间歇；横片分组突然改变长度、行内容和偏移。按钮采用少量较厚切片，容器混合大块缺损与细尾迹，减少均匀细线。部分采样行用相邻像素的 R / B 分量错位，形成轻微色偏。它是 datamoshing 风格的 UI 表现，不处理影片编解码。
+- **按钮参考动效。** 同步按钮底色采用小切角，命中范围和标签不变。鼠标掠过时，轮廓产生窄幅青红重影；本应用按钮文字最多一到两条约 1–2px 横带短时错位，保持大部分字形连续。装饰只读取自有按钮标签并在现有 Canvas 上绘制，不复制交互节点，不处理聊天文字。
 - **无弹性回落。** 取消正弦伸缩和连续位移曲线；条块以不等厚度与不规则间隙出现，生命周期约 840ms，后半程分批丢弃并清空，不缩回原位置。一个容器最多保留两个经过的位置，背景最多保留八次交互，余迹各自到期，不把整片效果黏在当前鼠标上。
 - **轮廓可识别。** 卡片破损集中于侧边约 10%–20% 范围，主体内容保留；横向条块主要向外延伸。底栏按经过位置选择左 / 右边缘，按钮同时激活自己的边缘与所属底栏。拖拽时按实时边界重绘，旧位置清除。
-- **内容区保护。** 每帧清除影片、控制栏、输入框、聊天气泡 / 消息信息、语音入口与按钮文字区域的装饰。装饰没有命中区域，不移动实际控件，不提交房间操作。
+- **内容区保护。** 每帧清除影片、控制栏、输入框、聊天气泡 / 消息信息与语音入口的装饰。普通边缘碎片仍避开按钮中央，仅自有按钮文字有上述限高切片。装饰没有命中区域，不移动实际控件，不提交房间操作。
 - **减少动态效果时关闭故障。** 触屏保留干净界面；系统减少动态效果、强制颜色、隐藏页面与全屏都有相应停用 / 隐藏。退出全屏恢复背景，同一播放器和语音连接保持。
 
 ## 界面与资源
@@ -49,16 +52,17 @@ Edit this existing production photographic background. Preserve its exact photog
 - `npm run build`：类型检查、前端 / 服务端与助手构建。助手 ZIP 仍为 18,483 字节、SHA-256 `4c94b6e9c51934513326402fd1d34a21d42da72f3a3052349113f85b38a13307`；没有发布助手或客户端。
 - `npm run test:appearance`：真实双端 MP4、实际房间 WebSocket、双向文字聊天、语音收听后换肤、拖拽、停靠、随机分配与偏好记忆。换肤保持同一 video，0 次 loadstart，没有暂停或房间操作。
 - 动态检查分别验证「静止透明」「扫过后实际像素变化」「经过容器后拖动仍绑定新边缘」「旧位置不残留」「到期恢复原透明画布」。不再将固定纹理移动视为合格。
+- 新增按钮标签实际像素检查：中央出现青红通道偏移，但受影响行数小于标签高度的 35%，DOM 标签不变；随后恢复透明。此上限用于防止整段文字被遮盖，实际数值另见回执。
 - 实时采样检查临时将隔离页面的天空替换为纯金色测试底图，实际碎片应出现同色像素，再恢复真实天空；同时确认没有旧断层图片网络请求。这是验证输入与输出关系的测试素材，不会加入产品或 README 截图。
 - 装饰在影片和输入区域逐点采样应全透明；减少动态效果无变化，强制颜色隐藏，退出网页全屏后照片与画布恢复。检查 2560×1440、800×1100、1.5 倍 visual viewport、390 / 320px 布局；不是手机真机结论。
 - `VS_TEST_SKIN=glitch npm run test:player-controls`：实际 MP4 / HLS、暂停、跳转、画面预览、精细定位、系统 / 网页全屏、约 1 秒闲置隐藏与窄屏操作。
 - 公网独立预览使用实际 WSS 与受控视频 fixture，不等于 B 站 / 稀饭全部线路的真机验收。
 
-参考：[Canvas drawImage](https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/drawImage)、[关闭图片平滑](https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/imageSmoothingEnabled)、[PixiJS GlitchFilter 原始着色器](https://github.com/pixijs/filters/blob/main/src/glitch/glitch.frag)。借鉴水平位移图、分通道采样的机制；本项目独立实现 Canvas 版本，没有复制着色器或引入其运行依赖。
+参考：[Canvas drawImage](https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/drawImage)、[关闭图片平滑](https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/imageSmoothingEnabled)、[文字切片绘制](https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/fillText)、[背景轮廓裁切](https://developer.mozilla.org/en-US/docs/Web/CSS/Reference/Properties/clip-path)、[PixiJS GlitchFilter 原始着色器](https://github.com/pixijs/filters/blob/main/src/glitch/glitch.frag)。借鉴水平位移图、分通道采样的机制；本项目独立实现 Canvas 版本，没有复制着色器或引入其运行依赖。
 
 本机证据：`.local/appearance-evidence.json`、`.local/appearance-public-evidence.json`、`.local/daylight-motion.webm`、`.local/daylight-scroll-evidence.json`、`.local/daylight-public-assets.json`。
 
-## 部署回执
+## 前次部署回执（按钮参考润色前）
 
 前一预览 `fa95d7c0`、源码 `26e5391` 使用固定照片条块，是这轮用户反馈的基线。
 
