@@ -67,4 +67,13 @@ Use case: background-extraction. Edit target: the provided tall broken cloud/blu
 
 ## 部署回执
 
-前一预览 `ab7dacdf`（源码 `8c4f8c0`）是本次用户反馈的基线；本轮完成后以下记录以实际新部署为准。
+前一预览 `ab7dacdf`（源码 `8c4f8c0`）是本次用户反馈的基线。
+
+- 本轮运行时代码 `26e5391`；2026-10-31 已更新独立 Pages 预览 `fa95d7c0`，固定地址 <https://fa95d7c0.videosreeeen.pages.dev/?skin=glitch>，别名 <https://daylight-a.videosreeeen.pages.dev/?skin=glitch>。
+- 最终构建、格式检查、本地与公网 `test:appearance` 通过。真实双端视频、文字聊天和语音收听后换肤保持；播放器对象不变、0 次 loadstart，没有房间控制。A 皮肤 `test:player-controls` 通过实际 MP4 / HLS、预览、精细定位、全屏与闲置隐藏，错误列表为空。测试未访问用户物理麦克风，不是手机真机结论。
+- 本地 / 公网均测得聊天室原边缘深色像素 7,192、浅色像素 7,316；移动后新边缘深色 7,213、浅色 7,567，旧位置两项均为 0。数字只用于验证材质归属与残留，视觉效果另以真实截图和实录检查。
+- 最终布局仍为 1536×1024 下播放器 `(79.86, 204)`、`968.77×503.75`，聊天室 `(1068.63, 204)`、`387.52×503.75`，底栏 `(79.86, 727.75)`、`1376.28×96`。
+- 动效实录 `.local/daylight-motion.webm`：5.45 秒、1152×768、571,357 字节，来自隔离浏览器的实际页面。390×844 窗口向下滚动 325px 后，背景仍固定覆盖可视区；源图自然宽度 1536、cover，缩略采样有 982 种照片色值。
+- 公网 HTML、7 个资源和预览别名与本地成品逐字节一致。入口 `index-1E_O6Npz.js` SHA-256 `aa7408ce6f8521830768215030e8bb5bea9a0dbaf77a6637b9aa9bfb972adf1c`；CSS `index-Ba_wyFUD.css` SHA-256 `36964723dad06c659c2a257154da243899f4a25a8962111a3382bcd74338b35d`；天空 SHA-256 `48e5b26cbf31428e23df58d83d4770edb5fdf4655f2dea3298e25e9f935cba69`；边缘材质 SHA-256 `0825a5c8416f528f56d155370e5e26694ec4ab15b54b561fc5e2c3f01050bf92`。
+- 正式入口仍为 `assets/index-ByAASs3a.js`，Worker 保持原服务，未更新用户房间、已发布客户端、标签或 Release，没有新付费资源或 TURN。本轮源码推送仅针对现有开发分支，不触发手动客户端发布工作流。
+- 当前 dist 与 Pages 上传目录各约 5.27 MiB，服务端产物约 0.28 MiB；输出原位更新，没有额外候选安装包或回退目录。继续沿用 `.local/rollback/manifest.json` 定位的唯一回退。构建后 D 盘可用约 45.65 GiB。
