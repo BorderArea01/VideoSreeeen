@@ -8,6 +8,8 @@
 
 构建、类型检查和上述 24 组隔离布局检查通过。1556 px 紫电主题下，修正后正常、错误提示、共享画面、本地视频和共同播放均为 44 px。原始记录为 `.local/playback-tabs-baseline-evidence.json` 与 `.local/playback-tabs-local-evidence.json`。
 
+发布后在正式入口另建独立验收房间，同样的 24 组检查全部通过；仍然没有提交媒体 / 播放控制 / 模式更换指令，验收浏览器已关闭。原始记录为 `.local/playback-tabs-public-evidence.json`，汇总测量值保存在部署回执。
+
 ![修正后：右侧提示不再撑高左侧选项](screenshots/playback-tabs-height.png)
 
-部署和实际检查结果见对应回执。更新仅涉及网页样式；不更新房间 Worker，不主动刷新现有用户页面。当前构建和已有唯一回退保留，没有新增历史构建副本或客户端安装包。
+已发布到正式网页，部署 `91ef5e51`、源码 `584cb9d`。线上 102 个文件的 SHA-256 与已验收构建一致，房间健康检查正常，结果见[部署和布局回执](playback-tabs-deployment.json)。更新仅涉及网页样式；没有更新房间 Worker 或主动刷新现有用户页面。当前构建和已有唯一回退保留，没有新增历史构建副本或客户端安装包；助手仍为 0.1.2。
