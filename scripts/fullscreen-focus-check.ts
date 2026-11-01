@@ -208,6 +208,9 @@ try {
       assert.equal(await hidden(page), false);
       sample.pausedKeepsControls = true;
       await page.locator('#play-button').click();
+      // Public room operations need a server acknowledgement before playback
+      // resumes; that network round trip is separate from the idle deadline.
+      await page.waitForFunction(() => !document.querySelector<HTMLVideoElement>('#video')!.paused);
       await idle(page);
       if (mode === 'page') {
         await page.mouse.move(430, 330);

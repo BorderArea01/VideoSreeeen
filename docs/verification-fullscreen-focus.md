@@ -21,6 +21,8 @@
 
 构建与 TypeScript 检查通过，最终 6 组另行确认控制栏实际 CSS 透明度为 0，截图经目视检查。原有 `test:player-controls` 回归通过，包括无 CORS MP4 画面预览、上拖精细跳转且只提交一次、10 / 30 / 60 / 90 秒跳转、HLS 预览、窄屏与模拟触摸；旧普通点击路径测得隐藏耗时约 994 ms。
 
-正式发布结果另存后续记录。测试源码在 `scripts/fullscreen-focus-check.ts`，原始记录在 `.local/fullscreen-focus-evidence.json` 与 `.local/player-controls-local-evidence.json`；所有任务经受控入口串行执行，不更新房间 Worker 或强制刷新用户页面。
+正式 Pages 发布为 `133dce6a`，运行时代码提交 `5343c56`，主脚本 `index-BN1kbJfn.js`。正式入口 105 个静态资源与本地构建逐项 SHA-256 一致，健康检查通过；同一套 6 组焦点回归在正式入口的独立房间全部通过。线上测试恢复播放时先等待服务器确认，再检查闲置隐藏期限，避免将房间网络往返时间误计为控件隐藏时间。结果见[发布与验收记录](fullscreen-focus-deployment.json)。
+
+测试源码在 `scripts/fullscreen-focus-check.ts`，原始记录在 `.local/fullscreen-focus-evidence.json`、`.local/fullscreen-focus-public-evidence.json` 与 `.local/player-controls-local-evidence.json`；所有任务经受控入口串行执行，不更新房间 Worker 或强制刷新用户页面。浏览器助手 ZIP 未改动，未重发客户端或创建标签。D 盘可用约 50.9 GiB，仍保留现有唯一项目回退版本，本轮未增加历史构建副本。
 
 参考：[focusin 的触发与冒泡](https://developer.mozilla.org/en-US/docs/Web/API/Element/focusin_event)、[浏览器的 focus-visible 启发式](https://developer.mozilla.org/en-US/docs/Web/CSS/Reference/Selectors/:focus-visible)。
