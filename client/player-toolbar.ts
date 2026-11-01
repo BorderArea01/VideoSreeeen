@@ -20,9 +20,14 @@ export class PlayerToolbar {
     this.settings.id = 'player-settings';
     this.settings.innerHTML = `<summary title="播放设置" aria-label="播放设置">${icon('settings', 18)}</summary><div class="player-settings-panel"><label id="player-volume-setting"><span>视频音量</span></label><label id="player-speed-setting"><span>播放速度</span></label><label id="player-step-setting"><span>跳转时长</span></label></div>`;
     this.volume = this.settings.querySelector('#player-volume-setting')!;
+    this.volume.querySelector('span')!.innerHTML =
+      '视频音量 <output id="video-volume-value">100%</output>';
     this.speed = this.settings.querySelector('#player-speed-setting')!;
     this.step = this.settings.querySelector('#player-step-setting')!;
     this.volume.append(get('video-volume'));
+    const note = document.createElement('small');
+    note.id = 'video-volume-note';
+    this.volume.append(note);
     this.speed.append(get('rate'));
     this.step.append(get('skip-step'));
     get('skip-back').innerHTML = icon('backward', 18);

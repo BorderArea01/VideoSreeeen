@@ -20,6 +20,7 @@ export class VoiceActivity {
 /** User volume and temporary ducking have independent ownership. */
 export class MovieSound {
   level = 1;
+  maximum = 1;
   muted = false;
   private lastLevel = 1;
   private factor = 1;
@@ -29,18 +30,18 @@ export class MovieSound {
     try {
       const saved = localStorage.getItem('vs-video-volume');
       const value = saved === null ? 1 : Number(saved);
-      if (Number.isFinite(value) && value >= 0 && value <= 1) this.level = value;
+      if (Number.isFinite(value) && value >= 0 && value <= 2) this.level = value;
       if (this.level > 0) this.lastLevel = this.level;
     } catch {
       /* Private browsing still permits session volume. */
     }
   }
   get effective() {
-    return this.level * this.factor;
+    return Math.min(this.level, this.maximum) * this.factor;
   }
   setLevel(value: number) {
     if (!Number.isFinite(value)) return;
-    this.level = Math.max(0, Math.min(1, value));
+    this.level = Math.max(0, Math.min(2, value));
     this.muted = false;
     if (this.level > 0) this.lastLevel = this.level;
     try {

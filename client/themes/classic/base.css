@@ -455,6 +455,17 @@ h1 {
 .player-settings-panel label:last-child {
   margin-bottom: 0;
 }
+#video-volume-value {
+  display: block;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+#video-volume-note {
+  grid-column: 1 / -1;
+  margin-top: -7px;
+  color: var(--muted);
+  font-size: 10px;
+}
 #player-settings select {
   width: 100%;
   padding: 5px 8px;

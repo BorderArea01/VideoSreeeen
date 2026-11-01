@@ -87,6 +87,7 @@ async function makePage(index: number) {
     });
   // Raw JS avoids transpiler helpers in page-scope functions. No samples are recorded.
   await context.addInitScript(`(() => {
+    localStorage.setItem('videosreeeen.appearance', 'classic'); // Stable default layout; theme/voice preservation has separate coverage.
     window.__micCalls = 0; window.__tracks = []; window.__voiceSockets = []; window.__roomSockets = []; window.__lag = false;
     window.__inputRequests = []; window.__sinkCalls = []; window.__removedOutput = false;
     const device = (kind, deviceId, label) => ({ kind, deviceId, label, groupId: 'fixture', toJSON() { return { kind, deviceId, label }; } });
@@ -139,7 +140,7 @@ async function makePage(index: number) {
     const Worklet = AudioWorkletNode;
     if (window.AudioEncoder) {
       const Encoder = AudioEncoder;
-      window.AudioEncoder = class extends Encoder { constructor(init) { super(init); window.__encoderFailure = init.error; } };
+      window.AudioEncoder = class extends Encoder { constructor(init) { super(init); window.__testEncoder = this; window.__encoderFailure = init.error; } };
     }
     window.AudioWorkletNode = class extends Worklet {
       constructor(context, name, options) { super(context, name, options); if (name === 'vs-voice-playout') { window.__voiceContext = context; window.__voiceGain = null; const analyser = context.createAnalyser(); analyser.fftSize = 4096; analyser.smoothingTimeConstant = 0; this.connect(analyser); window.__analyser = analyser; } }
@@ -213,7 +214,7 @@ try {
     await page.locator('#name-input').fill(name);
     await page.locator('#join-button').click();
   }
-  await host.locator('#member-count').filter({ hasText: '3' }).waitFor();
+  await host.locator('#member-count').filter({ hasText: '3' }).waitFor({ state: 'attached' });
   await selectSource(host, movieUrl);
   await host.waitForFunction(
     () => document.querySelector<HTMLVideoElement>('#video')!.readyState >= 3,
@@ -613,7 +614,9 @@ try {
   assert.equal(await guest.evaluate('window.__micCalls'), beforeReconnectMicCalls);
   await audio(host, 1);
   evidence.audioContextRecoveryPreservesMic = true;
-  await guest.waitForFunction(() => typeof (window as any).__encoderFailure === 'function');
+  // Context recovery closes the previous encoder. Wait for its replacement,
+  // rather than injecting into an already closed encoder's stale callback.
+  await guest.waitForFunction(() => (window as any).__testEncoder?.state === 'configured');
   await guest.evaluate(
     'window.__encoderFailure(new DOMException("synthetic encoder failure", "EncodingError"))',
   );

@@ -35,6 +35,7 @@ import {
 import { RoomVoice } from './voice';
 import { RoomModeration } from './moderation';
 import { MovieSound } from './audio-mix';
+import { MovieBoost, movieLimiter } from './movie-boost';
 import { PageFullscreen } from './page-fullscreen';
 import { ChatSidebar } from './chat-sidebar';
 import { FullscreenIdle } from './fullscreen-idle';
@@ -417,6 +418,7 @@ let renderedChat = '';
 let nextBusy = false;
 let nextAutoplay: { code: string; url: string; startedAt?: number } | null = null;
 const playbackHealth = new PlaybackHealth();
+const movieBoost = new MovieBoost(() => movieSound.apply());
 const movieSound = new MovieSound(applyMovieSound);
 const voice = new RoomVoice($('chat-panel'), (active) => movieSound.voice(active));
 const moderation = new RoomModeration($('chat-messages'), (message) => send(message));
@@ -468,16 +470,43 @@ document.addEventListener('visibilitychange', () => {
   if (document.hidden) movieSound.settle();
 });
 
-function applyMovieSound(gain: number, muted: boolean) {
-  video.volume = audio.volume = gain;
-  audio.muted = muted;
+function applyMovieSound(_gain: number, muted: boolean) {
   const preview = hasPendingPreview() || room?.media?.broadcast?.host === memberId;
-  video.muted = playerPriming || preview || !!audio.getAttribute('src') || muted;
-  if (publisher && (publisher as HTMLVideoElement & { __stream?: MediaStream }).__stream) {
+  const monitoring =
+    !!publisher && !!(publisher as HTMLVideoElement & { __stream?: MediaStream }).__stream;
+  const target = siteOpen
+    ? null
+    : monitoring
+      ? publisherMonitor
+        ? null
+        : publisher
+      : preview
+        ? null
+        : audio.getAttribute('src')
+          ? audio
+          : video;
+  movieBoost.bind(target, `${playerGeneration}:${target?.getAttribute('src') ?? ''}`);
+  movieSound.maximum = monitoring && publisherMonitor ? 2 : movieBoost.maximum;
+  const routed = movieBoost.apply(
+    movieSound.effective,
+    muted || (target === video && playerPriming),
+    movieSound.level > 1,
+  );
+  movieSound.maximum = monitoring && publisherMonitor ? 2 : movieBoost.maximum;
+  const gain = movieSound.effective;
+  video.volume = audio.volume = Math.min(1, gain);
+  audio.muted = muted || (target === audio && routed);
+  video.muted =
+    playerPriming ||
+    preview ||
+    !!audio.getAttribute('src') ||
+    muted ||
+    (target === video && routed);
+  if (publisher && monitoring) {
     if (publisherMonitor) publisherMonitor.gain.value = muted ? 0 : gain;
     else {
-      publisher.volume = gain;
-      publisher.muted = muted;
+      publisher.volume = Math.min(1, gain);
+      publisher.muted = muted || (target === publisher && routed);
     }
   }
   renderLiveSound();
@@ -1099,9 +1128,21 @@ function renderLiveSound() {
   button.setAttribute('aria-pressed', String(muted));
   button.innerHTML = icon(muted || playbackPermissionNeeded ? 'volume-off' : 'volume', 19);
   const slider = $<HTMLInputElement>('video-volume');
-  slider.value = String(Math.round(movieSound.level * 100));
+  slider.max = String(movieSound.maximum * 100);
+  slider.value = String(Math.round(Math.min(movieSound.level, movieSound.maximum) * 100));
   slider.title = `视频音量 ${slider.value}% · 仅本机`;
   slider.setAttribute('aria-valuetext', slider.value + '%');
+  $('video-volume-value').textContent = slider.value + '%';
+  const note = $('video-volume-note');
+  note.textContent =
+    movieSound.maximum === 1
+      ? '此来源或浏览器暂不支持增强'
+      : movieSound.level > 1 && !publisherMonitor && !movieBoost.active
+        ? '正在启用增强；当前保持原声'
+        : movieSound.level > 1
+          ? '本机音量增强'
+          : '最高 200% · 仅本机';
+  note.dataset.boost = movieBoost.state;
 }
 function renderLiveStatus() {
   const sharing = room?.media?.broadcast;
@@ -1621,6 +1662,7 @@ function renderChat() {
   messages.scrollTop = nearBottom ? messages.scrollHeight : previousTop;
 }
 async function clearPlayback(keepSite = false, keepPreview = false) {
+  movieBoost.reset();
   cacheContext = null;
   lastCacheProgress = null;
   cachePlaybackFailed = false;
@@ -1666,6 +1708,7 @@ async function clearPlayback(keepSite = false, keepPreview = false) {
   await cache.clear().catch(error);
 }
 async function stopCachedPlayback() {
+  movieBoost.reset();
   cacheContext = null;
   lastCacheProgress = null;
   cachePlaybackFailed = false;
@@ -1786,6 +1829,7 @@ async function retryLocalVideo() {
   }
 }
 async function setPlayer(src: string, audioSrc?: string, isHls = false) {
+  movieBoost.reset();
   playerStartup?.abort();
   playerFirstFrameReady = false;
   playerPriming = true;
@@ -2143,6 +2187,7 @@ qualitySelect.onchange = () => {
   broadcastFallback.setQuality(qualitySelect.value);
 };
 function releasePublisher() {
+  movieBoost.reset();
   broadcastFallback.close();
   pendingBroadcastUrl = '';
   if (nativeCapture) {
@@ -2253,7 +2298,7 @@ $<HTMLInputElement>('local-video-input').onchange = () => {
       const monitor = sound.createGain();
       publisherMonitor = monitor;
       audioSource.connect(output);
-      audioSource.connect(monitor).connect(sound.destination);
+      audioSource.connect(monitor).connect(movieLimiter(sound)).connect(sound.destination);
       for (const track of output.stream.getAudioTracks()) stream.addTrack(track);
       publisherCleanup = () => {
         clearInterval(timer);
@@ -2552,6 +2597,11 @@ $('copy-video-diagnostics').onclick = () => {
                     : 'direct'
                   : 'none',
           ...sourceDiagnostics(video, audio),
+          sound: {
+            level: Math.min(movieSound.level, movieSound.maximum),
+            muted: movieSound.muted,
+            boost: movieBoost.state,
+          },
           sourceTimedOut,
           corrections: { automaticSeeks, explicitSeeks },
           clock: playbackClock.diagnostics(performance.now()),
@@ -2998,13 +3048,17 @@ $('play-button').onclick = () => {
 };
 $('live-sound').onclick = () => {
   if ($('live-sound').hidden) return;
+  movieBoost.unlock();
   movieSound.toggleMute(playbackPermissionNeeded);
   // A user gesture unlocks local playback; it must not pause the whole room.
   if (playbackPermissionNeeded) playElement(video);
   renderLiveSound();
 };
-$<HTMLInputElement>('video-volume').oninput = () =>
+$<HTMLInputElement>('video-volume').onpointerdown = () => movieBoost.unlock();
+$<HTMLInputElement>('video-volume').oninput = () => {
+  movieBoost.unlock();
   movieSound.setLevel(Number($<HTMLInputElement>('video-volume').value) / 100);
+};
 video.onclick = () => {
   if (room?.media?.broadcast?.kind === 'screen' || hasPendingPreview()) {
     if (playbackPermissionNeeded) $('live-sound').click();

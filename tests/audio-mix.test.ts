@@ -87,6 +87,28 @@ test('视频避让保留最新手动音量，静音不会被恢复覆盖；交�
     sound.settle();
     assert.equal(sound.effective, 0.4, '后台不依赖暂停的动画帧恢复音量');
     assert.equal(frames.size, 0);
+    sound.maximum = 2;
+    sound.setLevel(2);
+    assert.equal(sound.effective, 2);
+    sound.voice(true);
+    tick(100);
+    assert.equal(sound.effective, 0.5, '200% 时人声避让仍降低至手动增益的四分之一');
+    sound.setLevel(1.6);
+    assert.equal(sound.effective, 0.4);
+    sound.maximum = 1;
+    assert.equal(sound.effective, 0.25, '不支持的来源先限制手动音量再避让');
+    assert.equal(sound.level, 1.6, '切到不支持的来源不删除增强偏好');
+    sound.maximum = 2;
+    sound.voice(false);
+    tick(600);
+    assert.equal(sound.effective, 1.6);
+    sound.toggleMute();
+    assert.equal(output.muted, true);
+    sound.toggleMute();
+    assert.equal(sound.effective, 1.6);
+    assert.equal(new MovieSound(() => {}).level, 1.6);
+    sound.setLevel(100);
+    assert.equal(sound.level, 2, '增强上限 200%');
   } finally {
     for (const [key, descriptor] of previous)
       if (descriptor) Object.defineProperty(globalThis, key, descriptor);
