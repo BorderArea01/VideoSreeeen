@@ -20,6 +20,12 @@
 - `VS_BOOST_SCENARIO=failure`：仅对隔离测试注入连接音频图失败，恢复原生声音、上限 100%，半成品轨道和上下文释放，无房间控制副作用。
 - 原有 `test:voice` 全量回归通过：三人合成音源、Opus / 兼容编解码、180 ms 抖动、输出 / 输入设备边界、语音及房间重连、音频上下文暂停恢复、编码故障恢复、语音释放与普通视频避让。验收固定默认主题布局，并在上下文恢复后等待实际替换的编码器就绪再注入故障，避免命中已关闭实例的旧回调；没有修改语音产品实现。
 
-测试入口均经 `scripts/controlled.ps1 -AllowGameThisRun -MinFreeMiB 0` 串行执行。实际应用没有全局测试桥接；采样监测只由隔离测试安装。原始记录位于 `.local/movie-boost-*-evidence.json`，界面截图位于 `.local/screenshots/movie-boost-settings.png`；不提交采样音频或真实用户媒体。构建、正式网页部署、资源核对与线上结果另记。
+测试入口均经 `scripts/controlled.ps1 -AllowGameThisRun -MinFreeMiB 0` 串行执行。实际应用没有全局测试桥接；采样监测只由隔离测试安装。原始记录位于 `.local/movie-boost-*-evidence.json`，[设置截图](screenshots/movie-boost-settings.png)保留在文档中；不提交采样音频或真实用户媒体。
+
+## 正式网页
+
+网页部署 `c5d4c1d1`，运行源码 `fadb66c`，主脚本 `index-GXGkG51m.js`；105 个文件全部完成线上 SHA-256 比对，房间健康检查通过。[部署回执](movie-boost-deployment.json)记录资源清单、六组本地 / 线上场景与语音回归摘要。房间 Worker、安装包和助手未更新，现有用户页面未被强制刷新。
+
+正式入口的独立双端重复正常增强、缺少捕获能力及音频图失败三种场景，均通过。线上 200% RMS 约 0.188，收到合成语音时约 0.047，停顿后恢复到最新 160% 设置的约 0.150；轨道与上下文全部释放，切回原站型直链继续有原生声音。该证据来自 Windows 浏览器，不是手机或实际耳机听感验收。
 
 参考：[媒体捕获的音轨生命周期与音量独立性](https://www.w3.org/TR/mediacapture-fromelement/#html-media-element-media-capture-extensions)、[Web Audio 跨域媒体安全边界](https://www.w3.org/TR/webaudio-1.1/#MediaElementAudioSourceNode-security)。

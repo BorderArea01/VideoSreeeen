@@ -108,6 +108,15 @@ _本地双端实播截图，使用 MDN CC0 示例视频；昵称和消息为演�
 </details>
 
 <details>
+<summary>本机视频音量增强</summary>
+
+<img src="docs/screenshots/movie-boost-settings.png" alt="播放器设置中的 200% 本机视频音量增强" width="252">
+
+截图来自隔离浏览器的合成音源与实际缓存验收。只对支持的本机音轨开放增强，原站直连保持 100%。
+
+</details>
+
+<details>
 <summary>手机浏览器界面</summary>
 
 <img src="docs/screenshots/mobile.png" alt="390px 手机浏览器布局：视频、播放方式、成员和可滚动聊天室" width="300">
