@@ -20,4 +20,10 @@
 - 12 项线路 / 剧集 / 播放源单元检查通过，`test:next-start` 的独立房间首帧起播与迟到 / 取消回归通过；构建及 TypeScript 检查通过。
 - 可重复入口：`npm run test:site-source -- <原站页面>`；`VS_TEST_SOURCE_DELAY_MS=17000` 注入仅限测试上下文的视频请求延迟，`VS_TEST_DIRECT_MEDIA=1` 使本地测试从 CDN 直连，`VS_TEST_EVIDENCE` 指定证据文件。所有运行均通过受控串行入口；不会改变系统网络或进入用户房间。
 
-实现依据：[AbortSignal 超时与组合取消](https://developer.mozilla.org/en-US/docs/Web/API/AbortSignal/timeout_static)、[loadeddata 首帧数据事件](https://developer.mozilla.org/en-US/docs/Web/API/HTMLMediaElement/loadeddata_event)。修订后的本地、部署与线上结果另记于本页及部署回执。
+## 部署与线上复测
+
+正式网页部署 `56b7845b`，运行源码 `18dfbaf`，主脚本 `index-CIMhzRPF.js`。105 个文件逐项核对线上 SHA-256，房间健康检查通过；[部署回执](xifan-movie-deployment.json)保留文件清单、修订前复现和修订后验收摘要。未更新房间 Worker、安装包或助手，未主动刷新用户页面。
+
+发布后在正式网页的独立双端再次注入同样的 17 秒视频请求延迟：16 秒时仍在首帧检查、无错误或换片，约 24.4 秒成功完成；双方 1920×1080、有实际音频解码，播放、拖动、暂停、倍速、接口网络错误与首帧取消检查均通过。记录 `.local/xifan-movie-public.json`。该结果是 Windows 浏览器隔离上下文的端到端证据，不冒充用户设备真机验证，也不承诺所有网络上的 CDN 都可达。
+
+实现依据：[AbortSignal 超时与组合取消](https://developer.mozilla.org/en-US/docs/Web/API/AbortSignal/timeout_static)、[loadeddata 首帧数据事件](https://developer.mozilla.org/en-US/docs/Web/API/HTMLMediaElement/loadeddata_event)。

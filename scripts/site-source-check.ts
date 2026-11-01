@@ -532,16 +532,15 @@ try {
     await host.unroute(metadataRoute);
 
     const currentVideo = latest.media.source.video;
-    let started!: () => void, releaseFrame!: () => void;
-    const requestedFrame = new Promise<void>((resolve) => {
-      started = resolve;
+    let releaseFrame!: () => void;
+    const requestedFrame = host.waitForRequest((request) => request.url() === currentVideo, {
+      timeout: 15000,
     });
     const heldFrame = new Promise<void>((resolve) => {
       releaseFrame = resolve;
     });
     const matchesVideo = (url: URL) => url.href === currentVideo;
     await context.route(matchesVideo, async (route) => {
-      started();
       await heldFrame;
       await route.continue().catch(() => {});
     });
