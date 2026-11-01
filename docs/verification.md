@@ -1,5 +1,7 @@
 # 0.4.0 验证记录
 
+2026-11-01 稀饭电影真实双端实播、慢首帧误报“未识别”的复现及分阶段等待修订，见[长片识别验证](verification-xifan-movie.md)。
+
 2026-11-01 主题按目录独立维护、清单注册与资源生命周期、运行时装卸及隔离回归，见[主题框架验收](verification-theme-framework.md)和[维护指南](theme-framework.md)。
 
 2026-11-01 天光按钮视觉统一及主题选项副标题删除，见[控件统一验收](verification-daylight-controls.md)。

@@ -30,6 +30,8 @@ const expectedCdn = xifan
   : 'r2.jzacg.com';
 if (xifan) assert.ok(xifanSourceId, 'The test needs an observed original-site source ID');
 const directMedia = process.env.VS_TEST_DIRECT_MEDIA === '1';
+const sourceDelayMs = Number(process.env.VS_TEST_SOURCE_DELAY_MS || 0);
+assert.ok(Number.isFinite(sourceDelayMs) && sourceDelayMs >= 0 && sourceDelayMs <= 45000);
 const metadataRoute = xifan
   ? 'https://api.xifanacg.com/functions/v1/issue-web-playback'
   : '**/resolve-source/**';
@@ -191,14 +193,46 @@ try {
   await guest.goto(invite);
   await guest.locator('#name-input').fill('原站源独立播放');
   await guest.locator('#join-button').click();
-  await host.locator('#member-count').filter({ hasText: '2' }).waitFor();
+  // Optional themes may move the visible count into their own heading.
+  await host.locator('#member-count').filter({ hasText: '2' }).waitFor({ state: 'attached' });
+  if (sourceDelayMs) {
+    let releaseAt = 0;
+    // Only this isolated provider's CDN requests are delayed. The real API,
+    // signed URL, byte ranges and movie bytes remain unchanged.
+    await context.route(
+      (url) => url.hostname === expectedCdn,
+      async (route) => {
+        releaseAt ||= Date.now() + sourceDelayMs;
+        const remaining = releaseAt - Date.now();
+        if (remaining > 0) await new Promise((resolve) => setTimeout(resolve, remaining));
+        await route.continue().catch(() => {});
+      },
+    );
+  }
   const began = Date.now();
   await selectSource(host, site);
+  if (sourceDelayMs > 15000) {
+    await host.locator('#source-form button').filter({ hasText: '检查视频' }).waitFor();
+    await host.waitForTimeout(16000);
+    proof.slowFirstFrame = {
+      delayMs: sourceDelayMs,
+      stillCheckingAfter16s:
+        (await host.locator('#source-form').getAttribute('aria-busy')) === 'true',
+      error: await host.locator('#link-error').textContent(),
+      mediaCommands: commands.length,
+    };
+    assert.equal(
+      proof.slowFirstFrame.stillCheckingAfter16s,
+      true,
+      'Metadata deadline must not cancel a slow first frame',
+    );
+    assert.equal(commands.length, 0, 'The movie must not be published before its first frame');
+  }
   try {
     await host
       .locator('#current-playback')
       .filter({ hasText: '当前：共同播放' })
-      .waitFor({ timeout: 20000 });
+      .waitFor({ state: 'attached', timeout: sourceDelayMs ? 60000 : 20000 });
   } catch (error) {
     proof.resolutionError = await host.locator('#link-error').textContent();
     proof.metadataStatus = metadataStatus;
@@ -490,6 +524,42 @@ try {
     );
     proof.unplayableResultNotPublished = true;
     await host.unroute(metadataRoute);
+    await intercept((route) => route.abort('failed'));
+    await selectSource(host, site);
+    await host.locator('#link-error').filter({ hasText: '无法连接原站播放接口' }).waitFor();
+    assert.equal(commands.length, before);
+    proof.metadataNetworkFailureIsIdentified = true;
+    await host.unroute(metadataRoute);
+
+    const currentVideo = latest.media.source.video;
+    let started!: () => void, releaseFrame!: () => void;
+    const requestedFrame = new Promise<void>((resolve) => {
+      started = resolve;
+    });
+    const heldFrame = new Promise<void>((resolve) => {
+      releaseFrame = resolve;
+    });
+    const matchesVideo = (url: URL) => url.href === currentVideo;
+    await context.route(matchesVideo, async (route) => {
+      started();
+      await heldFrame;
+      await route.continue().catch(() => {});
+    });
+    try {
+      await intercept((route) => route.fulfill({ headers: cors, json: reply() }));
+      await selectSource(host, site);
+      await requestedFrame;
+      await host.locator('#source-form button').filter({ hasText: '检查视频' }).waitFor();
+      await choosePlayback(host, 'file');
+    } finally {
+      releaseFrame();
+      await context.unroute(matchesVideo);
+      await host.unroute(metadataRoute);
+    }
+    assert.equal(await host.locator('#source-form').getAttribute('aria-busy'), 'false');
+    assert.equal(commands.length, before);
+    proof.cancelledFirstFrameKeepsMedia = true;
+    await choosePlayback(host, 'link');
   }
   if (process.env.VS_TEST_NEXT) {
     const unchanged = latest.media.id,
@@ -602,5 +672,8 @@ try {
   await app?.close();
   await mkdir('.local', { recursive: true });
   const evidenceName = xifan ? `xifan-${sourceCode}` : provider;
-  await writeFile(`.local/${evidenceName}-playback-evidence.json`, JSON.stringify(proof, null, 2));
+  await writeFile(
+    process.env.VS_TEST_EVIDENCE || `.local/${evidenceName}-playback-evidence.json`,
+    JSON.stringify(proof, null, 2),
+  );
 }

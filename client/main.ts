@@ -2822,13 +2822,22 @@ async function resolveSiteSource(media: MediaInput, autoplay = false, episodeTit
   button.textContent = '正在识别…';
   $('source-form').setAttribute('aria-busy', 'true');
   $('link-unavailable').hidden = true;
+  let checkingVideo = false;
   try {
-    const signal = AbortSignal.any([controller.signal, AbortSignal.timeout(15000)]);
-    const resolved = await fetchResolvedSite(media, signal);
+    const resolved = await fetchResolvedSite(
+      media,
+      AbortSignal.any([controller.signal, AbortSignal.timeout(15000)]),
+    );
     if (media.provider === 'xifan' && episodeTitle)
       resolved.title = `喜番 · ${episodeTitle}`.slice(0, 200);
     button.textContent = '检查视频…';
-    await checkResolvedVideo(resolved, signal);
+    // Large MP4s may require a tail range for their sample index. Give actual
+    // first-frame loading its own bounded budget after metadata has succeeded.
+    checkingVideo = true;
+    await checkResolvedVideo(
+      resolved,
+      AbortSignal.any([controller.signal, AbortSignal.timeout(60000)]),
+    );
     if (
       sourceResolution !== controller ||
       !connected ||
@@ -2851,10 +2860,17 @@ async function resolveSiteSource(media: MediaInput, autoplay = false, episodeTit
       $('bili-open-browser').hidden = cause.code !== 'BROWSER';
     }
     $('link-error').textContent =
-      cause instanceof Error &&
-      !['SyntaxError', 'ZodError', 'TimeoutError', 'TypeError'].includes(cause.name)
-        ? cause.message
-        : '原站视频源暂未识别，请重试或使用共享画面';
+      cause instanceof Error && cause.name === 'TimeoutError'
+        ? checkingVideo
+          ? '视频地址已识别，但首帧加载超时；可能是视频服务器响应较慢，请重试。当前视频保持不变。'
+          : '原站播放接口响应超时，请重试。当前视频保持不变。'
+        : cause instanceof Error && cause.name === 'TypeError'
+          ? checkingVideo
+            ? '视频地址已识别，但当前网络无法完成视频加载，请重试。当前视频保持不变。'
+            : '无法连接原站播放接口，请检查网络后重试。当前视频保持不变。'
+          : cause instanceof Error && !['SyntaxError', 'ZodError'].includes(cause.name)
+            ? cause.message
+            : '原站视频源暂未识别，请重试或使用共享画面';
     $('link-unavailable').hidden = false;
   } finally {
     if (sourceResolution === controller) cancelSourceResolution(false);
