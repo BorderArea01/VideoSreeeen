@@ -3,7 +3,6 @@ import { themeRegistry } from './themes/catalog';
 import { ThemeController } from './themes/core/controller';
 
 const preferenceKey = 'videosreeeen.appearance';
-const sessionKey = 'videosreeeen.appearance.session';
 function read(kind: 'localStorage' | 'sessionStorage', key: string) {
   try {
     return window[kind].getItem(key);
@@ -23,21 +22,14 @@ function randomTheme() {
   const themes = themeRegistry.list();
   return themes[crypto.getRandomValues(new Uint32Array(1))[0]! % themes.length]!.id;
 }
-const preference = read('localStorage', preferenceKey),
-  session = read('sessionStorage', sessionKey);
-const navigation = performance.getEntriesByType('navigation')[0] as
-  PerformanceNavigationTiming | undefined;
+const preference = read('localStorage', preferenceKey);
 const pageUrl = new URL(location.href),
   requested = pageUrl.searchParams.get('skin');
-let automatic = !themeRegistry.has(preference);
-let initial = themeRegistry.has(preference)
-  ? preference
-  : themeRegistry.has(session) && navigation?.type !== 'navigate'
-    ? session
-    : randomTheme();
+let remembered = themeRegistry.has(preference);
+let initial = themeRegistry.has(preference) ? preference : themeRegistry.defaultId;
 if (themeRegistry.has(requested)) {
   initial = requested;
-  automatic = false;
+  remembered = true;
   write('localStorage', preferenceKey, initial);
   pageUrl.searchParams.delete('skin');
   history.replaceState(history.state, '', pageUrl);
@@ -52,7 +44,7 @@ export function setupAppearance(settings: HTMLElement) {
     <section class="appearance-settings" aria-labelledby="appearance-title">
       <div class="appearance-heading"><h3 id="appearance-title">界面皮肤</h3><span>仅本机</span></div>
       <fieldset class="theme-choices"><legend class="theme-sr-only">选择界面皮肤</legend></fieldset>
-      <div class="appearance-auto"><span id="appearance-status" role="status"></span><button id="appearance-random" type="button" class="text-button" title="重新随机选择皮肤；未手动选择时，新标签页自动分配">随机选择</button></div>
+      <div class="appearance-auto"><span id="appearance-status" role="status"></span><button id="appearance-random" type="button" class="text-button" title="随机换一个并记住；刷新或下次打开不会自动更换">随机换一个</button></div>
     </section>`,
   );
   const choices = settings.querySelector('.theme-choices')!;
@@ -98,9 +90,9 @@ export function setupAppearance(settings: HTMLElement) {
       ? '正在加载主题…'
       : state.failed
         ? '主题暂不可用'
-        : automatic
-          ? '随机分配 · 刷新保持'
-          : '已记住你的选择';
+        : remembered
+          ? '已记住你的选择 · 下次仍使用'
+          : '默认使用原版界面 · 可手动更换';
     const definition = themeRegistry.get(selected) ?? themeRegistry.get(themeRegistry.defaultId)!;
     const name = definition.name + (definition.hint ? ' · ' + definition.hint : '');
     settings
@@ -111,15 +103,15 @@ export function setupAppearance(settings: HTMLElement) {
       entry.title = `切换皮肤 · ${name}`;
       entry.setAttribute('aria-label', `切换皮肤，当前${name}`);
     }
-    if (!state.loading) write('sessionStorage', sessionKey, state.active);
   }
   let selection = 0;
-  function select(id: string, random = false) {
+  function select(id: string) {
     const ticket = ++selection;
-    automatic = random;
-    if (random) write('localStorage', preferenceKey, null);
     void themeController.select(id).then((applied) => {
-      if (applied && ticket === selection && !random) write('localStorage', preferenceKey, id);
+      if (applied && ticket === selection) {
+        write('localStorage', preferenceKey, id);
+        remembered = true;
+      }
       update();
     });
   }
@@ -131,25 +123,24 @@ export function setupAppearance(settings: HTMLElement) {
     )
       select(event.target.value);
   });
-  // Clicking an already selected automatic choice still makes it a preference.
+  // Clicking the default choice also pins it for future visits.
   choices.addEventListener('click', (event) => {
     if (
       event.target instanceof HTMLInputElement &&
       event.target.checked &&
-      automatic &&
       themeRegistry.has(event.target.value)
     )
       select(event.target.value);
   });
   settings
     .querySelector('#appearance-random')!
-    .addEventListener('click', () => select(randomTheme(), true));
+    .addEventListener('click', () => select(randomTheme()));
   themeController.subscribe(update);
   themeRegistry.subscribe(() => {
     const saved = read('localStorage', preferenceKey);
     if (saved && !themeRegistry.has(saved)) {
       write('localStorage', preferenceKey, null);
-      automatic = true;
+      remembered = false;
     }
     renderChoices();
     update();

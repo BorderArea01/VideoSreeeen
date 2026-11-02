@@ -85,7 +85,7 @@ async function select(page: Page, value: string) {
   if (!(await page.locator('#settings-dialog').isVisible()))
     await page.locator('#appearance-button').click();
   await page.locator(`.theme-choice:has(input[value="${value}"])`).click();
-  await waitForTheme(page,value);
+  await waitForTheme(page, value);
   assert.equal(await theme(page), value);
   await page.waitForTimeout(180); // Let the existing 150 ms color transition settle before screenshots.
 }
@@ -146,11 +146,14 @@ try {
     });
   });
   await owner.goto(origin);
+  assert.equal(await theme(owner), 'classic');
+  await select(owner, 'glitch');
+  await close(owner);
   assert.equal(await theme(owner), 'glitch');
   await owner.reload();
   assert.equal(await theme(owner), 'glitch');
-  proof.randomVariantsAndStableReload = true;
-  await select(owner, 'glitch'); // Clicking the already-selected random skin pins it too.
+  proof.defaultClassicAndRememberedReload = true;
+  await select(owner, 'glitch');
   assert.match(await owner.locator('#appearance-status').innerText(), /已记住/);
   await close(owner);
   await glitchContext.addInitScript(() => {
@@ -804,14 +807,19 @@ try {
   assert.equal(await theme(owner), 'glitch');
   proof.keyboardSelection = true;
   await owner.locator('#appearance-random').click();
-  assert.match(await owner.locator('#appearance-status').innerText(), /随机分配/);
-  assert.equal(await owner.evaluate(() => localStorage.getItem('videosreeeen.appearance')), null);
+  await owner.waitForFunction(() =>
+    document.querySelector('#appearance-status')?.textContent?.includes('已记住'),
+  );
+  assert.equal(
+    await owner.evaluate(() => localStorage.getItem('videosreeeen.appearance')),
+    await theme(owner),
+  );
   await close(owner);
   await owner.reload();
   const reloaded = await theme(owner);
   await owner.reload();
   assert.equal(await theme(owner), reloaded);
-  proof.returnToRandom = true;
+  proof.oneTimeRandomRemembered = true;
   const blockedContext = await context(1);
   await blockedContext.addInitScript(() => {
     const get = Storage.prototype.getItem;
