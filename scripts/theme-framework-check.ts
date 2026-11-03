@@ -41,7 +41,11 @@ const proof: any = {
   realPhone: false,
 };
 try {
-  const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
+  const context = await browser.newContext({
+    locale: 'zh-CN',
+    timezoneId: 'Asia/Shanghai',
+    viewport: { width: 1440, height: 1000 },
+  });
   await context.addInitScript((backend) => {
     localStorage.setItem('videosreeeen.appearance', 'classic');
     localStorage.setItem('server', backend);

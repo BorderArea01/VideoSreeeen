@@ -28,7 +28,11 @@ const proof: any = {
   widths: [],
 };
 try {
-  const context = await browser.newContext({ viewport: { width: 1536, height: 1024 } });
+  const context = await browser.newContext({
+    locale: 'zh-CN',
+    timezoneId: 'Asia/Shanghai',
+    viewport: { width: 1536, height: 1024 },
+  });
   await context.addInitScript(() => localStorage.setItem('videosreeeen.appearance', 'glitch'));
   const page = await context.newPage();
   const errors: string[] = [],
@@ -44,7 +48,7 @@ try {
     }),
   );
   await page.goto(origin);
-  await waitForTheme(page,'glitch');
+  await waitForTheme(page, 'glitch');
   await page.locator('#hero-create').click();
   await page.locator('#name-input').fill('天光按钮验收');
   await page.locator('#create-button').click();
@@ -89,13 +93,11 @@ try {
     await page.mouse.move(1, 1);
     await page.waitForTimeout(160);
   }
-  await page.locator('.theme-voice > summary').click();
   await inspect();
   assert.equal(
     await page.locator('#voice-join').evaluate((n) => getComputedStyle(n).backgroundColor),
     'rgb(0, 83, 230)',
   );
-  await page.locator('.theme-voice > summary').click();
   await page.locator('#invite-button').click();
   await inspect();
   await closeInvitation(page);

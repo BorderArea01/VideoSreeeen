@@ -71,7 +71,7 @@ try {
   for (const theme of ['signal', 'glitch', 'classic']) {
     await page.locator('#appearance-button').click();
     await page.locator(`.theme-choice:has(input[value="${theme}"])`).click();
-    await waitForTheme(page,theme);
+    await waitForTheme(page, theme);
     await page.locator('[data-close="settings-dialog"]').first().click();
     await page.evaluate(() => document.fonts.ready);
     for (const width of [1556, 1920, 1200, 1160, 850, 600, 390, 320]) {

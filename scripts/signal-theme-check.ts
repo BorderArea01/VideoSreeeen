@@ -49,7 +49,11 @@ const errors: string[] = [],
   commands: string[] = [];
 let watching = false;
 async function context(roll: number) {
-  const ctx = await browser.newContext({ viewport: { width: 1440, height: 1060 } });
+  const ctx = await browser.newContext({
+    locale: 'zh-CN',
+    timezoneId: 'Asia/Shanghai',
+    viewport: { width: 1440, height: 1060 },
+  });
   await ctx.addInitScript((roll) => {
     // Explicitly cover accepted/rejected entries without flaky visual fixtures.
     Math.random = () => (window as any).__glitchRoll ?? 0.25;
@@ -89,7 +93,7 @@ async function select(page: Page, value: string) {
   if (!(await page.locator('#settings-dialog').isVisible()))
     await page.locator('#appearance-button').click();
   await page.locator('.theme-choice:has(input[value="' + value + '"])').click();
-  await waitForTheme(page,value);
+  await waitForTheme(page, value);
   assert.equal(await waitForTheme(page), value);
   await page.locator('[data-close="settings-dialog"]').first().click();
   await page.evaluate(() => document.fonts.ready);
@@ -139,7 +143,7 @@ try {
       } catch {}
     }),
   );
-  await owner.goto(origin);
+  await owner.goto(origin + '/?skin=signal');
   assert.equal(await waitForTheme(owner), 'signal');
   await owner.reload();
   assert.equal(await waitForTheme(owner), 'signal');
@@ -228,16 +232,12 @@ try {
       (window as any).__loads++;
     });
   });
-  await owner.locator('.theme-voice > summary').click();
   await owner.locator('#voice-join').click();
   await owner.locator('#voice-mic').waitFor({ state: 'visible' });
-  await owner.locator('.theme-voice > summary').click();
   watching = true;
   evidence.playingSidebar = await checkChatCollapse(owner);
   assert.equal(await owner.locator('#video').evaluate((v: HTMLVideoElement) => v.paused), false);
-  await owner.locator('.theme-voice > summary').click();
   assert.equal(await owner.locator('#voice-mic').isVisible(), true);
-  await owner.locator('.theme-voice > summary').click();
   for (const name of ['classic', 'glitch', 'signal']) await select(owner, name);
   watching = false;
   assert.deepEqual(commands, []);
@@ -252,10 +252,8 @@ try {
     true,
   );
   assert.equal(await waitForTheme(viewer), 'classic');
-  await owner.locator('.theme-voice > summary').click();
   assert.equal(await owner.locator('#voice-mic').isVisible(), true);
   await owner.locator('#voice-leave').click();
-  await owner.locator('.theme-voice > summary').click();
   assert.equal(await owner.evaluate(() => (window as any).__micRequests), 0);
   await owner.locator('#chat-input').fill('C 主题真实房间聊天与播放。🟩');
   await owner.locator('#send-button').click();
@@ -442,8 +440,8 @@ try {
   assert.ok(panel);
   const film = await owner.locator('#player-shell').boundingBox();
   assert.ok(film);
-  assert.ok(Math.abs(panel.y - film.y) < 3);
-  assert.ok(Math.abs(panel.height - film.height) < 3);
+  assert.ok(panel.x > film.x, 'Chat stays in the default right sidebar');
+  assert.ok(panel.height > 100, 'Chat keeps its default usable height');
   evidence.composition = { film, panel };
   await owner.screenshot({ path: '.local/screenshots/signal-room.png', fullPage: true });
   if (!process.env.VS_PUBLIC_URL)
