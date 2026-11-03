@@ -71,7 +71,11 @@ const hidden = (p: Page) =>
   p.locator('#player-shell').evaluate((e) => e.classList.contains('player-idle'));
 try {
   for (const theme of ['classic', 'glitch', 'signal']) {
-    const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
+    const context = await browser.newContext({
+      locale: 'zh-CN',
+      timezoneId: 'Asia/Shanghai',
+      viewport: { width: 1440, height: 1000 },
+    });
     if (app)
       await context.route(origin + '/config', async (route) => {
         const r = await route.fetch();
@@ -216,6 +220,14 @@ try {
         await page.mouse.move(430, 330);
         await page.locator('#page-fullscreen').click();
       } else await page.evaluate(() => document.exitFullscreen());
+      // exitFullscreen resolves before the browser dispatches fullscreenchange.
+      // Observe the completed transition before checking the idle controller.
+      await page.waitForFunction(
+        () =>
+          !document.fullscreenElement &&
+          !document.body.classList.contains('page-cinema') &&
+          !document.querySelector('#player-shell')!.classList.contains('player-idle'),
+      );
       assert.equal(await hidden(page), false);
       assert.equal(
         await page.evaluate(

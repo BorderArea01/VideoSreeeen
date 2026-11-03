@@ -13,3 +13,5 @@
 本机从锁文件执行 `npm ci --ignore-scripts --no-audit --no-fund` 后，`npm run verify` 通过（133 项单元测试、完整格式检查、构建、Worker 类型和 dry-run）。`test:theme-framework` 的 24 次切换与资源释放、16 组布局检查、完整 `test:appearance`、`test:signal-theme` 均通过：真实双端影片不重载、语音接收和聊天保留；紫电逐帧比较 31 次，视频像素最大差异为 0。动态切片采集多个数据包帧，保留文字、图标、反色和稀疏行数断言。设置、画面与窄屏截图已目视核对。公共基础层补齐聊天输入留白与两行空间，并让链接图标不截住输入点击、始终居中。
 
 本地证据见 `.local/theme-layout-local.json`、`.local/theme-framework-evidence.json`、`.local/appearance-evidence.json`、`.local/signal-theme-evidence.json` 和 `.local/unified-verify.log`。仓库记录实现与本地验收；远端 CI 与合并状态以本次 PR 的最新 head SHA 检查为准，正式发布和静态资源哈希另在部署完成后核对，不用本机结果替代云端或真机结论。
+
+补充 `test:fullscreen-focus` 六组回归通过，三主题 × 网页 / 系统全屏均保留约一秒隐藏、被动焦点不唤醒、真实键盘操作可见、无媒体重载。测试等待浏览器完成 `fullscreenchange` 后再检查退出状态，避免将 `exitFullscreen()` Promise 完成误当作事件已分发；断言保留，未修改运行时隐藏逻辑。对应原始记录为 `.local/fullscreen-focus-evidence.json`。本机 Worker 集成也通过；PR 首次提交 `4e37437` 的 Linux `verify` 成功，补充测试后的最新 head 仍需单独核验。
