@@ -1,5 +1,7 @@
 # 0.4.0 验证记录
 
+2026-11-03 清理扩展主题默认装饰残留、对齐邀请入口、重整天光顶部材质，并统一按钮和聊天输入框边缘断层，见[主题材质修订](verification-theme-material-fixes.md)。
+
 2026-11-03 所有主题统一使用原版布局，删除主题专用控件搬移与网格，见[统一布局验收](verification-unified-theme-layout.md)。
 
 2026-11-02 默认使用原版暖夜、保存手动及主动随机结果，不再随新导航自动随机，见[主题偏好验收](verification-theme-preference.md)。

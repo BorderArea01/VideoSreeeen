@@ -288,14 +288,16 @@ h1 {
   border-radius: 50%;
   background: radial-gradient(circle at 35% 28%, #e7b39a90, #8c5c5a55 55%, #30243110 70%);
   box-shadow: 0 0 110px #b8775540;
-  opacity: 0.7;
+  opacity: var(--welcome-orb-opacity, 0.7);
 }
 .scene-lines {
   position: absolute;
   inset: 0;
-  background:
+  background: var(
+    --welcome-lines-background,
     linear-gradient(80deg, transparent 62%, #17151f80 62.1%, transparent 63%),
-    linear-gradient(0deg, #11121b80 10%, transparent 10.5%);
+    linear-gradient(0deg, #11121b80 10%, transparent 10.5%)
+  );
   z-index: 1;
 }
 .scene-lines:after {
@@ -305,7 +307,7 @@ h1 {
   right: 2%;
   width: 34%;
   height: 35%;
-  background: #1b1926;
+  background: var(--welcome-silhouette-background, #1b1926);
   clip-path: polygon(
     0 100%,
     0 65%,
@@ -1081,9 +1083,10 @@ input[type='range'] {
   align-items: center;
   gap: 7px;
   width: 100%;
-  border-top: 1px solid #302b35;
+  border: 1px solid var(--line);
   margin-top: 10px;
-  padding-top: 14px;
+  padding: 10px 12px;
+  border-radius: 6px;
   font-size: 10px;
   color: #a797a6;
 }
