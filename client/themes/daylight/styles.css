@@ -1,4 +1,4 @@
-/* A · Daylight Rupture: proportions and material follow the selected reference. */
+/* Daylight material only. Application layout belongs to the classic base. */
 :root[data-theme='glitch'] {
   color-scheme: only light;
   --bg: #1165ba;
@@ -35,165 +35,70 @@
 }
 :root[data-theme='glitch'] #app {
   position: relative;
-  z-index: 1;
 }
 :root[data-theme='glitch'] .topbar {
   position: relative;
-  max-width: 1700px;
-  margin: auto;
-  height: 204px;
-  padding: 0 5.2% 24px;
-  align-items: flex-end;
-  justify-content: flex-start;
   border: 0;
-  gap: 25px;
   background: none;
 }
 :root[data-theme='glitch'] .brand {
   position: relative;
   isolation: isolate;
-  padding: 9px 16px 11px;
-  margin-left: -16px;
-  transform: translateX(14px);
-  font-size: clamp(34px, 3.5vw, 57px);
   font-weight: 800;
-  letter-spacing: -2.6px;
   color: #072b58;
   text-shadow: 0 1px 0 #ffffff;
-  gap: 0;
-  line-height: 1;
 }
 :root[data-theme='glitch'] .brand::before {
   content: '';
   position: absolute;
-  inset: 0 -12px 0 0;
+  inset: -3px -8px;
   z-index: -1;
   pointer-events: none;
   background: linear-gradient(90deg, #f8fbfff5 0%, #f8fbffe8 84%, #f8fbff00 100%);
   border-left: 3px solid #0c4daf;
   border-radius: 3px 0 0 3px;
 }
-:root[data-theme='glitch'] .brand-mark {
-  display: none;
-}
 :root[data-theme='glitch'] .brand-light {
   font-weight: 800;
   color: inherit;
 }
-:root[data-theme='glitch'] .brand small {
-  display: none;
-}
 :root[data-theme='glitch'] .room-heading {
-  margin: 0;
-  padding-bottom: 1px;
-  min-width: 0;
-  max-width: 300px;
-  gap: 10px;
   color: #173c79;
 }
-:root[data-theme='glitch'] .room-heading .eyebrow {
-  display: none;
-}
 :root[data-theme='glitch'] .room-heading h1 {
-  max-width: 210px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 13px;
   font-weight: 550;
-  letter-spacing: 0.5px;
-  margin: 0 0 5px;
 }
 :root[data-theme='glitch'] .room-heading p {
   color: #28518b;
-  font-size: 10px;
-  margin: 0;
-}
-:root[data-theme='glitch'] .heading-actions {
-  gap: 0;
-}
-:root[data-theme='glitch'] .heading-actions .icon-button {
-  width: 25px;
-  height: 25px;
 }
 :root[data-theme='glitch'] .top-actions {
-  position: absolute;
-  right: 5.2%;
-  top: 14px;
-  gap: 9px;
-  padding: 5px 8px;
   background: #f3f9ffba;
   border-radius: 3px;
 }
-:root[data-theme='glitch'] .top-actions :is(#room-button, #platform, #web-entry) {
-  display: none;
-}
 :root[data-theme='glitch'] .connection {
-  font-size: 10px;
   color: #1c4e8a;
 }
-:root[data-theme='glitch'] .workspace {
-  max-width: 1700px;
-  margin: auto;
-  padding: 0 5.2% 30px;
-  display: grid;
-  grid-template-columns: minmax(0, 2.5fr) minmax(300px, 1fr);
-  gap: 20px;
-  align-items: stretch;
-}
-:root[data-theme='glitch'] .screen-column {
-  display: contents;
-}
-:root[data-theme='glitch'] .sidebar {
-  display: contents;
-}
-:root[data-theme='glitch'] .sidebar-foot {
-  display: none;
-}
 :root[data-theme='glitch'] .player-shell {
-  grid-column: 1;
-  grid-row: 1;
-  min-width: 0;
-  z-index: 6;
   border: 1px solid #f4f8ff;
   border-radius: 15px;
-  overflow: clip;
   box-shadow: 0 2px 14px #143e5229;
   background: #051626;
 }
 :root[data-theme='glitch'] .stage {
-  aspect-ratio: 2.14;
-  width: 100%;
-  height: auto;
   border: 0;
   border-radius: 0;
 }
-:root[data-theme='glitch'] .stage.lobby-stage {
-  min-height: 360px;
-}
 :root[data-theme='glitch'] .transport {
-  display: flex;
   color-scheme: dark;
   --text: #f1f7ff;
   --muted: #bed0e8;
   --line: #cce4ff38;
   --orange: #d4edff;
   --panel: #16354d;
-  min-height: 50px;
   color: #f1f7ff;
   background: #143248ed;
   border: 0;
   border-radius: 0;
-}
-:root[data-theme='glitch'] .transport-primary {
-  order: 0;
-}
-:root[data-theme='glitch'] .transport #seek-track {
-  order: 1;
-  flex: 1;
-}
-:root[data-theme='glitch'] .transport-tools {
-  order: 2;
 }
 :root[data-theme='glitch'] .transport :is(.icon-button, .play-button, .duration, .position) {
   color: #f1f7ff;
@@ -224,86 +129,29 @@
   clip-path: none;
 }
 :root[data-theme='glitch'] .chat-panel {
-  grid-column: 2;
-  grid-row: 1;
-  height: auto;
-  min-height: 0;
-  flex: none;
   border-radius: 14px;
-  overflow: visible;
-  padding: 0 4px 0 0;
 }
 :root[data-theme='glitch'] .chat-heading {
-  padding: 16px 18px 12px 24px;
   border-bottom: 1px solid #bccbe24d;
-  min-height: 66px;
-  gap: 8px;
 }
 :root[data-theme='glitch'] .chat-heading > div {
-  font-size: 18px;
   font-weight: 700;
 }
-:root[data-theme='glitch'] .chat-heading > div:first-child :is(svg, .tiny-dot) {
-  display: none;
-}
 :root[data-theme='glitch'] #sidebar-invite {
-  flex: 0 0 auto;
-  font-size: 12px;
   font-weight: 650;
-  width: auto;
-  margin: 0;
-  padding: 10px 12px;
-  gap: 7px;
-}
-:root[data-theme='glitch'] .chat-messages {
-  padding: 19px 27px 12px 24px;
-  scrollbar-color: #a7c1e1 transparent;
 }
 :root[data-theme='glitch'] .message,
 :root[data-theme='glitch'] .message.mine {
   position: relative;
-  display: block;
-  align-items: flex-start;
-  padding-left: 50px;
-  margin-bottom: 21px;
-  min-height: 44px;
-}
-:root[data-theme='glitch'] .message::before {
-  content: attr(data-initial);
-  position: absolute;
-  left: 0;
-  top: 0;
-  width: 39px;
-  height: 39px;
-  border-radius: 50%;
-  display: grid;
-  place-items: center;
-  color: #154277;
-  background: linear-gradient(145deg, #c4e3f1, #81b6cd 48%, #3b779d);
-  box-shadow: inset 0 0 0 1px #fff9;
-  font-size: 15px;
-}
-:root[data-theme='glitch'] .message:nth-child(3n + 2)::before {
-  background: linear-gradient(135deg, #e6d7c5, #85b2bf);
-}
-:root[data-theme='glitch'] .message:nth-child(3n)::before {
-  background: linear-gradient(135deg, #43536a, #92adc2);
-  color: #fff;
 }
 :root[data-theme='glitch'] .message-meta {
   color: #4a6695;
-  font-size: 11px;
-  margin: 0 0 5px;
 }
 :root[data-theme='glitch'] .bubble,
 :root[data-theme='glitch'] .mine .bubble {
   background: transparent;
   border: 0;
-  padding: 0;
   color: #0a2455;
-  font-size: 14px;
-  line-height: 1.65;
-  max-width: 100%;
   border-radius: 0;
 }
 :root[data-theme='glitch'] .bubble img {
@@ -311,190 +159,48 @@
 }
 :root[data-theme='glitch'] .chat-compose {
   position: relative;
-  padding: 12px 17px 19px 22px;
   border: 0;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 64px;
-  gap: 8px;
 }
 :root[data-theme='glitch'] .chat-compose textarea {
-  width: 100%;
-  height: 43px;
-  min-height: 43px;
-  padding: 11px 58px 9px 12px;
   border: 1px solid #c1cfe6;
   border-radius: 7px;
   color: #163768;
-  font-size: 12px;
   background: #fbfcffb3;
-  line-height: 20px;
-}
-:root[data-theme='glitch'] .compose-actions {
-  display: contents;
-}
-:root[data-theme='glitch'] .compose-actions > div {
-  position: absolute;
-  right: 91px;
-  top: 20px;
-  gap: 0;
-}
-:root[data-theme='glitch'] .compose-actions .icon-button {
-  width: 24px;
-  height: 25px;
 }
 :root[data-theme='glitch'] .send-button {
-  width: 64px;
-  height: 43px;
-  font-size: 13px;
   font-weight: 650;
 }
-:root[data-theme='glitch'] .send-button svg {
-  display: none;
-}
-:root[data-theme='glitch'] .send-button::after {
-  content: '发送';
-}
 :root[data-theme='glitch'] .source-card {
-  grid-column: 1 / -1;
-  grid-row: 2;
-  margin: 0;
-  padding: 18px 20px;
-  display: grid;
-  grid-template-columns: minmax(365px, 1.05fr) minmax(0, 1.5fr) 150px;
-  gap: 16px;
-  align-items: center;
   border-radius: 6px;
-  min-height: 96px;
-}
-:root[data-theme='glitch'] .source-card > .section-heading {
-  display: none;
 }
 :root[data-theme='glitch'] .playback-tabs {
-  grid-column: 1;
-  grid-row: 1;
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 6px;
-  margin: 0;
   border: 0;
-  padding-right: 16px;
   border-right: 1px solid #a8bbd87d;
 }
 :root[data-theme='glitch'] .playback-tabs button {
-  font-size: 13px;
   font-weight: 650;
-  padding: 13px 10px;
-  min-height: 48px;
-  white-space: nowrap;
-  gap: 9px;
-  justify-content: center;
-}
-:root[data-theme='glitch'] .playback-tabs button small {
-  display: none;
-}
-:root[data-theme='glitch'] .playback-tabs button > svg {
-  width: 23px;
-  height: 23px;
-}
-:root[data-theme='glitch'] .playback-tabs #choose-link > svg {
-  display: none;
-}
-:root[data-theme='glitch'] .playback-tabs #choose-link::before {
-  content: '';
-  width: 18px;
-  height: 20px;
-  background: currentColor;
-  clip-path: polygon(0 0, 100% 50%, 0 100%);
-}
-:root[data-theme='glitch'] .playback-choice {
-  grid-column: 2;
-  grid-row: 1;
-  padding: 0;
-  min-width: 0;
-}
-:root[data-theme='glitch'] .playback-copy {
-  display: none;
-}
-:root[data-theme='glitch'] .source-form {
-  margin: 0;
-  display: flex;
-  gap: 14px;
-  align-items: center;
 }
 :root[data-theme='glitch'] .source-form input {
-  min-width: 0;
-  flex: 1;
-  height: 48px;
   background: #fafdffaf;
   color: #26477b;
   border: 1px solid #c2d4ef;
   border-radius: 6px;
-  padding-left: 38px;
-  font-size: 14px;
 }
 :root[data-theme='glitch'] .source-form .input-icon {
-  top: 13px;
   color: #758eb7;
 }
 :root[data-theme='glitch'] .source-form .button {
-  min-height: 52px;
-  min-width: 190px;
-  padding: 12px 24px;
-  gap: 13px;
-  font-size: 19px;
-  letter-spacing: 0.2px;
   font-weight: 650;
 }
 :root[data-theme='glitch'] #source-form .button {
   position: relative;
   isolation: isolate;
-  font-size: 18px;
 }
 :root[data-theme='glitch'] .active-source {
-  grid-column: 1 / -1;
-  margin: 0;
-  padding: 8px 0 0;
   border-color: #c1d0e5;
-  font-size: 11px;
 }
 :root[data-theme='glitch'] .source-actions .subtle {
   color: #5d78a1;
-}
-:root[data-theme='glitch'] .source-card:has(.active-source:not([hidden])) {
-  row-gap: 9px;
-}
-:root[data-theme='glitch'] .theme-voice .voice-card {
-  position: absolute;
-  top: calc(100% + 12px);
-  right: 0;
-  width: 320px;
-  z-index: 30;
-  padding: 20px;
-  border-radius: 9px;
-  box-shadow: 0 10px 40px #123b7860;
-}
-:root[data-theme='glitch'] .theme-utilities .cache-options {
-  margin: 0;
-  min-width: 200px;
-  border-radius: 4px;
-  max-width: 620px;
-}
-:root[data-theme='glitch']
-  .workspace:has(#choose-link[aria-selected='false'])
-  .theme-utilities
-  .cache-options {
-  display: none;
-}
-:root[data-theme='glitch'] .theme-utilities .cache-options > summary {
-  padding: 9px 12px;
-}
-:root[data-theme='glitch'] .theme-utilities .screen-foot {
-  margin: 0 0 0 auto;
-  padding: 10px 12px;
-  color: #204c85;
-  background: #f5f9ffd9;
-  border-radius: 4px;
-  gap: 20px;
 }
 :root[data-theme='glitch'] :is(.cache-options[open], .cache-location-row) {
   background: #f1f6ff;
@@ -583,12 +289,7 @@
   color: #0f3f83;
 }
 :root[data-theme='glitch'] .welcome h2 {
-  font-size: 35px;
   font-weight: 650;
-  letter-spacing: -1px;
-}
-:root[data-theme='glitch'] :is(.scene-orb, .scene-lines) {
-  display: none;
 }
 :root[data-theme='glitch'] :is(.welcome-text p, .welcome .tag, .welcome .text-button) {
   color: #285b92;
@@ -602,7 +303,6 @@
 }
 :root[data-theme='glitch'] dialog::backdrop {
   background: #062b605e;
-  backdrop-filter: blur(4px);
 }
 :root[data-theme='glitch'] .room-tabs {
   background: #e1edfd;
@@ -617,8 +317,6 @@
   color: #204777;
   border-color: #d4e8ff4d;
   background: transparent;
-  padding-block: 12px;
-  font-size: 9px;
 }
 :root[data-theme='glitch'] .app-foot b {
   border-color: #7da2ce;
@@ -634,315 +332,17 @@
 }
 :root[data-theme='glitch'] .page-cinema .player-shell,
 :root[data-theme='glitch'] .player-shell:fullscreen {
-  position: fixed;
-  inset: 0;
-  z-index: 80;
   border: 0;
   border-radius: 0;
-  overflow: hidden;
-}
-:root[data-theme='glitch'] .page-cinema .stage,
-:root[data-theme='glitch'] .player-shell:fullscreen .stage {
-  aspect-ratio: auto;
-  height: auto;
-}
-:root[data-theme='glitch'] .page-cinema #sidebar {
-  display: flex;
-}
-:root[data-theme='glitch'] .page-cinema .chat-panel {
-  height: auto;
-  min-height: 300px;
-}
-@media (min-width: 1200px) {
-  :root[data-theme='glitch'] #source-form {
-    padding-right: 55px;
-  }
-  :root[data-theme='glitch'] #source-form .button {
-    min-width: 220px;
-    min-height: 60px;
-  }
-  :root[data-theme='glitch'] #source-form .button::after {
-    content: '';
-    width: 21px;
-    height: 21px;
-    flex-shrink: 0;
-    order: -1;
-    background: currentColor;
-    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='none' stroke='black' stroke-width='2.4' d='m10 13 4-4m-6 7-1 1a4 4 0 0 1-6-6l4-4a4 4 0 0 1 6 0m2 10a4 4 0 0 0 6 0l4-4a4 4 0 0 0-6-6l-1 1'/%3E%3C/svg%3E")
-      center / contain no-repeat;
-  }
-  :root[data-theme='glitch'] .transport #seek-track {
-    grid-column: auto;
-  }
-}
-@media (max-width: 1199px) {
-  :root[data-theme='glitch'] .topbar {
-    height: 170px;
-    padding-bottom: 20px;
-    gap: 15px;
-  }
-  :root[data-theme='glitch'] .brand {
-    transform: none;
-    font-size: 40px;
-  }
-  :root[data-theme='glitch'] .room-heading {
-    max-width: 180px;
-    margin-right: 180px;
-  }
-  :root[data-theme='glitch'] .workspace {
-    grid-template-columns: minmax(0, 2fr) minmax(270px, 1fr);
-    gap: 16px;
-  }
-  :root[data-theme='glitch'] .stage {
-    aspect-ratio: 1.78;
-  }
-  :root[data-theme='glitch'] .source-card {
-    grid-template-columns: minmax(290px, 1fr) minmax(0, 1.25fr) 115px;
-    padding: 16px;
-    gap: 10px;
-  }
-  :root[data-theme='glitch'] .playback-tabs {
-    padding-right: 10px;
-  }
-  :root[data-theme='glitch'] .playback-tabs button {
-    padding: 12px 5px;
-    gap: 6px;
-    font-size: 11px;
-  }
-  :root[data-theme='glitch'] .source-form {
-    gap: 8px;
-  }
-  :root[data-theme='glitch'] .source-form .button {
-    min-width: 105px;
-    min-height: 48px;
-    padding: 12px;
-  }
-  :root[data-theme='glitch'] #source-form .button {
-    font-size: 13px;
-  }
-  :root[data-theme='glitch'] .chat-heading {
-    padding-inline: 17px;
-  }
-  :root[data-theme='glitch'] .chat-heading > div {
-    font-size: 15px;
-  }
-  :root[data-theme='glitch'] #sidebar-invite {
-    padding: 8px;
-    font-size: 11px;
-  }
-  :root[data-theme='glitch'] .chat-messages {
-    padding: 15px 22px 10px 17px;
-  }
-  :root[data-theme='glitch'] .message {
-    padding-left: 43px;
-    margin-bottom: 16px;
-  }
-  :root[data-theme='glitch'] .message::before {
-    width: 33px;
-    height: 33px;
-  }
 }
 @media (max-width: 850px) {
-  :root[data-theme='glitch'] .topbar {
-    height: 150px;
-    padding: 0 24px 22px;
-  }
-  :root[data-theme='glitch'] .brand {
-    font-size: 38px;
-  }
-  :root[data-theme='glitch'] .room-heading {
-    max-width: 140px;
-    margin: 0;
-  }
-  :root[data-theme='glitch'] .heading-actions {
-    display: none;
-  }
-  :root[data-theme='glitch'] .workspace {
-    padding: 0 22px 25px;
-    grid-template-columns: minmax(0, 1fr);
-  }
-  :root[data-theme='glitch'] .player-shell {
-    grid-row: 1;
-    grid-column: 1;
-  }
-  :root[data-theme='glitch'] .source-card {
-    grid-row: 2;
-    grid-column: 1;
-    grid-template-columns: minmax(0, 1fr) 120px;
-  }
   :root[data-theme='glitch'] .playback-tabs {
-    grid-column: 1 / -1;
-    grid-row: 1;
-    padding-right: 0;
     border-right: 0;
-  }
-  :root[data-theme='glitch'] .playback-choice {
-    grid-column: 1;
-    grid-row: 2;
-  }
-  :root[data-theme='glitch'] .chat-panel {
-    grid-row: 3;
-    grid-column: 1;
-    height: 430px;
-  }
-  :root[data-theme='glitch'] .theme-utilities .screen-foot {
-    width: 100%;
-    margin: 0;
-    justify-content: space-between;
   }
 }
 @media (max-width: 540px) {
-  :root[data-theme='glitch'] .transport {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    gap: 2px 6px;
-    padding: 3px 8px 6px;
-  }
-  :root[data-theme='glitch'] .transport #seek-track {
-    order: 0;
-    grid-column: 1 / -1;
-  }
-  :root[data-theme='glitch'] .transport-primary {
-    order: 1;
-    gap: 3px;
-  }
-  :root[data-theme='glitch'] .transport-tools {
-    order: 2;
-    gap: 2px;
-  }
-  :root[data-theme='glitch'] .transport .icon-button {
-    width: 24px;
-    flex-basis: 24px;
-  }
-  :root[data-theme='glitch'] .transport .player-volume {
-    flex-basis: 24px;
-  }
-  :root[data-theme='glitch'] .transport .player-time {
-    font-size: 9px;
-  }
-  :root[data-theme='glitch'] .topbar {
-    height: 145px;
-    padding: 0 16px 22px;
-    display: block;
-  }
-  :root[data-theme='glitch'] .brand {
-    display: inline-flex;
-    position: absolute;
-    top: 66px;
-    padding: 6px 10px;
-    margin-left: 0;
-    left: 16px;
-    font-size: 34px;
-    letter-spacing: -1.9px;
-  }
-  :root[data-theme='glitch'] .top-actions {
-    top: 12px;
-    right: 14px;
-    gap: 3px;
-    padding: 2px;
-  }
-  :root[data-theme='glitch'] .top-actions .connection {
-    display: none;
-  }
-  :root[data-theme='glitch'] .room-heading {
-    position: absolute;
-    top: 116px;
-    left: 17px;
-    max-width: 260px;
-    width: 260px;
-  }
-  :root[data-theme='glitch'] .room-heading h1 {
-    display: inline;
-    font-size: 10px;
-    margin-right: 10px;
-  }
-  :root[data-theme='glitch'] .room-heading p {
-    display: inline;
-    font-size: 9px;
-  }
-  :root[data-theme='glitch'] .workspace {
-    padding: 0 14px 24px;
-    gap: 14px;
-  }
-  :root[data-theme='glitch'] .stage {
-    aspect-ratio: 1.78;
-  }
-  :root[data-theme='glitch'] .stage.lobby-stage {
-    min-height: 310px;
-  }
   :root[data-theme='glitch'] .player-shell {
     border-radius: 10px;
-  }
-  :root[data-theme='glitch'] .source-card {
-    padding: 12px;
-    grid-template-columns: minmax(0, 1fr) 44px;
-    gap: 10px;
-    min-height: 0;
-  }
-  :root[data-theme='glitch'] .playback-tabs {
-    gap: 5px;
-  }
-  :root[data-theme='glitch'] .playback-tabs button {
-    min-height: 42px;
-    padding: 9px 4px;
-    font-size: 11px;
-    gap: 5px;
-  }
-  :root[data-theme='glitch'] .playback-tabs button > svg {
-    display: block;
-    width: 16px;
-    height: 16px;
-  }
-  :root[data-theme='glitch'] .playback-tabs #choose-link::before {
-    width: 11px;
-    height: 13px;
-  }
-  :root[data-theme='glitch'] .source-form {
-    gap: 7px;
-    flex-wrap: nowrap;
-  }
-  :root[data-theme='glitch'] .source-form input {
-    height: 42px;
-    font-size: 11px;
-    padding-left: 28px;
-  }
-  :root[data-theme='glitch'] .source-form .input-icon {
-    left: 8px;
-    top: 11px;
-  }
-  :root[data-theme='glitch'] .source-form .input-icon svg {
-    width: 14px;
-  }
-  :root[data-theme='glitch'] .source-form .button {
-    min-width: 66px;
-    min-height: 42px;
-    padding: 8px;
-  }
-  :root[data-theme='glitch'] #source-form .button {
-    font-size: 10px;
-  }
-  :root[data-theme='glitch'] .theme-voice .voice-card {
-    width: min(310px, calc(100vw - 40px));
-    right: -2px;
-  }
-  :root[data-theme='glitch'] .theme-utilities .cache-options {
-    min-width: 170px;
-    flex: 1;
-  }
-  :root[data-theme='glitch'] .chat-panel {
-    height: 420px;
-  }
-  :root[data-theme='glitch'] .chat-heading {
-    padding: 13px 16px;
-  }
-  :root[data-theme='glitch'] .app-foot {
-    padding-inline: 16px;
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  :root[data-theme='glitch'] .theme-voice > summary,
-  :root[data-theme='glitch'] .accent {
-    transition: none;
   }
 }
 @media (forced-colors: active) {
@@ -953,17 +353,5 @@
   }
   :root[data-theme='glitch'] :is(.source-card, .members-card, .chat-panel, .cache-options)::before {
     display: none;
-  }
-  :root[data-theme='glitch']
-    :is(
-      .source-card,
-      .members-card,
-      .chat-panel,
-      .cache-options,
-      .top-actions,
-      .theme-members > summary
-    ) {
-    background: Canvas;
-    border: 1px solid CanvasText;
   }
 }

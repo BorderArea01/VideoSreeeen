@@ -101,11 +101,7 @@ export class SignalScene {
       (event) => {
         if (this.suspended() || !(event.target instanceof Element) || event.pointerType === 'touch')
           return;
-        if (
-          event.target.closest(
-            '.player-shell, dialog, input, textarea, select, .theme-voice[open], .theme-members[open]',
-          )
-        ) {
+        if (event.target.closest('.player-shell, dialog, input, textarea, select, details[open]')) {
           this.hover.reset();
           return;
         }
@@ -167,7 +163,7 @@ export class SignalScene {
   private burst(el: HTMLElement, variation?: GlitchVariation) {
     if (this.suspended() || this.timers.has(el) || el.matches(':disabled') || !el.checkVisibility())
       return;
-    if (el.closest('.player-shell, .theme-voice[open], .theme-members[open]')) return;
+    if (el.closest('.player-shell, details[open]')) return;
     if (el !== this.field) {
       const film = document.getElementById('player-shell')?.getBoundingClientRect(),
         rect = el.getBoundingClientRect();

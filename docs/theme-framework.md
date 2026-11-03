@@ -6,7 +6,7 @@
 client/themes/
   classic/                 默认基础样式、默认清单
   core/                    types / registry / controller / scope / picker
-  shared/                  通用面板布局、结构样式、悬停抽样
+  shared/                  通用悬停抽样等纯视觉能力
   daylight/                天光：manifest / index / styles / controls / scene / fracture / assets
   signal/                  紫电：manifest / index / styles / motion / fonts / scene / assets
   catalog.ts               自动发现清单，注册已安装主题
@@ -22,7 +22,7 @@ client/themes/
 
 `ThemeScope` 统一持有事件监听、观察器、计时器、动画帧、装饰节点、样式和临时属性。卸载幂等，先中止事件并停止观察 / 定时 / 绘制，再执行自定义释放，恢复临时属性和删除装饰节点；一次释放失败不跳过后续释放。图片 `onload` 或第三方效果等附加资源使用 `defer()` 登记。异步回调使用 `guard()` 或检查 `signal`，不能在卸载后重新挂接资源。
 
-公共 `PanelLayout` 通过锚点临时移动现有控件，卸载时放回原位置并删除锚点。它不包含主题 ID 判断，通过 `moveHeading` 等明确布局选项供模块选用；不移动或重建音视频元素，也不获取麦克风、改缓存、操作房间。主题专用规则限定在自己的 `data-theme` / 自有装饰节点内，借用的应用节点不归主题所有。
+所有主题共用默认布局；扩展主题不搬动标题、缓存、成员、语音或邀请控件，不另建布局容器或主题专属弹层。视觉规则限定在自己的 `data-theme` / 自有装饰节点内。布局、宽高、控件次序与响应式规则只归默认基础样式所有。原 `PanelLayout` 和 `panels.css` 已删除。
 
 运行时维护示例，适用于应用内受信的开发代码：
 

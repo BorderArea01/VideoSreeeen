@@ -728,7 +728,7 @@ input[type='range'] {
   margin: 18px 0 12px;
 }
 .source-form input {
-  padding: 12px 10px 12px 37px;
+  padding: 12px 10px 12px 39px;
   width: 100%;
   min-width: 0;
   background: #121217;
@@ -744,7 +744,11 @@ input[type='range'] {
 .input-icon {
   position: absolute;
   left: 11px;
-  top: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  pointer-events: none;
   color: #6c6672;
 }
 .source-form .button {
@@ -1177,8 +1181,8 @@ input[type='range'] {
   font-size: 11px;
   color: #e6dce5;
   line-height: 1.6;
-  padding: 0;
-  min-height: 38px;
+  padding: 12px;
+  min-height: calc(2lh + 28px);
 }
 .chat-compose textarea::placeholder {
   color: #716275;
@@ -1945,7 +1949,7 @@ button {
     display: none;
   }
   .source-form input {
-    padding-left: 32px;
+    padding-left: 37px;
     font-size: 10px;
   }
   .input-icon {

@@ -22,6 +22,7 @@
     "test:appearance": "tsx scripts/appearance-check.ts",
     "test:theme-framework": "tsx scripts/theme-framework-check.ts",
     "test:theme-preference": "tsx scripts/theme-preference-check.ts",
+    "test:theme-layout": "tsx scripts/theme-layout-check.ts",
     "test:daylight-controls": "tsx scripts/daylight-controls-check.ts",
     "test:signal-theme": "tsx scripts/signal-theme-check.ts",
     "test:onboarding": "tsx scripts/onboarding-check.ts",

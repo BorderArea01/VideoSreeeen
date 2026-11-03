@@ -73,36 +73,11 @@ export async function checkRoomPopovers(page: Page) {
     });
     assert.deepEqual(failures, [], 'Other controls paint over the open popover');
   }
-  await page.locator('.theme-voice > summary').click();
-  await page.locator('#voice-panel').scrollIntoViewIfNeeded();
-  await foreground('#voice-panel');
-  await page.screenshot({
-    path:
-      '.local/screenshots/sidebar-voice-' +
-      (await page.locator('html').getAttribute('data-theme')) +
-      '-' +
-      page.viewportSize()!.width +
-      '.png',
-    fullPage: true,
-  });
-  // This trigger can sit beneath the open voice card; keyboard activation tests
-  // mutual exclusion without pretending a pointer can click through a popup.
-  await page.locator('.theme-members > summary').focus();
-  await page.keyboard.press('Enter');
-  await page.waitForFunction(
-    () => !document.querySelector<HTMLDetailsElement>('.theme-voice')!.open,
-  );
-  await page.locator('.theme-members > .members-card').scrollIntoViewIfNeeded();
-  await foreground('.theme-members > .members-card');
-  await page.keyboard.press('Escape');
-  assert.equal(
-    await page.locator('.theme-members').evaluate((el: HTMLDetailsElement) => el.open),
-    false,
-  );
-  await page.locator('.theme-voice > summary').click();
-  await page.locator('#chat-input').click();
-  assert.equal(
-    await page.locator('.theme-voice').evaluate((el: HTMLDetailsElement) => el.open),
-    false,
-  );
+  // Themes no longer create member/voice popovers. Both original cards remain
+  // in the default sidebar and must stay visible and unobstructed.
+  for (const selector of ['#voice-panel', '#sidebar > .members-card:not(.voice-card)']) {
+    await page.locator(selector).scrollIntoViewIfNeeded();
+    await foreground(selector);
+  }
+  assert.equal(await page.locator('.theme-voice,.theme-members,.theme-utilities').count(), 0);
 }

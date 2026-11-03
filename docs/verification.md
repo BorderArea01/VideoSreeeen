@@ -1,5 +1,7 @@
 # 0.4.0 验证记录
 
+2026-11-03 所有主题统一使用原版布局，删除主题专用控件搬移与网格，见[统一布局验收](verification-unified-theme-layout.md)。
+
 2026-11-02 默认使用原版暖夜、保存手动及主动随机结果，不再随新导航自动随机，见[主题偏好验收](verification-theme-preference.md)。
 
 2026-11-01 全屏按钮被动焦点恢复引发底栏弹出、键盘状态停留与无位移鼠标唤醒修订，见[全屏焦点验收](verification-fullscreen-focus.md)。

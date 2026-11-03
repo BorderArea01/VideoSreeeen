@@ -285,7 +285,7 @@ export class GlitchScene {
     });
     const protectedRects = Array.from(
       document.querySelectorAll<HTMLElement>(
-        '.player-shell, dialog[open], .theme-voice[open] > .voice-card, .theme-members[open] > .members-card, input:not([type="range"]), textarea, select, .bubble, .message-meta',
+        '.player-shell, dialog[open], details[open], input:not([type="range"]), textarea, select, .bubble, .message-meta',
       ),
     )
       .filter((e) => e.checkVisibility())

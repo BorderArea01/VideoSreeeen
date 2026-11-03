@@ -272,8 +272,6 @@ test('theme ownership has no legacy root entries or imports into another optiona
     readFileSync('client/appearance.ts', 'utf8'),
     /=== ['"](?:glitch|signal)['"]|new (?:GlitchScene|SignalScene)/,
   );
-  assert.doesNotMatch(
-    readFileSync('client/themes/shared/panels.css', 'utf8'),
-    /data-theme=['"](?:glitch|signal)/,
-  );
+  assert.equal(existsSync('client/themes/shared/panels.css'), false);
+  assert.equal(existsSync('client/themes/shared/panel-layout.ts'), false);
 });
