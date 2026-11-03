@@ -16,10 +16,12 @@ type Wake = {
   samples: Map<string, HTMLCanvasElement>;
 };
 const controlSelector = 'button, summary, a.button, [role="button"]';
+// Welcome actions are buttons too; the playing stage remains protected.
+const mediaArea = '.stage:not(:has(.welcome:not([hidden])))';
 const materialSelector =
   '.source-card, .members-card, .chat-panel, .chat-compose, textarea, .cache-options[open], ' +
   controlSelector;
-const excluded = '.stage, dialog, .chat-messages, .emoji-picker, .members, .voice-members';
+const excluded = `${mediaArea}, dialog, .chat-messages, .emoji-picker, .members, .voice-members`;
 function materials() {
   return Array.from(document.querySelectorAll<HTMLElement>(materialSelector))
     .filter((node) => !node.closest(excluded))
@@ -215,7 +217,7 @@ export class GlitchScene {
   private pointer = (event: PointerEvent) => {
     if (this.suspended() || this.motion.matches || event.pointerType === 'touch') return;
     const target = event.target instanceof Element ? event.target : null;
-    if (!target || target.closest('.stage, dialog, input, select')) {
+    if (!target || target.closest(`${mediaArea}, dialog, input, select`)) {
       this.hover.reset();
       return;
     }
@@ -224,7 +226,8 @@ export class GlitchScene {
     const node =
       target.closest<HTMLElement>(materialSelector) ??
       this.nodes.find((element) => {
-        if (!element.checkVisibility() || element.closest('dialog, [hidden], .stage')) return false;
+        if (!element.checkVisibility() || element.closest(`dialog, [hidden], ${mediaArea}`))
+          return false;
         const r = element.getBoundingClientRect();
         return (
           event.clientY >= r.top - 15 &&
@@ -273,7 +276,11 @@ export class GlitchScene {
   };
   private paint(now: number) {
     const visible = this.nodes.flatMap((node, i) => {
-      if (!node.isConnected || !node.checkVisibility() || node.closest('[hidden], dialog, .stage'))
+      if (
+        !node.isConnected ||
+        !node.checkVisibility() ||
+        node.closest(`[hidden], dialog, ${mediaArea}`)
+      )
         return [];
       const r = node.getBoundingClientRect();
       if (r.bottom < 0 || r.top > innerHeight || r.width < 20 || r.height < 12) return [];
@@ -281,7 +288,7 @@ export class GlitchScene {
     });
     const protectedRects = Array.from(
       document.querySelectorAll<HTMLElement>(
-        '.stage, dialog[open], details[open], input:not([type="range"]), textarea, select, .bubble, .message-meta',
+        `${mediaArea}, dialog[open], details[open], input:not([type="range"]), textarea, select, .bubble, .message-meta`,
       ),
     )
       .filter((e) => e.checkVisibility())

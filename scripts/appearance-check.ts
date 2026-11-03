@@ -153,6 +153,21 @@ try {
   assert.equal(await theme(owner), 'classic');
   await select(owner, 'glitch');
   await close(owner);
+  await owner.locator('#hero-create').hover();
+  await owner.waitForTimeout(140);
+  const welcomeFracture = await owner
+    .locator('#theme-fragments')
+    .evaluate((canvas: HTMLCanvasElement) => {
+      const pixels = canvas.getContext('2d')!.getImageData(0, 0, canvas.width, canvas.height).data;
+      let count = 0;
+      for (let index = 3; index < pixels.length; index += 4) if (pixels[index]) count++;
+      return count;
+    });
+  assert.ok(
+    welcomeFracture > 0,
+    'Welcome actions must use the same edge fracture as other buttons',
+  );
+  proof.welcomeButtonEdge = true;
   assert.equal(await theme(owner), 'glitch');
   await owner.reload();
   assert.equal(await theme(owner), 'glitch');
