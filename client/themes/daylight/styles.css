@@ -8,6 +8,9 @@
   --muted: #647ca3;
   --orange: #0054e8;
   --accent: #0054e8;
+  --welcome-orb-opacity: 0;
+  --welcome-lines-background: none;
+  --welcome-silhouette-background: transparent;
 }
 :root[data-theme='glitch'] body {
   background: #1165ba;
@@ -39,7 +42,8 @@
 :root[data-theme='glitch'] .topbar {
   position: relative;
   border: 0;
-  background: none;
+  background: #f5f9ffe0;
+  backdrop-filter: blur(8px);
 }
 :root[data-theme='glitch'] .brand {
   position: relative;
@@ -48,15 +52,9 @@
   color: #072b58;
   text-shadow: 0 1px 0 #ffffff;
 }
-:root[data-theme='glitch'] .brand::before {
-  content: '';
-  position: absolute;
-  inset: -3px -8px;
-  z-index: -1;
-  pointer-events: none;
-  background: linear-gradient(90deg, #f8fbfff5 0%, #f8fbffe8 84%, #f8fbff00 100%);
-  border-left: 3px solid #0c4daf;
-  border-radius: 3px 0 0 3px;
+:root[data-theme='glitch'] .brand-mark {
+  background: var(--accent);
+  color: #fff;
 }
 :root[data-theme='glitch'] .brand-light {
   font-weight: 800;
@@ -72,8 +70,7 @@
   color: #28518b;
 }
 :root[data-theme='glitch'] .top-actions {
-  background: #f3f9ffba;
-  border-radius: 3px;
+  background: transparent;
 }
 :root[data-theme='glitch'] .connection {
   color: #1c4e8a;

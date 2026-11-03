@@ -56,6 +56,35 @@ try {
       await page.locator('[data-close="settings-dialog"]').first().click();
       await page.evaluate(() => scrollTo(0, 0));
       await page.evaluate(() => document.fonts.ready);
+      const material = await page.evaluate(() => {
+        const orb = getComputedStyle(document.querySelector('.scene-orb')!);
+        const lines = document.querySelector('.scene-lines')!;
+        const invite = document.querySelector<HTMLElement>('#sidebar-invite')!;
+        const style = getComputedStyle(invite),
+          box = invite.getBoundingClientRect();
+        const icon = invite.querySelector('svg')!.getBoundingClientRect();
+        return {
+          orb: orb.opacity,
+          lines: getComputedStyle(lines).backgroundImage,
+          silhouette: getComputedStyle(lines, '::after').backgroundColor,
+          padding: [style.paddingTop, style.paddingBottom],
+          iconOffset: Math.abs(box.y + box.height / 2 - icon.y - icon.height / 2),
+          headerBlocks: getComputedStyle(document.querySelector('.top-actions')!).backgroundColor,
+          brandPlate: getComputedStyle(document.querySelector('.brand')!, '::before').content,
+        };
+      });
+      assert.equal(material.padding[0], material.padding[1]);
+      assert.ok(material.iconOffset <= 1, JSON.stringify(material));
+      if (theme === 'classic') assert.equal(material.orb, '0.7');
+      else {
+        assert.equal(material.orb, '0');
+        assert.equal(material.lines, 'none');
+        assert.equal(material.silhouette, 'rgba(0, 0, 0, 0)');
+      }
+      if (theme === 'glitch') {
+        assert.equal(material.headerBlocks, 'rgba(0, 0, 0, 0)');
+        assert.equal(material.brandPlate, 'none');
+      }
       const state = await page.evaluate(() => {
         const ids = [
           '.topbar',

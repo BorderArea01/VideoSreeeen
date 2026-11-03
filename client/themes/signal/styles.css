@@ -30,6 +30,9 @@
   --muted: #b9a8c6;
   --orange: #c9ff4b;
   --accent: #c9ff4b;
+  --welcome-orb-opacity: 0;
+  --welcome-lines-background: none;
+  --welcome-silhouette-background: transparent;
   --signal-surface: linear-gradient(120deg, #211729, #261a31);
   --signal-travel: 48px;
   --signal-duration: 680ms;

@@ -1,5 +1,5 @@
 import skyUrl from './assets/daylight-sky.png';
-import { fractureControl, fractureEdge, fractureSky, glitchLifetime } from './fracture';
+import { fractureEdge, fractureSky, glitchLifetime } from './fracture';
 import { HoverGlitch } from '../shared/hover-glitch';
 import { ThemeScope } from '../core/scope';
 
@@ -17,8 +17,9 @@ type Wake = {
 };
 const controlSelector = 'button, summary, a.button, [role="button"]';
 const materialSelector =
-  '.source-card, .members-card, .chat-panel, .cache-options[open], ' + controlSelector;
-const excluded = '.player-shell, dialog, .chat-messages, .emoji-picker, .members, .voice-members';
+  '.source-card, .members-card, .chat-panel, .chat-compose, textarea, .cache-options[open], ' +
+  controlSelector;
+const excluded = '.stage, dialog, .chat-messages, .emoji-picker, .members, .voice-members';
 function materials() {
   return Array.from(document.querySelectorAll<HTMLElement>(materialSelector))
     .filter((node) => !node.closest(excluded))
@@ -214,7 +215,7 @@ export class GlitchScene {
   private pointer = (event: PointerEvent) => {
     if (this.suspended() || this.motion.matches || event.pointerType === 'touch') return;
     const target = event.target instanceof Element ? event.target : null;
-    if (!target || target.closest('.player-shell, dialog, input, textarea, select')) {
+    if (!target || target.closest('.stage, dialog, input, select')) {
       this.hover.reset();
       return;
     }
@@ -223,8 +224,7 @@ export class GlitchScene {
     const node =
       target.closest<HTMLElement>(materialSelector) ??
       this.nodes.find((element) => {
-        if (!element.checkVisibility() || element.closest('dialog, [hidden], .player-shell'))
-          return false;
+        if (!element.checkVisibility() || element.closest('dialog, [hidden], .stage')) return false;
         const r = element.getBoundingClientRect();
         return (
           event.clientY >= r.top - 15 &&
@@ -273,11 +273,7 @@ export class GlitchScene {
   };
   private paint(now: number) {
     const visible = this.nodes.flatMap((node, i) => {
-      if (
-        !node.isConnected ||
-        !node.checkVisibility() ||
-        node.closest('[hidden], dialog, .player-shell')
-      )
+      if (!node.isConnected || !node.checkVisibility() || node.closest('[hidden], dialog, .stage'))
         return [];
       const r = node.getBoundingClientRect();
       if (r.bottom < 0 || r.top > innerHeight || r.width < 20 || r.height < 12) return [];
@@ -285,11 +281,18 @@ export class GlitchScene {
     });
     const protectedRects = Array.from(
       document.querySelectorAll<HTMLElement>(
-        '.player-shell, dialog[open], details[open], input:not([type="range"]), textarea, select, .bubble, .message-meta',
+        '.stage, dialog[open], details[open], input:not([type="range"]), textarea, select, .bubble, .message-meta',
       ),
     )
       .filter((e) => e.checkVisibility())
-      .map((e) => e.getBoundingClientRect());
+      .map((e) => {
+        const r = e.getBoundingClientRect();
+        // The extra 10px safety window below protects the text and caret;
+        // only a thin empty edge can fracture. Never sample the input value.
+        const inset =
+          e instanceof HTMLTextAreaElement ? Math.min(18, r.width * 0.1, r.height * 0.25) : 0;
+        return new DOMRect(r.x + inset, r.y + inset, r.width - 2 * inset, r.height - 2 * inset);
+      });
     const content = visible
       .filter(({ node }) => node.matches(controlSelector))
       .map(({ node }) => ({ node, rects: readableContent(node) }));
@@ -316,7 +319,6 @@ export class GlitchScene {
     this.hadMotion = this.wakes.length > 0;
     const ctx = this.context,
       ink = this.ink;
-    const labels: { node: HTMLElement; wake: Wake; surface: string }[] = [];
     ctx.setTransform(this.scale, 0, 0, this.scale, 0, 0);
     ctx.globalAlpha = 1;
     ctx.clearRect(0, 0, this.canvas.width / this.scale, this.canvas.height / this.scale);
@@ -349,7 +351,6 @@ export class GlitchScene {
             : compact
               ? 'rgba(0, 0, 0, 0)'
               : '#f5f7fb';
-      if (compact && !this.motion.matches) labels.push({ node, wake: candidates[0]!, surface });
       for (const wake of packets) {
         const edge = {
           box: r,
@@ -393,12 +394,7 @@ export class GlitchScene {
     // Keep a readable core without punching a whole rectangular hole through the edge.
     for (const { rects } of content) eraseGlyphs(rects);
     eraseGlyphs(headerRects);
-    for (const { node, wake, surface } of labels)
-      fractureControl(ink, node, { ...wake, elapsed: now - wake.at }, surface, protectedRects);
-    const animated = new Set(labels.map(({ node }) => node));
-    for (const { node, rects } of content) if (!animated.has(node)) eraseGlyphs(rects);
-    eraseGlyphs(headerRects);
-    // Label slices are strictly decorative and obey the same protected areas.
+    // All controls use edge fractures; text and icons stay intact.
     for (const r of protectedRects)
       ink.clearRect(r.left - 10, r.top - 10, r.width + 20, r.height + 20);
   }

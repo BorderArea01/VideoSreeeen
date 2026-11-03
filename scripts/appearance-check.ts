@@ -417,7 +417,7 @@ try {
     plate: getComputedStyle(e, '::before').backgroundImage,
   }));
   assert.equal(heading.color, 'rgb(7, 43, 88)');
-  assert.match(heading.plate, /linear-gradient/);
+  assert.equal(heading.plate, 'none');
   proof.cleanPhotoAndReadableBrand = true;
   await owner.emulateMedia({ reducedMotion: 'reduce' });
   await owner.locator('#source-form .button').hover();
@@ -533,22 +533,19 @@ try {
       }),
     );
   }
-  const labelSlices =
-    labelSamples.find(
-      (sample) =>
-        sample && sample.channels > 2 && sample.iconGlyphPixels > 0 && sample.sharedRows > 0,
-    ) ?? labelSamples[0];
-  assert.ok(labelSlices && labelSlices.channels > 2, JSON.stringify(labelSamples));
-  assert.ok(
-    labelSlices.changedRows > 0 && labelSlices.changedRows <= labelSlices.height * 0.35,
-    JSON.stringify(labelSlices),
+  // The user replaced text glitches with edge fractures. Labels and icons
+  // must now remain entirely clear throughout the sampled packet frames.
+  for (const sample of labelSamples) {
+    assert.ok(sample);
+    assert.equal(sample.changedRows, 0, JSON.stringify(sample));
+    assert.equal(sample.channels, 0, JSON.stringify(sample));
+    assert.equal(sample.iconRows, 0, JSON.stringify(sample));
+  }
+  assert.equal(
+    (await owner.locator('#voice-join').innerText()).split('\n')[0],
+    labelSamples[0]!.text,
   );
-  assert.equal((await owner.locator('#voice-join').innerText()).split('\n')[0], labelSlices.text);
-  assert.ok(
-    labelSlices.iconRows > 0 && labelSlices.sharedRows > 0 && labelSlices.iconGlyphPixels > 0,
-    JSON.stringify(labelSlices),
-  );
-  proof.referenceLabelSlices = labelSlices;
+  proof.edgeFracturesKeepLabelsAndIconsClear = true;
   const afterimage = await signature('#theme-fragments');
   await owner.waitForTimeout(180);
   assert.notEqual(await signature('#theme-fragments'), afterimage);
@@ -558,6 +555,55 @@ try {
   await owner.waitForTimeout(250);
   assert.equal(await signature('#theme-fragments'), settledButton);
   proof.buttonMaterialAfterimage = true;
+  await owner.locator('#chat-input').scrollIntoViewIfNeeded();
+  await owner.locator('#chat-input').fill('边缘断层保留完整输入 🟦');
+  const inputBefore = await owner
+    .locator('#chat-input')
+    .evaluate((element: HTMLTextAreaElement) => {
+      element.focus();
+      element.setSelectionRange(2, 5);
+      return [element.value, element.selectionStart, element.selectionEnd];
+    });
+  await owner.locator('#chat-input').hover({ position: { x: 4, y: 20 } });
+  await owner.waitForTimeout(140);
+  const inputFracture = await owner.locator('#chat-input').evaluate((element) => {
+    const r = element.getBoundingClientRect(),
+      canvas = document.querySelector<HTMLCanvasElement>('#theme-fragments')!;
+    const scale = canvas.width / innerWidth;
+    const pixels = canvas.getContext('2d')!.getImageData(0, 0, canvas.width, canvas.height).data;
+    let edge = 0,
+      interior = 0;
+    for (
+      let y = Math.max(0, Math.ceil(r.top));
+      y < Math.min(innerHeight, Math.floor(r.bottom));
+      y++
+    )
+      for (
+        let x = Math.max(0, Math.ceil(r.left));
+        x < Math.min(innerWidth, Math.floor(r.right + 50));
+        x++
+      ) {
+        if (!pixels[(Math.floor(y * scale) * canvas.width + Math.floor(x * scale)) * 4 + 3])
+          continue;
+        if (x > r.right - 5) edge++;
+        if (x > r.left + 20 && x < r.right - 20 && y > r.top + 20 && y < r.bottom - 20) interior++;
+      }
+    return { edge, interior };
+  });
+  assert.ok(inputFracture.edge > 0, JSON.stringify(inputFracture));
+  assert.equal(inputFracture.interior, 0);
+  assert.deepEqual(
+    await owner
+      .locator('#chat-input')
+      .evaluate((element: HTMLTextAreaElement) => [
+        element.value,
+        element.selectionStart,
+        element.selectionEnd,
+      ]),
+    inputBefore,
+  );
+  proof.chatInputEdgeAndCaret = inputFracture;
+  await owner.locator('#chat-input').fill('');
   // A rejected hover stays rejected for this entire entry, even after moving.
   await owner.evaluate(() => ((window as any).__glitchRoll = 0.5));
   await owner.locator('#source-url').hover();
